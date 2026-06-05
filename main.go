@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"tuical/internal/db"
-	"tuical/internal/sync"
-	"tuical/internal/tui"
+	"stream/internal/db"
+	"stream/internal/sync"
+	"stream/internal/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

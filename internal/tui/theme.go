@@ -3,24 +3,24 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 type Theme struct {
-	// Colors
-	CanvasBg    lipgloss.Color // Layer 0: Dark Canvas (#1a1b26)
-	PanelBg     lipgloss.Color // Layer 1: Panel Background (#1f2335)
-	SelectedBg  lipgloss.Color // Layer 2: Selected/Active (#24283b)
-	ModalBg     lipgloss.Color // Layer 3: Modal/Elevated (#2f354f)
-	Fg          lipgloss.Color // Primary Text (#c0caf5)
-	Muted       lipgloss.Color // Secondary/Muted (#565f89)
-	Accent      lipgloss.Color // Active Accent (#7aa2f7)
-	FocusPurple lipgloss.Color // Focused Accent (#bb9af7)
+	// Colors (Linear / Arc Palette)
+	CanvasBg    lipgloss.Color // Layer 0: Charcoal Black (#121318)
+	PanelBg     lipgloss.Color // Layer 1: Elevated Slate (#1c1d24)
+	SelectedBg  lipgloss.Color // Layer 2: Selected Focus (#2b2d38)
+	ModalBg     lipgloss.Color // Layer 3: Modal Elevated (#252730)
+	Fg          lipgloss.Color // Primary Text (#e2e8f0)
+	Muted       lipgloss.Color // slate gray helper text (#626875)
+	Accent      lipgloss.Color // Linear Signature Indigo (#5e6ad2)
+	FocusPurple lipgloss.Color // Focus Highlight (#8b5cf6)
 
 	// Priorities
-	P0Color lipgloss.Color // Crimson/Red (#f7768e)
-	P1Color lipgloss.Color // Orange/Amber (#e0af68)
-	P2Color lipgloss.Color // Blue (#7aa2f7)
-	P3Color lipgloss.Color // Gray (#565f89)
+	P0Color lipgloss.Color // Crimson Rose (#f43f5e)
+	P1Color lipgloss.Color // Amber (#f59e0b)
+	P2Color lipgloss.Color // Soft Blue (#3b82f6)
+	P3Color lipgloss.Color // Gray (#6b7280)
 
 	// Statuses
-	SuccessColor lipgloss.Color // Muted Green (#9ece6a)
+	SuccessColor lipgloss.Color // Emerald Green (#10b981)
 
 	// Styling templates
 	BaseStyle      lipgloss.Style
@@ -34,21 +34,21 @@ type Theme struct {
 }
 
 func NewTheme() Theme {
-	canvasBg := lipgloss.Color("#1a1b26")
-	panelBg := lipgloss.Color("#1f2335")
-	selectedBg := lipgloss.Color("#24283b")
-	modalBg := lipgloss.Color("#2f354f")
-	fg := lipgloss.Color("#c0caf5")
-	muted := lipgloss.Color("#565f89")
-	accent := lipgloss.Color("#7aa2f7")
-	focusPurple := lipgloss.Color("#bb9af7")
+	canvasBg := lipgloss.Color("#121318")
+	panelBg := lipgloss.Color("#1c1d24")
+	selectedBg := lipgloss.Color("#2b2d38")
+	modalBg := lipgloss.Color("#252730")
+	fg := lipgloss.Color("#e2e8f0")
+	muted := lipgloss.Color("#626875")
+	accent := lipgloss.Color("#5e6ad2")
+	focusPurple := lipgloss.Color("#8b5cf6")
 
-	p0 := lipgloss.Color("#f7768e")
-	p1 := lipgloss.Color("#e0af68")
-	p2 := lipgloss.Color("#7aa2f7")
-	p3 := lipgloss.Color("#565f89")
+	p0 := lipgloss.Color("#f43f5e")
+	p1 := lipgloss.Color("#f59e0b")
+	p2 := lipgloss.Color("#3b82f6")
+	p3 := lipgloss.Color("#6b7280")
 
-	success := lipgloss.Color("#9ece6a")
+	success := lipgloss.Color("#10b981")
 
 	return Theme{
 		CanvasBg:     canvasBg,

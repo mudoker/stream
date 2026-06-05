@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"tuical/internal/model"
+	"stream/internal/model"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -137,7 +137,7 @@ func (m Model) renderArcSidebar() string {
 	sb = append(sb, lipgloss.NewStyle().
 		Foreground(m.Theme.Accent).
 		Bold(true).
-		Render("▲  t u i c a l"))
+		Render("▲  s t r e a m"))
 	sb = append(sb, "")
 
 	// 2. Navigation Spaces (Tabs)

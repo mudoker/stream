@@ -57,10 +57,21 @@ func (m Model) renderDayView(height int) string {
 	// Calculate 24 hours * 4 rows/hour = 96 rows total
 	var timelineLines []string
 
-	// Add title header
-	headerText := fmt.Sprintf("DAILY TIMELINE  /  %s", strings.ToUpper(m.SelectedDay.Format("Monday, Jan _2")))
-	timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(headerText)+"\n")
+	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", timelineWidth-6))
 
+	dayName := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(m.SelectedDay.Format("Monday"))
+	dayDate := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(m.SelectedDay.Format("January 2, 2006"))
+	navHint := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("H ◂ day ▸ L")
+
+	headerPad := timelineWidth - 6 - lipgloss.Width(dayName) - lipgloss.Width(dayDate) - lipgloss.Width(navHint) - 6
+	if headerPad < 1 {
+		headerPad = 1
+	}
+	headerLine := dayName + "  " + dayDate + strings.Repeat(" ", headerPad) + navHint
+
+	timelineLines = append(timelineLines, headerLine)
+	timelineLines = append(timelineLines, sep)
+	timelineLines = append(timelineLines, "")
 	// Calculate "NOW" indicator row index
 	nowRow := -1
 	if isToday {
@@ -204,13 +215,16 @@ func (m Model) renderDayView(height int) string {
 	}
 
 	var visibleTimelineLines []string
-	visibleTimelineLines = append(visibleTimelineLines, timelineLines[0]) // Header
+	visibleTimelineLines = append(visibleTimelineLines, timelineLines[0]) // day name header
+	visibleTimelineLines = append(visibleTimelineLines, timelineLines[1]) // separator
+	visibleTimelineLines = append(visibleTimelineLines, timelineLines[2]) // empty spacer
 	if timelineStartRow > 0 {
 		visibleTimelineLines = append(visibleTimelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("      ▲  (scroll up)"))
 	}
 
+	const headerOffset = 3
 	for r := timelineStartRow; r <= timelineEndRow; r++ {
-		visibleTimelineLines = append(visibleTimelineLines, timelineLines[r+1])
+		visibleTimelineLines = append(visibleTimelineLines, timelineLines[r+headerOffset])
 	}
 
 	if timelineEndRow < 95 {

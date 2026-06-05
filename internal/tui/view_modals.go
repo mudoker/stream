@@ -10,6 +10,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// modalSep returns a styled horizontal rule for use inside modals.
+func (m Model) modalSep(w int) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", w))
+}
+
 func (m Model) renderDetailPanel(height int) string {
 	t := m.DetailTask
 
@@ -49,90 +54,132 @@ func (m Model) renderDetailPanel(height int) string {
 
 func (m Model) renderDetailModal() string {
 	t := m.DetailTask
+	const innerW = 46
 
 	var sb strings.Builder
-	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("ℹ  TASK INSPECTOR\n"))
-	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", 44)) + "\n\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("Task Inspector") + "\n")
+	sb.WriteString(m.modalSep(innerW) + "\n\n")
 
-	sb.WriteString(fmt.Sprintf("  Title:        %s\n", lipgloss.NewStyle().Bold(true).Render(sentenceCase(t.Title))))
-	sb.WriteString(fmt.Sprintf("  Priority:     %s      •  Story Points:  %d SP\n", t.Priority, t.StoryPoints))
-	sb.WriteString(fmt.Sprintf("  State:        %s  •  Schedule:      %s\n\n", t.LifecycleState, t.SchedulingType))
+	titleStr := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(sentenceCase(t.Title))
+	sb.WriteString(fmt.Sprintf("  %s\n\n", titleStr))
+
+	pColor := m.priorityColor(t.Priority)
+	pBadge := lipgloss.NewStyle().Foreground(pColor).Bold(true).Render(fmt.Sprintf("▲ %s", t.Priority))
+	sb.WriteString(fmt.Sprintf("  %s  •  %d SP  •  %s\n", pBadge, t.StoryPoints, t.LifecycleState))
+	sb.WriteString(fmt.Sprintf("  Schedule: %s\n", t.SchedulingType))
 
 	if t.SchedulingType == model.Anchored {
-		sb.WriteString(fmt.Sprintf("  Start Time:   %s\n", t.TimeWindow.Start.Format("2006-01-02 15:04")))
-		sb.WriteString(fmt.Sprintf("  End Time:     %s\n\n", t.TimeWindow.End.Format("15:04")))
+		sb.WriteString("\n")
+		sb.WriteString(fmt.Sprintf("  %s  →  %s\n",
+			t.TimeWindow.Start.Format("Mon Jan 2  15:04"),
+			t.TimeWindow.End.Format("15:04")))
 	}
 
-	sb.WriteString("  DESCRIPTION:\n")
+	sb.WriteString("\n")
+	sb.WriteString(m.modalSep(innerW) + "\n\n")
+
 	desc := t.Description
 	if desc == "" {
-		desc = "(No description provided)"
+		desc = "(no description)"
 	}
-	wrappedDesc := wrapText(desc, 40)
-	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(indentText(wrappedDesc, "    ")) + "\n\n")
+	wrapped := wrapText(desc, innerW-2)
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(indentText(wrapped, "  ")) + "\n\n")
+	sb.WriteString(m.modalSep(innerW) + "\n\n")
 
-	sb.WriteString("  EXECUTION METRICS:\n")
-	sb.WriteString(fmt.Sprintf("   ● Focus Logged:    %v\n", time.Duration(t.ExecutionMetrics.ElapsedFocusSeconds)*time.Second))
-	sb.WriteString(fmt.Sprintf("   ● Pomodoros:       %d/%d\n", t.ExecutionMetrics.TotalCompletedPomodoros, t.ExecutionMetrics.TargetPomodoros))
-	sb.WriteString(fmt.Sprintf("   ● Interruptions:   %d\n", t.ExecutionMetrics.InterruptionCount))
+	sb.WriteString(fmt.Sprintf("  Focus logged   %v\n", time.Duration(t.ExecutionMetrics.ElapsedFocusSeconds)*time.Second))
+	sb.WriteString(fmt.Sprintf("  Pomodoros      %d / %d\n", t.ExecutionMetrics.TotalCompletedPomodoros, t.ExecutionMetrics.TargetPomodoros))
+	sb.WriteString(fmt.Sprintf("  Interruptions  %d\n", t.ExecutionMetrics.InterruptionCount))
 
-	sb.WriteString("\n  [z] Start Focus   [x] Complete   [d] Delete   [Esc/Enter] Close")
+	sb.WriteString("\n")
+	sb.WriteString(m.modalSep(innerW) + "\n")
+	hint := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("z focus  x complete  d delete  Esc close")
+	sb.WriteString("  " + hint)
 
-	return m.Theme.ModalStyle.
-		Width(48).
-		Render(sb.String())
+	return m.Theme.ModalStyle.Width(innerW + 4).Render(sb.String())
 }
 
 func (m Model) renderFormModal() string {
 	f := m.Form
+	const innerW = 52
 
 	var fields []string
-	fields = append(fields, "  CREATE WORK ITEM TASK\n  ─────────────────────\n")
+	title := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("Create Task")
+	fields = append(fields, title)
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
 
-	renderField := func(label string, input string, index int) string {
-		style := lipgloss.NewStyle().Foreground(m.Theme.Fg)
+	renderField := func(num, label string, input string, index int) string {
+		numStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(num)
+		lblStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg)
 		if f.ActiveField == index {
-			style = style.Foreground(m.Theme.Accent).Bold(true)
+			lblStyle = lblStyle.Foreground(m.Theme.Accent).Bold(true)
 		}
-		return fmt.Sprintf("  %-15s %s", style.Render(label), input)
+		return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), input)
 	}
 
-	fields = append(fields, renderField("1. Title:", f.TitleInput.View(), 0))
-	fields = append(fields, renderField("2. Description:", f.DescInput.View(), 1))
-	fields = append(fields, renderField("3. Priority:", f.PriorityInput.View(), 2))
-	fields = append(fields, renderField("4. Story Points:", f.SPInput.View(), 3))
-	fields = append(fields, renderField("5. Anchored (Y/N):", f.AnchorInput.View(), 4))
-	fields = append(fields, renderField("6. Start Time:", f.StartTimeInput.View(), 5))
-	fields = append(fields, renderField("7. Duration (m):", f.DurationInput.View(), 6))
+	fields = append(fields, renderField("1", "Title", f.TitleInput.View(), 0))
+	fields = append(fields, renderField("2", "Description", f.DescInput.View(), 1))
+	fields = append(fields, renderField("3", "Priority", f.PriorityInput.View(), 2))
+	fields = append(fields, renderField("4", "Story Points", f.SPInput.View(), 3))
+	fields = append(fields, renderField("5", "Anchored (Y/N)", f.AnchorInput.View(), 4))
+	fields = append(fields, renderField("6", "Start Time", f.StartTimeInput.View(), 5))
+	fields = append(fields, renderField("7", "Duration (min)", f.DurationInput.View(), 6))
+	fields = append(fields, "")
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
 
-	submitText := " [SUBMIT] "
+	submitBg := m.Theme.PanelBg
+	submitFg := m.Theme.SuccessColor
 	if f.ActiveField == 7 {
-		submitText = lipgloss.NewStyle().Background(m.Theme.SuccessColor).Foreground(m.Theme.CanvasBg).Bold(true).Render(submitText)
-	} else {
-		submitText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render(submitText)
+		submitBg = m.Theme.SuccessColor
+		submitFg = m.Theme.CanvasBg
 	}
-	fields = append(fields, "\n  "+submitText)
+	submitBtn := lipgloss.NewStyle().
+		Background(submitBg).
+		Foreground(submitFg).
+		Bold(true).
+		Padding(0, 2).
+		Render("Submit")
+	fields = append(fields, "  "+submitBtn)
 
-	return m.Theme.ModalStyle.
-		Width(48).
-		Render(strings.Join(fields, "\n"))
+	return m.Theme.ModalStyle.Width(innerW + 4).Render(strings.Join(fields, "\n"))
 }
 
 func (m Model) renderCommandPalette() string {
 	var sb strings.Builder
 	sb.WriteString(m.CommandInput.View() + "\n")
-	sb.WriteString("  ────────────────────────────────────────────\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", m.Width-8)) + "\n")
 
 	val := strings.ToLower(m.CommandInput.Value())
-	cmds := []string{"create", "todo", "complete", "delete", "sync", "auth", "dashboard", "month", "week", "day", "analytics", "quit"}
+	type cmdEntry struct {
+		name string
+		desc string
+	}
+	cmds := []cmdEntry{
+		{"create", "anchor a new task for today at 9:00 AM"},
+		{"todo", "add a floating task to the backlog shelf"},
+		{"complete", "complete the selected task"},
+		{"delete", "delete the selected task"},
+		{"sync", "force Google Calendar sync"},
+		{"auth", "authenticate with Google Calendar"},
+		{"review", "open daily shutdown review"},
+		{"dashboard", "switch to dashboard view"},
+		{"month", "switch to month grid view"},
+		{"week", "switch to week lanes view"},
+		{"day", "switch to day timeline view"},
+		{"analytics", "switch to analytics view"},
+		{"quit", "exit stream"},
+	}
 
 	count := 0
 	for _, c := range cmds {
-		if strings.Contains(c, val) {
+		if strings.Contains(c.name, val) {
 			bullet := lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("❯")
-			sb.WriteString(fmt.Sprintf("  %s %-12s  %s\n", bullet, c, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("command action")))
+			nameStr := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(c.name)
+			descStr := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(c.desc)
+			sb.WriteString(fmt.Sprintf("  %s %-12s  %s\n", bullet, nameStr, descStr))
 			count++
-			if count >= 4 {
+			if count >= 5 {
 				break
 			}
 		}
@@ -144,67 +191,89 @@ func (m Model) renderCommandPalette() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(m.Theme.Accent).
 		Width(m.Width - 4).
-		Padding(1, 2).
+		Padding(0, 2).
 		Render(sb.String())
 }
 
 func (m Model) renderPromptModal() string {
+	const innerW = 46
 	var lines []string
-	lines = append(lines, "  ⚡ TASK READY FOR FOCUS\n  ──────────────────────\n")
-	lines = append(lines, fmt.Sprintf("  Title:    %s", lipgloss.NewStyle().Bold(true).Render(strings.ToUpper(m.PromptTask.Title))))
-	lines = append(lines, fmt.Sprintf("  Priority: %s  •  Story Points: %d", m.PromptTask.Priority, m.PromptTask.StoryPoints))
-	lines = append(lines, fmt.Sprintf("  Time:     %s - %s", m.PromptTask.TimeWindow.Start.Format("15:04"), m.PromptTask.TimeWindow.End.Format("15:04")))
-	lines = append(lines, "\n  [Enter] Start Focus   [s] Snooze 5m   [d/Esc] Dismiss")
+	lines = append(lines, lipgloss.NewStyle().Foreground(m.Theme.P1Color).Bold(true).Render("Task Ready for Focus"))
+	lines = append(lines, m.modalSep(innerW))
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  %s", lipgloss.NewStyle().Bold(true).Render(sentenceCase(m.PromptTask.Title))))
+	lines = append(lines, fmt.Sprintf("  %s  •  %d SP", m.PromptTask.Priority, m.PromptTask.StoryPoints))
+	lines = append(lines, fmt.Sprintf("  %s → %s",
+		m.PromptTask.TimeWindow.Start.Format("15:04"),
+		m.PromptTask.TimeWindow.End.Format("15:04")))
+	lines = append(lines, "")
+	lines = append(lines, m.modalSep(innerW))
+	hint := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("Enter start  s snooze 5m  d dismiss")
+	lines = append(lines, "  "+hint)
 
-	return m.Theme.ModalStyle.
-		Width(48).
-		BorderForeground(m.Theme.Accent).
-		Render(strings.Join(lines, "\n"))
+	return m.Theme.ModalStyle.Width(innerW + 4).Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) renderReviewModal() string {
+	const innerW = 46
 	var lines []string
-	lines = append(lines, "  📊 DAILY SHUTDOWN REVIEW\n  ────────────────────────\n")
-	lines = append(lines, fmt.Sprintf("  Completed Tasks:   %d", m.ReviewTasksCompleted))
-	lines = append(lines, fmt.Sprintf("  Deferred Tasks:    %d", m.ReviewTasksDeferred))
-	lines = append(lines, fmt.Sprintf("  Total Focus Logged: %v", time.Duration(m.ReviewFocusSeconds)*time.Second))
-	lines = append(lines, "\n  Move unfinished scheduled tasks to tomorrow?")
-	lines = append(lines, "  [y] Yes, defer them   [n/Esc] No, leave as overdue")
+	lines = append(lines, lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render("Daily Shutdown Review"))
+	lines = append(lines, m.modalSep(innerW))
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  Completed tasks   %d", m.ReviewTasksCompleted))
+	lines = append(lines, fmt.Sprintf("  Deferred tasks    %d", m.ReviewTasksDeferred))
+	lines = append(lines, fmt.Sprintf("  Focus logged      %v", time.Duration(m.ReviewFocusSeconds)*time.Second))
+	lines = append(lines, "")
+	lines = append(lines, m.modalSep(innerW))
+	lines = append(lines, "")
+	lines = append(lines, "  Move unfinished anchored tasks to tomorrow?")
+	lines = append(lines, "")
+	yesStr := lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render("y")
+	noStr := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("n / Esc")
+	lines = append(lines, fmt.Sprintf("  [%s] defer them   [%s] leave as overdue", yesStr, noStr))
 
-	return m.Theme.ModalStyle.
-		Width(48).
-		BorderForeground(m.Theme.SuccessColor).
-		Render(strings.Join(lines, "\n"))
+	return m.Theme.ModalStyle.Width(innerW + 4).Render(strings.Join(lines, "\n"))
 }
 
 func (m Model) renderHelpModal() string {
-	var lines []string
-	lines = append(lines, "  ▲ S T R E A M   C O M M A N D   R E F E R E N C E\n  ────────────────────────────────────────────────\n")
-	lines = append(lines, "  KEYBOARD SHORTCUTS")
-	lines = append(lines, "    1 - 5       Switch views (Dashboard, Month, Week, Day, Stats)")
-	lines = append(lines, "    Tab / h / l Toggle Focus between Panels (Timeline / Shelf)")
-	lines = append(lines, "    j / k       Navigate items or timeline hours")
-	lines = append(lines, "    H / L       Navigate days backward / forward")
-	lines = append(lines, "    ctrl+d / u  Scroll active pane down / up")
-	lines = append(lines, "    i           Open task creation wizard form")
-	lines = append(lines, "    x           Complete selected task")
-	lines = append(lines, "    d           Delete selected task")
-	lines = append(lines, "    z           Start Zen Mode focus session for task")
-	lines = append(lines, "    :           Enter Command Palette mode")
-	lines = append(lines, "    ?           Toggle this help documentation modal")
-	lines = append(lines, "")
-	lines = append(lines, "  COMMAND PALETTE (:command)")
-	lines = append(lines, "    :create <t> Anchor a new task for today at 9:00 AM")
-	lines = append(lines, "    :todo <t>   Add a floating task to the Backlog Shelf")
-	lines = append(lines, "    :complete   Complete active task")
-	lines = append(lines, "    :delete     Delete active task")
-	lines = append(lines, "    :sync       Force Google Calendar sync")
-	lines = append(lines, "    :review     Open Daily Shutdown Review checklist")
-	lines = append(lines, "    :quit       Exit the stream application")
-	lines = append(lines, "\n  Press [Esc / Enter / ?] to dismiss this help window")
+	const innerW = 56
+	accent := lipgloss.NewStyle().Foreground(m.Theme.Accent)
+	muted := lipgloss.NewStyle().Foreground(m.Theme.Muted)
+	bold := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true)
 
-	return m.Theme.ModalStyle.
-		Width(54).
-		BorderForeground(m.Theme.Accent).
-		Render(strings.Join(lines, "\n"))
+	section := func(s string) string {
+		return "\n" + muted.Bold(true).Render(s)
+	}
+	key := func(k, desc string) string {
+		return fmt.Sprintf("  %s  %s",
+			accent.Render(fmt.Sprintf("%-16s", k)),
+			muted.Render(desc))
+	}
+
+	var lines []string
+	lines = append(lines, bold.Render("▲ stream")+"  "+muted.Render("command reference"))
+	lines = append(lines, m.modalSep(innerW))
+	lines = append(lines, section("NAVIGATION"))
+	lines = append(lines, key("1 – 5", "Switch views"))
+	lines = append(lines, key("j / k", "Navigate items / timeline hours"))
+	lines = append(lines, key("H / L", "Day backward / forward"))
+	lines = append(lines, key("Tab", "Toggle timeline ↔ backlog shelf"))
+	lines = append(lines, key("ctrl+d / ctrl+u", "Scroll pane down / up"))
+	lines = append(lines, section("TASK ACTIONS"))
+	lines = append(lines, key("i", "Create new task"))
+	lines = append(lines, key("x", "Complete selected task"))
+	lines = append(lines, key("d", "Delete selected task"))
+	lines = append(lines, key("z", "Start Zen focus session"))
+	lines = append(lines, key("Enter", "Inspect task details"))
+	lines = append(lines, section("WORKSPACE"))
+	lines = append(lines, key(":", "Open command palette"))
+	lines = append(lines, key("?", "Toggle this help modal"))
+	lines = append(lines, key(":sync", "Force Google Calendar sync"))
+	lines = append(lines, key(":review", "Open shutdown review"))
+	lines = append(lines, key(":quit", "Exit stream"))
+	lines = append(lines, "")
+	lines = append(lines, m.modalSep(innerW))
+	lines = append(lines, muted.Render("  Esc / Enter / ? to close"))
+
+	return m.Theme.ModalStyle.Width(innerW + 4).Render(strings.Join(lines, "\n"))
 }

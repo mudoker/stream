@@ -16,42 +16,43 @@ func (m Model) View() string {
 		return "Initializing workspace..."
 	}
 
-	// 1. Zen Mode takes over full canvas
+	// 1. Zen Mode takes over the workspace only if in active fullscreen focus
 	if m.CurrentMode == ModeZen {
 		return m.renderZenMode()
 	}
 
-	// 2. Main structure: Header + Workspace Content + Footer
-	header := m.renderHeader()
-	footer := m.renderFooter()
+	// 2. Build the left Arc-style Sidebar (width = 22 characters)
+	sidebar := m.renderArcSidebar()
 
-	mainHeight := m.Height - lipgloss.Height(header) - lipgloss.Height(footer)
-	if mainHeight < 5 {
-		mainHeight = 5
+	// 3. Calculate remaining workspace width for content
+	workspaceWidth := m.Width - 25
+	if workspaceWidth < 30 {
+		workspaceWidth = 30
 	}
+	workspaceHeight := m.Height
 
 	var content string
 	switch m.CurrentView {
 	case DashboardView:
-		content = m.renderDashboard(mainHeight)
+		content = m.renderDashboard(workspaceHeight)
 	case MonthView:
-		content = m.renderMonthView(mainHeight)
+		content = m.renderMonthView(workspaceHeight)
 	case WeekView:
-		content = m.renderWeekView(mainHeight)
+		content = m.renderWeekView(workspaceHeight)
 	case DayView:
-		content = m.renderDayView(mainHeight)
+		content = m.renderDayView(workspaceHeight)
 	case AnalyticsView:
-		content = m.renderAnalyticsView(mainHeight)
+		content = m.renderAnalyticsView(workspaceHeight)
 	}
 
-	// Drawer slide-over on the right (Linear style inspector)
+	// Slide-over drawer on the right
 	if m.DetailOpen {
-		detailPanel := m.renderDetailPanel(mainHeight)
-		drawerWidth := int(float64(m.Width) * 0.35)
+		detailPanel := m.renderDetailPanel(workspaceHeight)
+		drawerWidth := int(float64(workspaceWidth) * 0.35)
 		if drawerWidth < 25 {
 			drawerWidth = 25
 		}
-		leftWidth := m.Width - drawerWidth - 3
+		leftWidth := workspaceWidth - drawerWidth - 3
 		if leftWidth < 20 {
 			leftWidth = 20
 		}
@@ -60,7 +61,7 @@ func (m Model) View() string {
 		content = lipgloss.JoinHorizontal(lipgloss.Top, leftContent, "   ", rightContent)
 	}
 
-	// Task Creation Wizard Overlay
+	// Modal overlays for prompts and wizard forms
 	if m.CurrentMode == ModeForm {
 		formModal := m.renderFormModal()
 		contentHeight := lipgloss.Height(content)
@@ -102,9 +103,25 @@ func (m Model) View() string {
 		)
 	}
 
-	canvas := lipgloss.JoinVertical(lipgloss.Left, header, content, footer)
+	// Join Left Arc Sidebar and Right Workspace Content
+	sidebarStyle := lipgloss.NewStyle().
+		Width(22).
+		Height(workspaceHeight).
+		Background(m.Theme.PanelBg).
+		Padding(1, 1)
 
-	// Floating Command Palette Overlay at the bottom
+	workspaceStyle := lipgloss.NewStyle().
+		Width(workspaceWidth).
+		Height(workspaceHeight).
+		Background(m.Theme.CanvasBg)
+
+	canvas := lipgloss.JoinHorizontal(lipgloss.Top,
+		sidebarStyle.Render(sidebar),
+		"   ",
+		workspaceStyle.Render(content),
+	)
+
+	// Command Palette Overlay at the bottom
 	if m.CurrentMode == ModeCommand {
 		cmdPalette := m.renderCommandPalette()
 		canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, cmdPalette)
@@ -113,93 +130,101 @@ func (m Model) View() string {
 	return canvas
 }
 
-func (m Model) renderHeader() string {
-	viewNames := []string{"dashboard", "month grid", "weekly lanes", "daily timeline", "analytics"}
-	var tabs []string
+func (m Model) renderArcSidebar() string {
+	var sb []string
 
+	// 1. Logo
+	sb = append(sb, lipgloss.NewStyle().
+		Foreground(m.Theme.Accent).
+		Bold(true).
+		Render("▲  t u i c a l"))
+	sb = append(sb, "")
+
+	// 2. Navigation Spaces (Tabs)
+	viewNames := []string{"dashboard", "month grid", "week lanes", "day timeline", "analytics"}
 	for i, name := range viewNames {
 		if int(m.CurrentView) == i {
-			// Linear-style soft indigo active tab
-			tabs = append(tabs, lipgloss.NewStyle().
+			sb = append(sb, lipgloss.NewStyle().
 				Foreground(m.Theme.Accent).
 				Bold(true).
-				Render(name))
+				Render(fmt.Sprintf("● %s", name)))
 		} else {
-			tabs = append(tabs, lipgloss.NewStyle().
+			sb = append(sb, lipgloss.NewStyle().
 				Foreground(m.Theme.Muted).
-				Render(name))
+				Render(fmt.Sprintf("  %s", name)))
 		}
 	}
 
-	tabsJoined := strings.Join(tabs, "  /  ")
+	sb = append(sb, "")
 
-	// Arc-style minimalist mode indicator
-	modeColor := m.Theme.Accent
-	if m.CurrentMode == ModeZen {
-		modeColor = m.Theme.P0Color
-	} else if m.CurrentMode == ModeForm {
-		modeColor = m.Theme.P1Color
+	// 3. Docked Focus Session (Mini Zen Mode)
+	if m.ZenTimer != nil && m.ZenTimer.Running {
+		zt := m.ZenTimer
+		sess := zt.Sessions[zt.CurrentSessionIdx]
+		hVal := int(zt.TimeRemaining.Hours())
+		mVal := int(zt.TimeRemaining.Minutes()) % 60
+		sVal := int(zt.TimeRemaining.Seconds()) % 60
+		timeStr := fmt.Sprintf("%02d:%02d:%02d", hVal, mVal, sVal)
+
+		// Calculate progress bar
+		pct := 1.0 - (zt.TimeRemaining.Seconds() / sess.Duration.Seconds())
+		bar := RenderProgressBar(16, pct)
+
+		title := zt.Task.Title
+		if len(title) > 16 {
+			title = title[:13] + "..."
+		}
+
+		sessionHeader := "FOCUS SESSION"
+		if zt.IsPaused {
+			sessionHeader = "PAUSED"
+		}
+
+		dockedWidget := lipgloss.NewStyle().
+			Background(m.Theme.SelectedBg).
+			Foreground(m.Theme.Fg).
+			Padding(1, 1).
+			Width(20).
+			Render(fmt.Sprintf(
+				"%s\n%s\n%s\n%s",
+				lipgloss.NewStyle().Foreground(m.Theme.P0Color).Bold(true).Render(sessionHeader),
+				strings.ToUpper(title),
+				lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(timeStr),
+				bar,
+			))
+
+		sb = append(sb, "\n"+dockedWidget)
 	}
-	modeLabel := lipgloss.NewStyle().
-		Foreground(modeColor).
+
+	// 4. Fill spacing dynamically to push footer elements down
+	occupiedRows := len(sb) + 2
+	if m.ZenTimer != nil && m.ZenTimer.Running {
+		occupiedRows += 6
+	}
+	remainingRows := m.Height - occupiedRows - 4
+	if remainingRows > 0 {
+		sb = append(sb, strings.Repeat("\n", remainingRows))
+	}
+
+	// 5. Sidebar Status Utilities (Mode, GCal sync, time)
+	syncColor := m.Theme.Muted
+	if m.Sync.IsOnline() {
+		syncColor = m.Theme.SuccessColor
+	}
+	gcalBadge := lipgloss.NewStyle().Foreground(syncColor).Render("● gcal")
+
+	modeBadge := lipgloss.NewStyle().
+		Foreground(m.Theme.FocusPurple).
 		Bold(true).
 		Render(strings.ToLower(string(m.CurrentMode)))
 
-	timeStr := time.Now().Format("Jan _2 15:04")
-	timeDisplay := lipgloss.NewStyle().
-		Foreground(m.Theme.SuccessColor).
-		Render(timeStr)
+	timeStr := time.Now().Format("15:04")
 
-	gapWidth := m.Width - lipgloss.Width(tabsJoined) - lipgloss.Width(modeLabel) - lipgloss.Width(timeDisplay) - 10
-	if gapWidth < 2 {
-		gapWidth = 2
-	}
-	gap := strings.Repeat(" ", gapWidth)
+	sb = append(sb, strings.Repeat("─", 20))
+	sb = append(sb, modeBadge+"  •  "+gcalBadge)
+	sb = append(sb, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(timeStr))
 
-	headerLine := lipgloss.JoinHorizontal(lipgloss.Center, tabsJoined, gap, modeLabel, "   ", timeDisplay)
-
-	return lipgloss.NewStyle().
-		Background(m.Theme.CanvasBg).
-		Width(m.Width).
-		Padding(1, 2).
-		Render(headerLine) + "\n"
-}
-
-func (m Model) renderFooter() string {
-	shortcuts := "1-5 view switch  •  i new task  •  enter details  •  z zen mode  •  : commands"
-	status := m.StatusMsg
-	if status == "" {
-		status = "idle"
-	}
-	status = strings.ToLower(status)
-	if len(status) > 35 {
-		status = status[:32] + "..."
-	}
-
-	syncState := "offline"
-	if m.Sync.IsOnline() {
-		syncState = "online"
-	}
-	syncDisplay := lipgloss.NewStyle().
-		Foreground(m.Theme.SuccessColor).
-		Render(fmt.Sprintf("gcal: %s", syncState))
-
-	left := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(shortcuts)
-	center := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("   " + status)
-
-	gapWidth := m.Width - lipgloss.Width(left) - lipgloss.Width(center) - lipgloss.Width(syncDisplay) - 4
-	if gapWidth < 2 {
-		gapWidth = 2
-	}
-	gap := strings.Repeat(" ", gapWidth)
-
-	footerLine := lipgloss.JoinHorizontal(lipgloss.Center, left, center, gap, syncDisplay)
-
-	return "\n" + lipgloss.NewStyle().
-		Background(m.Theme.CanvasBg).
-		Width(m.Width).
-		Padding(0, 2).
-		Render(footerLine)
+	return strings.Join(sb, "\n")
 }
 
 func (m Model) renderDashboard(height int) string {
@@ -231,7 +256,6 @@ func (m Model) renderDashboard(height int) string {
 		}
 	}
 
-	// Linear style section headers
 	hdrStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true)
 
 	todayWidgetContent := fmt.Sprintf(
@@ -272,7 +296,7 @@ func (m Model) renderDashboard(height int) string {
 
 	leftPane := lipgloss.JoinVertical(lipgloss.Left, todayWidget, "\n", upcomingWidget)
 
-	// Workload Chart Widget
+	// Capacity widget
 	weeklyPoints := make(map[time.Weekday]int)
 	startOfWeek := today.AddDate(0, 0, -int(today.Weekday()))
 	for i := 0; i < 7; i++ {
@@ -316,7 +340,7 @@ func (m Model) renderDashboard(height int) string {
 		chartLines = append(chartLines, fmt.Sprintf("%s   │ %s (%d SP)", weekdayNames[idx], coloredBar, pts))
 	}
 
-	rightWidth := m.Width - 46
+	rightWidth := m.Width - 48
 	if rightWidth < 20 {
 		rightWidth = 20
 	}
@@ -400,7 +424,7 @@ func (m Model) renderMonthView(height int) string {
 	}
 
 	return m.Theme.PanelStyle.
-		Width(m.Width - 4).
+		Width(m.Width - 28).
 		Height(height).
 		Render(sb.String())
 }
@@ -416,7 +440,7 @@ func (m Model) renderWeekView(height int) string {
 	weekdayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 	var columns []string
 
-	colWidth := (m.Width - 10) / 7
+	colWidth := (m.Width - 32) / 7
 	if colWidth < 12 {
 		colWidth = 12
 	}
@@ -496,8 +520,9 @@ func (m Model) renderWeekView(height int) string {
 }
 
 func (m Model) renderDayView(height int) string {
-	timelineWidth := int(float64(m.Width) * 0.73)
-	shelfWidth := m.Width - timelineWidth - 4
+	// 75% Timeline, 25% Todo Shelf
+	timelineWidth := int(float64(m.Width-25) * 0.73)
+	shelfWidth := (m.Width - 25) - timelineWidth - 4
 	if timelineWidth < 30 {
 		timelineWidth = 30
 	}
@@ -518,14 +543,13 @@ func (m Model) renderDayView(height int) string {
 	cols := ResolveOverlaps(anchoredTasks)
 
 	var timelineLines []string
-	headerText := fmt.Sprintf("DAILY WORKSPACE  /  %s", strings.ToUpper(m.SelectedDay.Format("Monday, Jan _2")))
+	headerText := fmt.Sprintf("DAILY TIMELINE  /  %s", strings.ToUpper(m.SelectedDay.Format("Monday, Jan _2")))
 	timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(headerText)+"\n")
 
 	now := time.Now()
 	isToday := m.SelectedDay.Year() == now.Year() && m.SelectedDay.Month() == now.Month() && m.SelectedDay.Day() == now.Day()
 
 	for h := 8; h <= 20; h++ {
-		// Clean visual timeline cursor slicing schedule
 		if isToday && now.Hour() == h && now.Minute() < 30 && h > 8 {
 			lineText := fmt.Sprintf("───────────────────── %02d:%02d NOW ─────────────────────", now.Hour(), now.Minute())
 			timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(lineText))
@@ -626,7 +650,7 @@ func (m Model) renderDayView(height int) string {
 
 	// Todo Shelf (Command Center)
 	var shelfLines []string
-	shelfLines = append(shelfLines, "TODO COMMAND CENTER\n")
+	shelfLines = append(shelfLines, "TODO BACKLOG\n")
 
 	shelfTasks := m.getTodoShelfTasks()
 
@@ -688,7 +712,7 @@ func (m Model) renderDayView(height int) string {
 
 func (m Model) renderZenMode() string {
 	if m.ZenTimer == nil {
-		return "No focus timer running."
+		return "No focus session timer."
 	}
 
 	t := m.ZenTimer.Task
@@ -788,7 +812,7 @@ func (m Model) renderAnalyticsView(height int) string {
 	sb.WriteString("  Fri ████████ 8 SP\n")
 
 	return m.Theme.PanelStyle.
-		Width(m.Width - 4).
+		Width(m.Width - 28).
 		Height(height).
 		Render(sb.String())
 }

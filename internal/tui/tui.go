@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"tuical/internal/db"
-	"tuical/internal/model"
-	"tuical/internal/sync"
+	"stream/internal/db"
+	"stream/internal/model"
+	"stream/internal/sync"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"

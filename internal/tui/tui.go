@@ -138,6 +138,16 @@ type Model struct {
 
 	// Task Creation Wizard
 	Form TaskForm
+
+	// Auto-activation Task Prompt
+	PromptOpen bool
+	PromptTask model.Task
+
+	// Daily Shutdown Review
+	ReviewOpen           bool
+	ReviewTasksCompleted int
+	ReviewTasksDeferred  int
+	ReviewFocusSeconds   int
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
@@ -165,6 +175,26 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 
 func (m *Model) refreshTasks() {
 	m.Tasks = m.DB.GetTasks()
+
+	// Automatically transition expired incomplete tasks to OVERDUE
+	now := time.Now()
+	updatedAny := false
+	for i, t := range m.Tasks {
+		if t.SchedulingType == model.Anchored &&
+			t.TimeWindow.End.Before(now) &&
+			t.LifecycleState != model.StateCompleted &&
+			t.LifecycleState != model.StateArchived &&
+			t.LifecycleState != model.StateOverdue {
+
+			t.LifecycleState = model.StateOverdue
+			m.DB.UpdateTask(t)
+			m.Tasks[i] = t
+			updatedAny = true
+		}
+	}
+	if updatedAny {
+		m.Tasks = m.DB.GetTasks()
+	}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -200,6 +230,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.StatusMsg = fmt.Sprintf("Completed Focus Session for %s!", t.Title)
 			}
 		}
+
+		// Check for auto-activation tasks
+		if m.CurrentMode == ModeNormal && !m.PromptOpen && !m.ReviewOpen {
+			now := time.Now()
+			for _, t := range m.Tasks {
+				if t.SchedulingType == model.Anchored &&
+					t.LifecycleState == model.StateScheduled &&
+					t.TimeWindow.Start.Year() == now.Year() && t.TimeWindow.Start.Month() == now.Month() && t.TimeWindow.Start.Day() == now.Day() &&
+					t.TimeWindow.Start.Hour() == now.Hour() && t.TimeWindow.Start.Minute() == now.Minute() {
+					
+					m.PromptTask = t
+					m.PromptOpen = true
+					break
+				}
+			}
+		}
+
 		cmds = append(cmds, tickCmd())
 		return m, tea.Batch(cmds...)
 
@@ -214,6 +261,61 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.PromptOpen {
+			switch msg.String() {
+			case "enter":
+				m.startZenMode(m.PromptTask)
+				m.PromptOpen = false
+				return m, nil
+			case "s":
+				// Snooze 5 minutes
+				m.PromptTask.TimeWindow.Start = m.PromptTask.TimeWindow.Start.Add(5 * time.Minute)
+				m.PromptTask.TimeWindow.End = m.PromptTask.TimeWindow.End.Add(5 * time.Minute)
+				m.DB.UpdateTask(m.PromptTask)
+				m.refreshTasks()
+				m.PromptOpen = false
+				m.StatusMsg = "Task start snoozed by 5m."
+				return m, nil
+			case "d", "esc":
+				m.PromptTask.LifecycleState = model.StateReady
+				m.DB.UpdateTask(m.PromptTask)
+				m.refreshTasks()
+				m.PromptOpen = false
+				m.StatusMsg = "Task prompt dismissed."
+				return m, nil
+			}
+			return m, nil
+		}
+
+		if m.ReviewOpen {
+			switch msg.String() {
+			case "y", "enter":
+				today := time.Now()
+				shifted := 0
+				for _, t := range m.Tasks {
+					if t.SchedulingType == model.Anchored &&
+						t.TimeWindow.Start.Year() == today.Year() && t.TimeWindow.Start.Month() == today.Month() && t.TimeWindow.Start.Day() == today.Day() &&
+						t.LifecycleState != model.StateCompleted {
+						
+						t.TimeWindow.Start = t.TimeWindow.Start.AddDate(0, 0, 1)
+						t.TimeWindow.End = t.TimeWindow.End.AddDate(0, 0, 1)
+						t.LifecycleState = model.StateScheduled
+						m.DB.UpdateTask(t)
+						shifted++
+					}
+				}
+				m.refreshTasks()
+				m.ReviewOpen = false
+				m.StatusMsg = fmt.Sprintf("Moved %d incomplete tasks to tomorrow.", shifted)
+				return m, nil
+			case "n", "esc":
+				m.ReviewOpen = false
+				m.StatusMsg = "Daily review closed."
+				return m, nil
+			}
+			return m, nil
+		}
+
 		// ESC is universal: drop back to NORMAL mode, dismiss overlays
 		if msg.String() == "esc" {
 			if m.DetailOpen {
@@ -523,6 +625,9 @@ func (m Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ZenTimer.IsPaused = !m.ZenTimer.IsPaused
 		if m.ZenTimer.IsPaused {
 			m.StatusMsg = "Timer PAUSED"
+			m.ZenTimer.Task.ExecutionMetrics.InterruptionCount++
+			m.DB.UpdateTask(m.ZenTimer.Task)
+			m.refreshTasks()
 		} else {
 			m.StatusMsg = "Timer RUNNING"
 		}
@@ -619,6 +724,34 @@ func (m Model) runCommand(val string) (tea.Model, tea.Cmd) {
 		m.refreshTasks()
 		m.Sync.TriggerSync()
 		m.StatusMsg = fmt.Sprintf("Task '%s' created.", title)
+
+	case "review":
+		today := time.Now()
+		completed := 0
+		deferred := 0
+		secs := 0
+		for _, t := range m.Tasks {
+			isToday := false
+			if t.SchedulingType == model.Anchored {
+				isToday = t.TimeWindow.Start.Year() == today.Year() && t.TimeWindow.Start.Month() == today.Month() && t.TimeWindow.Start.Day() == today.Day()
+			} else {
+				isToday = t.CreatedAt.Year() == today.Year() && t.CreatedAt.Month() == today.Month() && t.CreatedAt.Day() == today.Day()
+			}
+
+			if isToday {
+				if t.LifecycleState == model.StateCompleted {
+					completed++
+				} else {
+					deferred++
+				}
+				secs += t.ExecutionMetrics.ElapsedFocusSeconds
+			}
+		}
+		m.ReviewTasksCompleted = completed
+		m.ReviewTasksDeferred = deferred
+		m.ReviewFocusSeconds = secs
+		m.ReviewOpen = true
+		m.StatusMsg = "Daily Shutdown Review opened."
 
 	case "complete":
 		task, exists := m.getActiveTask()

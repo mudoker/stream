@@ -9,11 +9,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) renderAnalyticsView(height int) string {
+func (m Model) renderAnalyticsView() string {
 	today := time.Now()
 	stats := m.calculateAnalyticsStats()
 
-	workspaceWidth := m.dashboardContentWidth()
+	workspaceWidth := m.Layout.WorkspaceW - 4
 
 	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", workspaceWidth))
 

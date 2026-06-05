@@ -81,7 +81,7 @@ func (m Model) renderMonthView(height int) string {
 	}
 
 	return m.Theme.PanelStyle.
-		Width(m.Width - 28).
+		Width(m.Layout.WorkspaceW - 4).
 		Height(height).
 		Render(sb.String())
 }
@@ -97,7 +97,7 @@ func (m Model) renderWeekView(height int) string {
 	weekdayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 	var columns []string
 
-	colWidth := (m.Width - 32) / 7
+	colWidth := (m.Layout.WorkspaceW - 4) / 7
 	if colWidth < 12 {
 		colWidth = 12
 	}

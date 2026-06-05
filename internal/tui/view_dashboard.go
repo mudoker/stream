@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) renderDashboard(height int) string {
+func (m Model) renderDashboard() string {
 	today := time.Now()
 	var todayTasks []model.Task
 	var completedCount int
@@ -40,7 +40,7 @@ func (m Model) renderDashboard(height int) string {
 		}
 	}
 
-	workspaceWidth := m.dashboardContentWidth()
+	workspaceWidth := m.Layout.WorkspaceW - 4 // 4 for Padding(1,2) on each side
 	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37"))
 
 	// ── Header bar ──────────────────────────────────────────────────
@@ -256,19 +256,6 @@ func (m Model) renderWeeklyCapacityChart(w int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m Model) dashboardContentWidth() int {
-	sidebarWidth := int(float64(m.Width) * 0.13)
-	if sidebarWidth < 18 {
-		sidebarWidth = 18
-	} else if sidebarWidth > 26 {
-		sidebarWidth = 26
-	}
-	w := m.Width - sidebarWidth - 8
-	if w < 40 {
-		w = 40
-	}
-	return w
-}
 
 func (m Model) priorityColor(p model.Priority) lipgloss.Color {
 	switch p {

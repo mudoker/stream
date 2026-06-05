@@ -330,6 +330,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if m.DetailOpen {
+			switch msg.String() {
+			case "esc", "enter":
+				m.DetailOpen = false
+				return m, nil
+			case "z":
+				m.startZenMode(m.DetailTask)
+				m.DetailOpen = false
+				return m, nil
+			case "x":
+				m.DetailTask.LifecycleState = model.StateCompleted
+				m.DB.UpdateTask(m.DetailTask)
+				m.refreshTasks()
+				m.DetailOpen = false
+				m.StatusMsg = fmt.Sprintf("Task '%s' completed!", m.DetailTask.Title)
+				return m, nil
+			case "d":
+				m.DB.DeleteTask(m.DetailTask.UUID)
+				m.refreshTasks()
+				m.DetailOpen = false
+				m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", m.DetailTask.Title)
+				return m, nil
+			}
+			return m, nil
+		}
+
 		// ESC is universal: drop back to NORMAL mode, dismiss overlays
 		if msg.String() == "esc" {
 			if m.DetailOpen {
@@ -403,24 +429,32 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ShelfScrollOffset = 0
 		return m, nil
 	case "ctrl+d":
-		if m.CurrentView == DayView && m.TodoShelfFocus {
-			m.ShelfScrollOffset += 2
-			shelfTasks := m.getTodoShelfTasks()
-			if m.ShelfScrollOffset > len(shelfTasks)-3 {
-				m.ShelfScrollOffset = len(shelfTasks) - 3
-			}
-			if m.ShelfScrollOffset < 0 {
-				m.ShelfScrollOffset = 0
+		if m.CurrentView == DayView {
+			if m.TodoShelfFocus {
+				m.ShelfScrollOffset += 2
+				shelfTasks := m.getTodoShelfTasks()
+				if m.ShelfScrollOffset > len(shelfTasks)-3 {
+					m.ShelfScrollOffset = len(shelfTasks) - 3
+				}
+				if m.ShelfScrollOffset < 0 {
+					m.ShelfScrollOffset = 0
+				}
+			} else {
+				m.TimelineHour = (m.TimelineHour + 2) % 24
 			}
 		} else {
 			m.ScrollOffset += 2
 		}
 		return m, nil
 	case "ctrl+u":
-		if m.CurrentView == DayView && m.TodoShelfFocus {
-			m.ShelfScrollOffset -= 2
-			if m.ShelfScrollOffset < 0 {
-				m.ShelfScrollOffset = 0
+		if m.CurrentView == DayView {
+			if m.TodoShelfFocus {
+				m.ShelfScrollOffset -= 2
+				if m.ShelfScrollOffset < 0 {
+					m.ShelfScrollOffset = 0
+				}
+			} else {
+				m.TimelineHour = (m.TimelineHour - 2 + 24) % 24
 			}
 		} else {
 			m.ScrollOffset -= 2

@@ -22,15 +22,26 @@ func (m Model) View() string {
 		return m.renderZenMode()
 	}
 
-	// 2. Build the left Arc-style Sidebar (width = 22 characters)
-	sidebar := m.renderArcSidebar()
+	// 2. Calculate dynamic column dimensions
+	sidebarWidth := int(float64(m.Width) * 0.13)
+	if sidebarWidth < 18 {
+		sidebarWidth = 18
+	} else if sidebarWidth > 26 {
+		sidebarWidth = 26
+	}
+	sidebarContentWidth := sidebarWidth - 2
+	if sidebarContentWidth < 10 {
+		sidebarContentWidth = 10
+	}
 
-	// 3. Calculate remaining workspace width for content
-	workspaceWidth := m.Width - 25
+	workspaceWidth := m.Width - sidebarWidth - 3
 	if workspaceWidth < 30 {
 		workspaceWidth = 30
 	}
 	workspaceHeight := m.Height
+
+	// 3. Build the left Arc-style Sidebar
+	sidebar := m.renderArcSidebar(sidebarContentWidth)
 
 	var content string
 	switch m.CurrentView {
@@ -46,57 +57,14 @@ func (m Model) View() string {
 		content = m.renderAnalyticsView(workspaceHeight)
 	}
 
-	// Slide-over drawer on the right
-	if m.DetailOpen {
-		detailPanel := m.renderDetailPanel(workspaceHeight)
-		drawerWidth := int(float64(workspaceWidth) * 0.35)
-		if drawerWidth < 25 {
-			drawerWidth = 25
-		}
-		leftWidth := workspaceWidth - drawerWidth - 3
-		if leftWidth < 20 {
-			leftWidth = 20
-		}
-		leftContent := lipgloss.NewStyle().Width(leftWidth).Render(content)
-		rightContent := lipgloss.NewStyle().Width(drawerWidth).Render(detailPanel)
-		content = lipgloss.JoinHorizontal(lipgloss.Top, leftContent, "   ", rightContent)
+	// 4. Overlay mini Zen Mode in top-right of workspace content
+	if m.ZenTimer != nil && m.ZenTimer.Running {
+		content = m.overlayMiniZen(content, workspaceWidth)
 	}
 
-	// Centered floating modal overlay handling
-	if m.CurrentMode == ModeForm || m.PromptOpen || m.ReviewOpen || m.HelpOpen {
-		var modalStr string
-		if m.CurrentMode == ModeForm {
-			modalStr = m.renderFormModal()
-		} else if m.PromptOpen {
-			modalStr = m.renderPromptModal()
-		} else if m.ReviewOpen {
-			modalStr = m.renderReviewModal()
-		} else if m.HelpOpen {
-			modalStr = m.renderHelpModal()
-		}
-
-		modalWidth := lipgloss.Width(modalStr)
-		modalHeight := lipgloss.Height(modalStr)
-
-		paddingTop := (workspaceHeight - modalHeight) / 2
-		if paddingTop < 0 {
-			paddingTop = 0
-		}
-		paddingLeft := (workspaceWidth - modalWidth) / 2
-		if paddingLeft < 0 {
-			paddingLeft = 0
-		}
-
-		modalStyle := lipgloss.NewStyle().
-			MarginTop(paddingTop).
-			MarginLeft(paddingLeft)
-
-		content = modalStyle.Render(modalStr)
-	}
-
-	// Join Left Arc Sidebar and Right Workspace Content
+	// 5. Join Left Arc Sidebar and Right Workspace Content
 	sidebarStyle := lipgloss.NewStyle().
-		Width(22).
+		Width(sidebarWidth).
 		Height(workspaceHeight).
 		Background(m.Theme.PanelBg).
 		Padding(1, 1)
@@ -118,10 +86,40 @@ func (m Model) View() string {
 		canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, cmdPalette)
 	}
 
+	// Centered floating modal overlay handling over the entire canvas (sidebar + content)
+	if m.CurrentMode == ModeForm || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen {
+		var modalStr string
+		if m.CurrentMode == ModeForm {
+			modalStr = m.renderFormModal()
+		} else if m.PromptOpen {
+			modalStr = m.renderPromptModal()
+		} else if m.ReviewOpen {
+			modalStr = m.renderReviewModal()
+		} else if m.HelpOpen {
+			modalStr = m.renderHelpModal()
+		} else if m.DetailOpen {
+			modalStr = m.renderDetailModal()
+		}
+
+		modalWidth := lipgloss.Width(modalStr)
+		modalHeight := lipgloss.Height(modalStr)
+
+		paddingTop := (m.Height - modalHeight) / 2
+		if paddingTop < 0 {
+			paddingTop = 0
+		}
+		paddingLeft := (m.Width - modalWidth) / 2
+		if paddingLeft < 0 {
+			paddingLeft = 0
+		}
+
+		canvas = overlayString(canvas, modalStr, paddingLeft, paddingTop, m.Width)
+	}
+
 	return canvas
 }
 
-func (m Model) renderArcSidebar() string {
+func (m Model) renderArcSidebar(width int) string {
 	var sb []string
 
 	// 1. Logo
@@ -135,79 +133,41 @@ func (m Model) renderArcSidebar() string {
 	sb = append(sb, lipgloss.NewStyle().
 		Foreground(m.Theme.Muted).
 		Bold(true).
+		Padding(0, 2).
 		Render("SPACES"))
 
 	viewNames := []string{"dashboard", "month grid", "week lanes", "day timeline", "analytics"}
 	for i, name := range viewNames {
 		if int(m.CurrentView) == i {
+			activeBorder := lipgloss.Border{Left: "┃"}
 			activeStyle := lipgloss.NewStyle().
 				Background(m.Theme.SelectedBg).
 				Foreground(m.Theme.Accent).
 				Bold(true).
+				Border(activeBorder, false, false, false, true).
+				BorderForeground(m.Theme.Accent).
 				Padding(0, 1).
-				Width(20)
+				Width(width - 1)
 			sb = append(sb, activeStyle.Render(strings.ToUpper(name)))
 		} else {
 			inactiveStyle := lipgloss.NewStyle().
 				Foreground(m.Theme.Muted).
-				Padding(0, 1).
-				Width(20)
+				Padding(0, 2). // Align text with active tab (border width 1 + padding 1)
+				Width(width)
 			sb = append(sb, inactiveStyle.Render(strings.ToUpper(name)))
 		}
 	}
 
 	sb = append(sb, "")
 
-	// 3. Docked Focus Session (Mini Zen Mode)
-	if m.ZenTimer != nil && m.ZenTimer.Running {
-		zt := m.ZenTimer
-		sess := zt.Sessions[zt.CurrentSessionIdx]
-		hVal := int(zt.TimeRemaining.Hours())
-		mVal := int(zt.TimeRemaining.Minutes()) % 60
-		sVal := int(zt.TimeRemaining.Seconds()) % 60
-		timeStr := fmt.Sprintf("%02d:%02d:%02d", hVal, mVal, sVal)
-
-		// Calculate progress bar
-		pct := 1.0 - (zt.TimeRemaining.Seconds() / sess.Duration.Seconds())
-		bar := RenderProgressBar(16, pct)
-
-		title := zt.Task.Title
-		if len(title) > 16 {
-			title = title[:13] + "..."
-		}
-
-		sessionHeader := "FOCUS SESSION"
-		if zt.IsPaused {
-			sessionHeader = "PAUSED"
-		}
-
-		dockedWidget := lipgloss.NewStyle().
-			Background(m.Theme.SelectedBg).
-			Foreground(m.Theme.Fg).
-			Padding(1, 1).
-			Width(20).
-			Render(fmt.Sprintf(
-				"%s\n%s\n%s\n%s",
-				lipgloss.NewStyle().Foreground(m.Theme.P0Color).Bold(true).Render(sessionHeader),
-				strings.ToUpper(title),
-				lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(timeStr),
-				bar,
-			))
-
-		sb = append(sb, "\n"+dockedWidget)
-	}
-
-	// 4. Fill spacing dynamically to push footer elements down
+	// 3. Fill spacing dynamically to push footer elements down
 	occupiedRows := len(sb) + 2
-	if m.ZenTimer != nil && m.ZenTimer.Running {
-		occupiedRows += 6
-	}
 	remainingRows := m.Height - occupiedRows - 4
 	if remainingRows > 0 {
 		sb = append(sb, strings.Repeat("\n", remainingRows))
 	}
 
-	// 5. Sidebar Status Utilities (Mode, GCal sync, time)
+	// 4. Sidebar Status Utilities (Mode, GCal sync, time)
 	syncColor := m.Theme.Muted
 	if m.Sync.IsOnline() {
 		syncColor = m.Theme.SuccessColor
@@ -221,7 +181,7 @@ func (m Model) renderArcSidebar() string {
 
 	timeStr := time.Now().Format("15:04")
 
-	sb = append(sb, strings.Repeat("─", 20))
+	sb = append(sb, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", width)))
 	sb = append(sb, modeBadge+"  •  "+gcalBadge)
 	sb = append(sb, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(timeStr))
 
@@ -542,9 +502,20 @@ func (m Model) renderWeekView(height int) string {
 }
 
 func (m Model) renderDayView(height int) string {
+	sidebarWidth := int(float64(m.Width) * 0.13)
+	if sidebarWidth < 18 {
+		sidebarWidth = 18
+	} else if sidebarWidth > 26 {
+		sidebarWidth = 26
+	}
+	workspaceWidth := m.Width - sidebarWidth - 3
+	if workspaceWidth < 30 {
+		workspaceWidth = 30
+	}
+
 	// 75% Timeline, 25% Todo Shelf
-	timelineWidth := int(float64(m.Width-25) * 0.73)
-	shelfWidth := (m.Width - 25) - timelineWidth - 4
+	timelineWidth := int(float64(workspaceWidth) * 0.75)
+	shelfWidth := workspaceWidth - timelineWidth - 4
 	if timelineWidth < 30 {
 		timelineWidth = 30
 	}
@@ -564,141 +535,183 @@ func (m Model) renderDayView(height int) string {
 
 	cols := ResolveOverlaps(anchoredTasks)
 
-	var timelineLines []string
-	headerText := fmt.Sprintf("DAILY TIMELINE  /  %s", strings.ToUpper(m.SelectedDay.Format("Monday, Jan _2")))
-	timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(headerText)+"\n")
-
 	now := time.Now()
 	isToday := m.SelectedDay.Year() == now.Year() && m.SelectedDay.Month() == now.Month() && m.SelectedDay.Day() == now.Day()
 
-	// Scroll timeline dynamically based on terminal height centering m.TimelineHour
-	timelineStartHour := 8
-	timelineEndHour := 20
-	maxHoursVisible := height - 6
-	if maxHoursVisible < 5 {
-		maxHoursVisible = 5
-	}
-	if 13 > maxHoursVisible {
-		timelineStartHour = m.TimelineHour - maxHoursVisible/2
-		if timelineStartHour < 8 {
-			timelineStartHour = 8
-		}
-		timelineEndHour = timelineStartHour + maxHoursVisible - 1
-		if timelineEndHour > 20 {
-			timelineEndHour = 20
-			timelineStartHour = timelineEndHour - maxHoursVisible + 1
-			if timelineStartHour < 8 {
-				timelineStartHour = 8
-			}
-		}
+	// Content area width for the timeline grid (excluding 6 char timestamp)
+	W := timelineWidth - 6
+	if W < 10 {
+		W = 10
 	}
 
-	if timelineStartHour > 8 {
-		timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("      ▲  (scroll up)"))
+	// Calculate 24 hours * 4 rows/hour = 96 rows total
+	var timelineLines []string
+	
+	// Add title header
+	headerText := fmt.Sprintf("DAILY TIMELINE  /  %s", strings.ToUpper(m.SelectedDay.Format("Monday, Jan _2")))
+	timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(headerText)+"\n")
+
+	// Calculate "NOW" indicator row index
+	nowRow := -1
+	if isToday {
+		nowRow = (now.Hour() * 4) + (now.Minute() / 15)
 	}
 
-	for h := timelineStartHour; h <= timelineEndHour; h++ {
-		if isToday && now.Hour() == h && now.Minute() < 30 && h > 8 {
-			lineText := fmt.Sprintf("───────────────────── %02d:%02d NOW ─────────────────────", now.Hour(), now.Minute())
-			timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(lineText))
+	// Render the 96 rows (00:00 to 23:45)
+	for r := 0; r < 96; r++ {
+		// Find all active tasks overlapping row r
+		type ActiveTaskCol struct {
+			ColIndex int
+			TotalCol int
+			Task     model.Task
 		}
-
-		var tasksAtHour []ScheduledColumn
+		var activeTasks []ActiveTaskCol
 		for _, rc := range cols {
-			startH := rc.Task.TimeWindow.Start.Hour()
-			endH := rc.Task.TimeWindow.End.Hour()
-			if h >= startH && h < endH {
-				tasksAtHour = append(tasksAtHour, rc)
+			startRow := (rc.Task.TimeWindow.Start.Hour() * 4) + (rc.Task.TimeWindow.Start.Minute() / 15)
+			endRow := (rc.Task.TimeWindow.End.Hour() * 4) + (rc.Task.TimeWindow.End.Minute() / 15)
+			if r >= startRow && r < endRow {
+				activeTasks = append(activeTasks, ActiveTaskCol{
+					ColIndex: rc.ColIndex,
+					TotalCol: rc.TotalCol,
+					Task:     rc.Task,
+				})
 			}
 		}
 
-		isSelectedHour := !m.TodoShelfFocus && m.TimelineHour == h
-		hourLabel := fmt.Sprintf("%02d:00", h)
-		if isSelectedHour {
-			hourLabel = lipgloss.NewStyle().Background(m.Theme.Accent).Foreground(m.Theme.CanvasBg).Bold(true).Render(hourLabel)
-		} else {
-			hourLabel = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(hourLabel)
+		// Partition W into segments
+		type RowSegment struct {
+			Start int
+			End   int
+			Text  string
+		}
+		var segments []RowSegment
+
+		for _, at := range activeTasks {
+			startRow := (at.Task.TimeWindow.Start.Hour() * 4) + (at.Task.TimeWindow.Start.Minute() / 15)
+			endRow := (at.Task.TimeWindow.End.Hour() * 4) + (at.Task.TimeWindow.End.Minute() / 15)
+			h := endRow - startRow
+
+			colStart := (at.ColIndex * W) / at.TotalCol
+			colEnd := ((at.ColIndex + 1) * W) / at.TotalCol
+			w := colEnd - colStart
+
+			// Check if this task is active NOW (machine timestamp matches its window)
+			isActiveBlock := isToday && now.After(at.Task.TimeWindow.Start) && now.Before(at.Task.TimeWindow.End)
+
+			// Render the segment of the task card at line relative to startRow
+			isNowRow := (r == nowRow)
+			isLeftmost := (colStart == 0)
+			lineText := m.renderTaskCardLine(at.Task, w, h, r-startRow, isActiveBlock, isNowRow, isLeftmost)
+			segments = append(segments, RowSegment{Start: colStart, End: colEnd, Text: lineText})
 		}
 
-		if len(tasksAtHour) == 0 {
-			timelineLines = append(timelineLines, fmt.Sprintf("  %s  │", hourLabel))
-		} else {
-			var colBlocks []string
-			cellWidth := (timelineWidth - 14) / len(tasksAtHour)
-			if cellWidth < 12 {
-				cellWidth = 12
-			}
+		// Sort segments by Start position
+		sort.Slice(segments, func(i, j int) bool {
+			return segments[i].Start < segments[j].Start
+		})
 
-			for _, col := range tasksAtHour {
-				t := col.Task
-				title := strings.ToUpper(t.Title)
-				if len(title) > cellWidth-6 {
-					title = title[:cellWidth-9] + "..."
-				}
-
-				isActiveBlock := isToday && now.Hour() >= t.TimeWindow.Start.Hour() && now.Hour() < t.TimeWindow.End.Hour()
-
-				var pBarColor lipgloss.Color = m.Theme.P2Color
-				if t.Priority == model.P0 {
-					pBarColor = m.Theme.P0Color
-				} else if t.Priority == model.P1 {
-					pBarColor = m.Theme.P1Color
-				} else if t.Priority == model.P3 {
-					pBarColor = m.Theme.P3Color
-				}
-
-				cardStyle := lipgloss.NewStyle().
-					Background(m.Theme.PanelBg).
-					Foreground(m.Theme.Fg).
-					Padding(1, 2)
-
-				if isActiveBlock {
-					cardStyle = cardStyle.Background(m.Theme.SelectedBg)
-				}
-
-				var cardLines []string
-				pBadge := lipgloss.NewStyle().Foreground(pBarColor).Bold(true).Render("▲ " + string(t.Priority))
-				spBadge := fmt.Sprintf("• %d SP", t.StoryPoints)
-				cardLines = append(cardLines, fmt.Sprintf("%s %s", pBadge, spBadge))
-
-				if isActiveBlock {
-					activeTimer := ""
-					if m.CurrentMode == ModeZen && m.ZenTimer != nil {
-						hVal := int(m.ZenTimer.TimeRemaining.Hours())
-						mVal := int(m.ZenTimer.TimeRemaining.Minutes()) % 60
-						sVal := int(m.ZenTimer.TimeRemaining.Seconds()) % 60
-						activeTimer = fmt.Sprintf(" • %02d:%02d:%02d", hVal, mVal, sVal)
+		// Fill in the gaps with guides/empty space
+		var rowParts []string
+		curr := 0
+		for _, seg := range segments {
+			if seg.Start > curr {
+				gapW := seg.Start - curr
+				var gapText string
+				if r == nowRow {
+					if curr == 0 {
+						badge := getNowBadge(gapW, now)
+						gapText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(badge + strings.Repeat("─", gapW-len(badge)))
+					} else {
+						gapText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(strings.Repeat("─", gapW))
 					}
-					cardLines = append(cardLines, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("▌ ACTIVE"+activeTimer))
+				} else if r%4 == 0 {
+					gapText = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", gapW))
+				} else {
+					gapText = strings.Repeat(" ", gapW)
 				}
-
-				cardLines = append(cardLines, "", lipgloss.NewStyle().Bold(true).Render(title))
-				cardLines = append(cardLines, fmt.Sprintf("%s → %s", t.TimeWindow.Start.Format("15:04"), t.TimeWindow.End.Format("15:04")))
-
-				renderedCard := cardStyle.Width(cellWidth - 4).Render(strings.Join(cardLines, "\n"))
-
-				leftBar := lipgloss.NewStyle().
-					Foreground(pBarColor).
-					Background(m.Theme.PanelBg).
-					Height(lipgloss.Height(renderedCard)).
-					Render("▌")
-
-				colBlocks = append(colBlocks, lipgloss.JoinHorizontal(lipgloss.Top, leftBar, renderedCard))
+				rowParts = append(rowParts, gapText)
 			}
+			rowParts = append(rowParts, seg.Text)
+			curr = seg.End
+		}
+		if curr < W {
+			gapW := W - curr
+			var gapText string
+			if r == nowRow {
+				if curr == 0 {
+					badge := getNowBadge(gapW, now)
+					gapText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(badge + strings.Repeat("─", gapW-len(badge)))
+				} else {
+					gapText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(strings.Repeat("─", gapW))
+				}
+			} else if r%4 == 0 {
+				gapText = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", gapW))
+			} else {
+				gapText = strings.Repeat(" ", gapW)
+			}
+			rowParts = append(rowParts, gapText)
+		}
 
-			joinedBlocks := lipgloss.JoinHorizontal(lipgloss.Top, colBlocks...)
-			timelineLines = append(timelineLines, fmt.Sprintf("  %s  │ %s", hourLabel, joinedBlocks))
+		// Clean left-aligned timestamp (removing vertical │)
+		var hourLabel string
+		isSelectedHour := !m.TodoShelfFocus && m.TimelineHour == (r/4) && (r%4 == 0)
+		if r == nowRow {
+			timeLabel := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
+			hourLabel = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(timeLabel) + " "
+		} else if r%4 == 0 {
+			timeLabel := fmt.Sprintf("%02d:00", r/4)
+			if isSelectedHour {
+				hourLabel = lipgloss.NewStyle().Background(m.Theme.Accent).Foreground(m.Theme.CanvasBg).Bold(true).Render(timeLabel) + " "
+			} else {
+				hourLabel = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(timeLabel) + " "
+			}
+		} else {
+			hourLabel = "      "
+		}
+
+		timelineLines = append(timelineLines, hourLabel+strings.Join(rowParts, ""))
+	}
+
+	// Scroll timeline dynamically centering around m.TimelineHour
+	timelineStartRow := 8 * 4 // Default start at 8:00 AM
+	maxRowsVisible := height - 4
+	if maxRowsVisible < 10 {
+		maxRowsVisible = 10
+	}
+	
+	// Center around m.TimelineHour
+	targetCenterRow := m.TimelineHour * 4
+	timelineStartRow = targetCenterRow - maxRowsVisible/2
+	if timelineStartRow < 0 {
+		timelineStartRow = 0
+	}
+	timelineEndRow := timelineStartRow + maxRowsVisible - 1
+	if timelineEndRow > 95 {
+		timelineEndRow = 95
+		timelineStartRow = timelineEndRow - maxRowsVisible + 1
+		if timelineStartRow < 0 {
+			timelineStartRow = 0
 		}
 	}
 
-	if timelineEndHour < 20 {
-		timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("      ▼  (scroll down)"))
+	var visibleTimelineLines []string
+	visibleTimelineLines = append(visibleTimelineLines, timelineLines[0]) // Header
+	if timelineStartRow > 0 {
+		visibleTimelineLines = append(visibleTimelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("      ▲  (scroll up)"))
+	}
+	
+	for r := timelineStartRow; r <= timelineEndRow; r++ {
+		visibleTimelineLines = append(visibleTimelineLines, timelineLines[r+1])
+	}
+
+	if timelineEndRow < 95 {
+		visibleTimelineLines = append(visibleTimelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("      ▼  (scroll down)"))
 	}
 
 	leftBox := m.Theme.PanelStyle.
 		Width(timelineWidth - 4).
 		Height(height - 2).
-		Render(strings.Join(timelineLines, "\n"))
+		Render(strings.Join(visibleTimelineLines, "\n"))
 
 	// Todo Shelf (Command Center)
 	var shelfLines []string
@@ -734,7 +747,7 @@ func (m Model) renderDayView(height int) string {
 			isSelected := m.TodoShelfFocus && t.UUID == m.SelectedTaskUUID
 			bullet := lipgloss.NewStyle().Foreground(pColors[idx]).Render("●")
 
-			title := strings.ToUpper(t.Title)
+			title := sentenceCase(t.Title)
 			if len(title) > shelfWidth-14 {
 				title = title[:shelfWidth-16] + ".."
 			}
@@ -757,20 +770,20 @@ func (m Model) renderDayView(height int) string {
 	// Apply Shelf scroll offset
 	shelfLinesRendered := strings.Join(shelfLines, "\n")
 	shelfLinesList := strings.Split(shelfLinesRendered, "\n")
-	
+
 	if m.ShelfScrollOffset >= len(shelfLinesList) {
 		m.ShelfScrollOffset = len(shelfLinesList) - 1
 	}
 	if m.ShelfScrollOffset < 0 {
 		m.ShelfScrollOffset = 0
 	}
-	
+
 	var visibleShelfList []string
 	if m.ShelfScrollOffset > 0 {
 		visibleShelfList = append(visibleShelfList, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  ▲  (scroll up)"))
 	}
 	visibleShelfList = append(visibleShelfList, shelfLinesList[m.ShelfScrollOffset:]...)
-	
+
 	if len(visibleShelfList) > height-2 {
 		visibleShelfList = visibleShelfList[:height-2]
 		visibleShelfList = append(visibleShelfList, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  ▼  (scroll down)"))
@@ -782,6 +795,178 @@ func (m Model) renderDayView(height int) string {
 		Render(strings.Join(visibleShelfList, "\n"))
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, "    ", rightBox)
+}
+
+func (m Model) renderTaskCardLine(task model.Task, w int, h int, lineIdx int, isActive bool, isNowRow bool, isLeftmost bool) string {
+	var pBarColor lipgloss.Color = m.Theme.P2Color
+	if task.Priority == model.P0 {
+		pBarColor = m.Theme.P0Color
+	} else if task.Priority == model.P1 {
+		pBarColor = m.Theme.P1Color
+	} else if task.Priority == model.P3 {
+		pBarColor = m.Theme.P3Color
+	}
+
+	bgStyle := lipgloss.NewStyle().Background(m.Theme.PanelBg).Foreground(m.Theme.Fg)
+	if isActive {
+		bgStyle = bgStyle.Background(m.Theme.SelectedBg)
+	}
+
+	timeStr := fmt.Sprintf("%s–%s", task.TimeWindow.Start.Format("15:04"), task.TimeWindow.End.Format("15:04"))
+	now := time.Now()
+	if isActive {
+		remaining := task.TimeWindow.End.Sub(now)
+		if remaining < 0 {
+			remaining = 0
+		}
+		hVal := int(remaining.Hours())
+		mVal := int(remaining.Minutes()) % 60
+		sVal := int(remaining.Seconds()) % 60
+		timeStr = fmt.Sprintf("%02d:%02d:%02d Remaining", hVal, mVal, sVal)
+	}
+
+	// Handle short task blocks (h < 4) using the borderless side-strip block style
+	if h < 4 {
+		var lineText string
+		if isNowRow {
+			contentW := w - 1
+			if contentW < 1 {
+				contentW = 1
+			}
+			if isLeftmost {
+				badge := getNowBadge(contentW, now)
+				lineText = badge + strings.Repeat("─", contentW-len(badge))
+			} else {
+				lineText = strings.Repeat("─", contentW)
+			}
+			leftStrip := lipgloss.NewStyle().Foreground(pBarColor).Background(bgStyle.GetBackground()).Render("┃")
+			return leftStrip + lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Background(bgStyle.GetBackground()).Bold(true).Render(lineText)
+		}
+
+		if h == 1 {
+			// Single row representation: sentence-case Title (Priority)
+			lineText = fmt.Sprintf(" %s (%s)", sentenceCase(task.Title), task.Priority)
+		} else if h == 2 {
+			if lineIdx == 0 {
+				lineText = " " + sentenceCase(task.Title)
+			} else {
+				lineText = fmt.Sprintf(" ▲ %s • %d SP", task.Priority, task.StoryPoints)
+			}
+		} else { // h == 3
+			if lineIdx == 0 {
+				lineText = " " + sentenceCase(task.Title)
+			} else if lineIdx == 1 {
+				lineText = fmt.Sprintf(" ▲ %s • %d SP", task.Priority, task.StoryPoints)
+			} else {
+				lineText = " " + timeStr
+			}
+		}
+
+		contentW := w - 1
+		if contentW < 1 {
+			contentW = 1
+		}
+		if len(lineText) > contentW {
+			if contentW > 3 {
+				lineText = lineText[:contentW-3] + "..."
+			} else {
+				lineText = lineText[:contentW]
+			}
+		} else {
+			lineText = lineText + strings.Repeat(" ", contentW-len(lineText))
+		}
+
+		leftStrip := lipgloss.NewStyle().Foreground(pBarColor).Background(bgStyle.GetBackground()).Render("┃")
+		return leftStrip + bgStyle.Render(lineText)
+	}
+
+	// Standardize task blocks as solid layout cards with custom borders (h >= 4)
+	customBorder := lipgloss.Border{
+		Top:         "─",
+		Bottom:      "─",
+		Left:        "┃",
+		Right:       "│",
+		TopLeft:     "╭",
+		TopRight:    "╮",
+		BottomLeft:  "╰",
+		BottomRight: "╯",
+	}
+
+	cardStyle := lipgloss.NewStyle().
+		Border(customBorder).
+		BorderForeground(pBarColor).
+		Background(bgStyle.GetBackground()).
+		Width(w).
+		Height(h)
+
+	// Build card content lines
+	var content []string
+	content = append(content, sentenceCase(task.Title))
+
+	// Active block real-time progress countdown pulse
+	if isActive {
+		timerText := "● ACTIVE"
+		content = append(content, lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(timerText))
+	} else {
+		content = append(content, "")
+	}
+
+	// Metadata grouping inline at the bottom
+	pColorName := "P2"
+	if task.Priority == model.P0 {
+		pColorName = "P0"
+	} else if task.Priority == model.P1 {
+		pColorName = "P1"
+	} else if task.Priority == model.P3 {
+		pColorName = "P3"
+	}
+	metaRow := fmt.Sprintf("▲ %s • %d SP • %s",
+		pColorName,
+		task.StoryPoints,
+		timeStr,
+	)
+	content = append(content, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(metaRow))
+
+	// Join content and pad/border render
+	var visibleContent []string
+	maxLines := h - 2
+	for i := 0; i < maxLines; i++ {
+		if isNowRow && i == lineIdx-1 {
+			innerWidth := w - 2
+			if innerWidth < 1 {
+				innerWidth = 1
+			}
+			var lineText string
+			if isLeftmost {
+				badge := getNowBadge(innerWidth, now)
+				lineText = badge + strings.Repeat("─", innerWidth-len(badge))
+			} else {
+				lineText = strings.Repeat("─", innerWidth)
+			}
+			visibleContent = append(visibleContent, lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(lineText))
+		} else {
+			val := ""
+			if i < len(content) {
+				val = content[i]
+			}
+			visibleContent = append(visibleContent, val)
+		}
+	}
+
+	rendered := cardStyle.Render(strings.Join(visibleContent, "\n"))
+	renderedLines := strings.Split(rendered, "\n")
+	if lineIdx < len(renderedLines) {
+		return renderedLines[lineIdx]
+	}
+	return strings.Repeat(" ", w)
+}
+
+func sentenceCase(s string) string {
+	if s == "" {
+		return ""
+	}
+	s = strings.ToLower(s)
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 func (m Model) renderZenMode() string {
@@ -1294,6 +1479,42 @@ func (m Model) renderDetailPanel(height int) string {
 		Render(sb.String())
 }
 
+func (m Model) renderDetailModal() string {
+	t := m.DetailTask
+
+	var sb strings.Builder
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("ℹ  TASK INSPECTOR\n"))
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", 44)) + "\n\n")
+
+	sb.WriteString(fmt.Sprintf("  Title:        %s\n", lipgloss.NewStyle().Bold(true).Render(sentenceCase(t.Title))))
+	sb.WriteString(fmt.Sprintf("  Priority:     %s      •  Story Points:  %d SP\n", t.Priority, t.StoryPoints))
+	sb.WriteString(fmt.Sprintf("  State:        %s  •  Schedule:      %s\n\n", t.LifecycleState, t.SchedulingType))
+
+	if t.SchedulingType == model.Anchored {
+		sb.WriteString(fmt.Sprintf("  Start Time:   %s\n", t.TimeWindow.Start.Format("2006-01-02 15:04")))
+		sb.WriteString(fmt.Sprintf("  End Time:     %s\n\n", t.TimeWindow.End.Format("15:04")))
+	}
+
+	sb.WriteString("  DESCRIPTION:\n")
+	desc := t.Description
+	if desc == "" {
+		desc = "(No description provided)"
+	}
+	wrappedDesc := wrapText(desc, 40)
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(indentText(wrappedDesc, "    ")) + "\n\n")
+
+	sb.WriteString("  EXECUTION METRICS:\n")
+	sb.WriteString(fmt.Sprintf("   ● Focus Logged:    %v\n", time.Duration(t.ExecutionMetrics.ElapsedFocusSeconds)*time.Second))
+	sb.WriteString(fmt.Sprintf("   ● Pomodoros:       %d/%d\n", t.ExecutionMetrics.TotalCompletedPomodoros, t.ExecutionMetrics.TargetPomodoros))
+	sb.WriteString(fmt.Sprintf("   ● Interruptions:   %d\n", t.ExecutionMetrics.InterruptionCount))
+
+	sb.WriteString("\n  [z] Start Focus   [x] Complete   [d] Delete   [Esc/Enter] Close")
+
+	return m.Theme.ModalStyle.
+		Width(48).
+		Render(sb.String())
+}
+
 func (m Model) renderFormModal() string {
 	f := m.Form
 
@@ -1418,4 +1639,173 @@ func (m Model) renderHelpModal() string {
 		Width(54).
 		BorderForeground(m.Theme.Accent).
 		Render(strings.Join(lines, "\n"))
+}
+
+func sliceAnsi(s string, start, end int) string {
+	var sb strings.Builder
+	var runes = []rune(s)
+	var inEscape = false
+	var visualCount = 0
+
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if r == '\x1b' {
+			inEscape = true
+			sb.WriteRune(r)
+			continue
+		}
+		if inEscape {
+			sb.WriteRune(r)
+			if r == 'm' {
+				inEscape = false
+			}
+			continue
+		}
+
+		if visualCount >= start && visualCount < end {
+			sb.WriteRune(r)
+		}
+		visualCount++
+	}
+	return sb.String()
+}
+
+func overlayString(base string, overlay string, x int, y int, baseWidth int) string {
+	baseLines := strings.Split(base, "\n")
+	overlayLines := strings.Split(overlay, "\n")
+	overlayWidth := 0
+	for _, l := range overlayLines {
+		w := lipgloss.Width(l)
+		if w > overlayWidth {
+			overlayWidth = w
+		}
+	}
+
+	for i, oLine := range overlayLines {
+		targetY := y + i
+		if targetY >= len(baseLines) {
+			break
+		}
+		bLine := baseLines[targetY]
+
+		leftPart := sliceAnsi(bLine, 0, x)
+		rightPart := sliceAnsi(bLine, x+overlayWidth, baseWidth)
+
+		leftVisualLen := lipgloss.Width(leftPart)
+		if leftVisualLen < x {
+			leftPart += strings.Repeat(" ", x-leftVisualLen)
+		}
+
+		baseLines[targetY] = leftPart + oLine + rightPart
+	}
+	return strings.Join(baseLines, "\n")
+}
+
+func wrapText(s string, limit int) string {
+	if len(s) <= limit {
+		return s
+	}
+	var words = strings.Fields(s)
+	if len(words) == 0 {
+		return s
+	}
+	var res []string
+	var currentLine string
+	for _, word := range words {
+		if len(currentLine)+len(word)+1 > limit {
+			res = append(res, currentLine)
+			currentLine = word
+		} else {
+			if len(currentLine) > 0 {
+				currentLine += " "
+			}
+			currentLine += word
+		}
+	}
+	if len(currentLine) > 0 {
+		res = append(res, currentLine)
+	}
+	return strings.Join(res, "\n")
+}
+
+func indentText(s string, indent string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = indent + l
+	}
+	return strings.Join(lines, "\n")
+}
+
+func getNowBadge(width int, now time.Time) string {
+	full := fmt.Sprintf("── NOW • %02d:%02d ──", now.Hour(), now.Minute())
+	if len(full) <= width {
+		return full
+	}
+	mid := fmt.Sprintf("NOW • %02d:%02d", now.Hour(), now.Minute())
+	if len(mid) <= width {
+		return mid
+	}
+	short := fmt.Sprintf("● %02d:%02d", now.Hour(), now.Minute())
+	if len(short) <= width {
+		return short
+	}
+	return "●"
+}
+
+func (m Model) overlayMiniZen(content string, workspaceWidth int) string {
+	if m.ZenTimer == nil || !m.ZenTimer.Running {
+		return content
+	}
+
+	zt := m.ZenTimer
+	sess := zt.Sessions[zt.CurrentSessionIdx]
+	hVal := int(zt.TimeRemaining.Hours())
+	mVal := int(zt.TimeRemaining.Minutes()) % 60
+	sVal := int(zt.TimeRemaining.Seconds()) % 60
+	timeStr := fmt.Sprintf("%02d:%02d:%02d Remaining", hVal, mVal, sVal)
+
+	pct := 1.0 - (zt.TimeRemaining.Seconds() / sess.Duration.Seconds())
+	bar := RenderProgressBar(18, pct)
+
+	title := zt.Task.Title
+	if len(title) > 20 {
+		title = title[:17] + "..."
+	}
+
+	widgetWidth := 26
+	widgetBg := m.Theme.SelectedBg
+	if zt.IsPaused {
+		widgetBg = m.Theme.PanelBg
+	}
+
+	sessionHeader := "● FOCUS RUNNING"
+	if zt.IsPaused {
+		sessionHeader = "● FOCUS PAUSED"
+	}
+
+	headerStyle := lipgloss.NewStyle().Foreground(m.Theme.P0Color).Bold(true)
+	if zt.IsPaused {
+		headerStyle = lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true)
+	}
+
+	widgetStr := lipgloss.NewStyle().
+		Background(widgetBg).
+		Foreground(m.Theme.Fg).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(m.Theme.Accent).
+		Padding(0, 1).
+		Width(widgetWidth).
+		Render(fmt.Sprintf(
+			"%s\n%s\n%s\n%s",
+			headerStyle.Render(sessionHeader),
+			sentenceCase(title),
+			lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(timeStr),
+			bar,
+		))
+
+	x := workspaceWidth - widgetWidth - 2
+	if x < 0 {
+		x = 0
+	}
+	return overlayString(content, widgetStr, x, 1, workspaceWidth)
 }

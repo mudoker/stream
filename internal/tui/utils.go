@@ -3,7 +3,7 @@ package tui
 import (
 	"sort"
 
-	"tuical/internal/model"
+	"stream/internal/model"
 )
 
 type ScheduledColumn struct {

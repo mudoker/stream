@@ -967,9 +967,6 @@ func (m Model) renderAnalyticsView(height int) string {
 		if barStr == "" && dayHrs > 0 {
 			barStr = "▏"
 		}
-		if len(barStr) < timelineBarWidth {
-			barStr += strings.Repeat("░", timelineBarWidth-len(barStr))
-		}
 
 		var barColor lipgloss.Color
 		if dayHrs == 0 {
@@ -1010,27 +1007,37 @@ func (m Model) renderAnalyticsView(height int) string {
 	personalPct := personalHrs / totalHrsForRatio
 
 	ratioBarWidth := 20
-	workBarLen := int(math.Round(workPct * float64(ratioBarWidth)))
-	workBarStr := strings.Repeat("█", workBarLen)
-	if workBarStr == "" && workHrs > 0 {
-		workBarStr = "▏"
-	}
-	if len(workBarStr) < ratioBarWidth {
-		workBarStr += strings.Repeat("░", ratioBarWidth-len(workBarStr))
-	}
-	coloredWorkBar := lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(workBarStr)
-	ratioLines = append(ratioLines, fmt.Sprintf("  Work     %s %.0f%% (%.1fh)", coloredWorkBar, workPct*100, workHrs))
+	var coloredRatioBar string
+	if totalHrs == 0 {
+		coloredRatioBar = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("·", ratioBarWidth))
+	} else {
+		workBarLen := int(math.Round(workPct * float64(ratioBarWidth)))
+		persBarLen := ratioBarWidth - workBarLen
+		if workBarLen == 0 && workHrs > 0 {
+			workBarLen = 1
+		}
+		if persBarLen == 0 && personalHrs > 0 {
+			persBarLen = 1
+		}
+		
+		// Adjust back to ratioBarWidth
+		if workBarLen + persBarLen > ratioBarWidth {
+			if workBarLen > persBarLen {
+				workBarLen = ratioBarWidth - persBarLen
+			} else {
+				persBarLen = ratioBarWidth - workBarLen
+			}
+		}
 
-	persBarLen := int(math.Round(personalPct * float64(ratioBarWidth)))
-	persBarStr := strings.Repeat("█", persBarLen)
-	if persBarStr == "" && personalHrs > 0 {
-		persBarStr = "▏"
+		workBarStr := strings.Repeat("█", workBarLen)
+		persBarStr := strings.Repeat("█", persBarLen)
+		coloredRatioBar = lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(workBarStr) +
+			lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render(persBarStr)
 	}
-	if len(persBarStr) < ratioBarWidth {
-		persBarStr += strings.Repeat("░", ratioBarWidth-len(persBarStr))
-	}
-	coloredPersBar := lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render(persBarStr)
-	ratioLines = append(ratioLines, fmt.Sprintf("  Personal %s %.0f%% (%.1fh)", coloredPersBar, personalPct*100, personalHrs))
+
+	ratioLines = append(ratioLines, fmt.Sprintf("  %s", coloredRatioBar))
+	ratioLines = append(ratioLines, fmt.Sprintf("  Work Focus     %.0f%% (%.1fh)", workPct*100, workHrs))
+	ratioLines = append(ratioLines, fmt.Sprintf("  Personal Focus %.0f%% (%.1fh)", personalPct*100, personalHrs))
 
 	// Top Tags
 	type TagVal struct {
@@ -1065,9 +1072,6 @@ func (m Model) renderAnalyticsView(height int) string {
 			if barStr == "" && tv.Secs > 0 {
 				barStr = "▏"
 			}
-			if len(barStr) < 12 {
-				barStr += strings.Repeat("░", 12-len(barStr))
-			}
 			coloredBar := lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Render(barStr)
 
 			tagName := tv.Tag
@@ -1097,7 +1101,7 @@ func (m Model) renderAnalyticsView(height int) string {
 	heatmapLines = append(heatmapLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("30-DAY FOCUS TREND"))
 
 	var trendSB strings.Builder
-	trendSB.WriteString("  [ ")
+	trendSB.WriteString("  ")
 	for i := 29; i >= 0; i-- {
 		date := today.AddDate(0, 0, -i)
 		dateStr := date.Format("2006-01-02")
@@ -1121,7 +1125,6 @@ func (m Model) renderAnalyticsView(height int) string {
 		}
 		trendSB.WriteString(lipgloss.NewStyle().Foreground(cellColor).Render(char) + " ")
 	}
-	trendSB.WriteString("]")
 	heatmapLines = append(heatmapLines, trendSB.String())
 
 	legendSB := strings.Builder{}

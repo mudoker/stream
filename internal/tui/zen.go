@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"tuical/internal/model"
+	"stream/internal/model"
 )
 
 type SessionType string

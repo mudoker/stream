@@ -40,110 +40,259 @@ func (m Model) renderDashboard(height int) string {
 		}
 	}
 
-	hdrStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true)
+	workspaceWidth := m.dashboardContentWidth()
+	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37"))
 
-	todayWidgetContent := fmt.Sprintf(
-		"planned focus        %-8s\n"+
-			"completed focus      %-8s\n"+
-			"remaining tasks      %-8d\n",
-		time.Duration(plannedFocusSecs)*time.Second,
-		time.Duration(elapsedFocusSecs)*time.Second,
-		len(todayTasks)-completedCount,
+	// ── Header bar ──────────────────────────────────────────────────
+	headerDate := lipgloss.NewStyle().
+		Foreground(m.Theme.Accent).
+		Bold(true).
+		Render(today.Format("Monday, January 2"))
+	subDate := lipgloss.NewStyle().
+		Foreground(m.Theme.Muted).
+		Render(today.Format("2006"))
+
+	headerLine := headerDate + "  " + subDate
+	divider := sepStyle.Render(strings.Repeat("─", workspaceWidth-4))
+
+	// ── Today KPI Strip ─────────────────────────────────────────────
+	remaining := len(todayTasks) - completedCount
+	completionPct := 0.0
+	if len(todayTasks) > 0 {
+		completionPct = float64(completedCount) / float64(len(todayTasks)) * 100
+	}
+
+	kpi := m.renderDashKPI(workspaceWidth,
+		planned(plannedFocusSecs), elapsed(elapsedFocusSecs),
+		completedCount, remaining, completionPct,
 	)
 
-	todayWidget := m.Theme.PanelStyle.
-		Width(38).
-		Render(hdrStyle.Render("T O D A Y   S U M M A R Y") + "\n\n" + todayWidgetContent)
+	// ── Left: Today tasks list ────────────────────────────────────
+	todayLines := []string{
+		lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("TODAY"),
+		"",
+	}
+	if len(todayTasks) == 0 {
+		todayLines = append(todayLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("No tasks scheduled for today."))
+	} else {
+		for _, t := range todayTasks {
+			dot := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("○")
+			if t.LifecycleState == model.StateCompleted {
+				dot = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render("✓")
+			} else if t.LifecycleState == model.StateActive {
+				dot = lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("●")
+			}
+			pColor := m.priorityColor(t.Priority)
+			pBadge := lipgloss.NewStyle().Foreground(pColor).Render("▲")
+			title := sentenceCase(t.Title)
+			if len(title) > 28 {
+				title = title[:26] + "…"
+			}
+			timeLabel := ""
+			if t.SchedulingType == model.Anchored {
+				timeLabel = "  " + lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(t.TimeWindow.Start.Format("15:04"))
+			}
+			todayLines = append(todayLines, fmt.Sprintf(" %s %s  %s%s", dot, pBadge, title, timeLabel))
+		}
+	}
 
-	upcomingLines := []string{hdrStyle.Render("U P C O M I N G   T A S K S") + "\n"}
+	// ── Right: Upcoming tasks ─────────────────────────────────────
+	upcomingLines := []string{
+		lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("UPCOMING"),
+		"",
+	}
 	var upcomingTasks []model.Task
 	for _, t := range m.Tasks {
 		if t.SchedulingType == model.Anchored && t.TimeWindow.Start.After(today) && t.LifecycleState != model.StateCompleted {
 			upcomingTasks = append(upcomingTasks, t)
 		}
 	}
-
 	if len(upcomingTasks) == 0 {
-		upcomingLines = append(upcomingLines, "no upcoming tasks scheduled.")
+		upcomingLines = append(upcomingLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("No upcoming tasks."))
 	} else {
 		for i, t := range upcomingTasks {
-			if i >= 3 {
+			if i >= 5 {
+				more := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("+ %d more…", len(upcomingTasks)-5))
+				upcomingLines = append(upcomingLines, " "+more)
 				break
 			}
-			upcomingLines = append(upcomingLines, fmt.Sprintf("%-5s   %s", t.TimeWindow.Start.Format("15:04"), strings.ToUpper(t.Title)))
+			timeStr := t.TimeWindow.Start.Format("Mon Jan _2  15:04")
+			tLabel := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(timeStr)
+			title := sentenceCase(t.Title)
+			if len(title) > 22 {
+				title = title[:20] + "…"
+			}
+			upcomingLines = append(upcomingLines, fmt.Sprintf(" %s  %s", tLabel, title))
 		}
 	}
 
-	upcomingWidget := m.Theme.PanelStyle.
-		Width(38).
+	// ── Weekly capacity bar chart ─────────────────────────────────
+	weekChart := m.renderWeeklyCapacityChart(workspaceWidth)
+
+	// ── Assemble layout ──────────────────────────────────────────
+	leftColW := (workspaceWidth / 2) - 4
+	rightColW := workspaceWidth - leftColW - 8
+	if leftColW < 20 {
+		leftColW = 20
+	}
+	if rightColW < 20 {
+		rightColW = 20
+	}
+
+	leftCol := lipgloss.NewStyle().
+		Width(leftColW).
+		Render(strings.Join(todayLines, "\n"))
+	rightCol := lipgloss.NewStyle().
+		Width(rightColW).
 		Render(strings.Join(upcomingLines, "\n"))
 
-	leftPane := lipgloss.JoinVertical(lipgloss.Left, todayWidget, "\n", upcomingWidget)
+	twoCol := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, "    ", rightCol)
 
-	// Capacity widget
+	var out strings.Builder
+	out.WriteString(headerLine + "\n")
+	out.WriteString(divider + "\n\n")
+	out.WriteString(kpi + "\n\n")
+	out.WriteString(divider + "\n\n")
+	out.WriteString(twoCol + "\n\n")
+	out.WriteString(divider + "\n\n")
+	out.WriteString(weekChart)
+
+	return out.String()
+}
+
+// renderDashKPI renders a horizontal KPI strip across the top of the dashboard.
+func (m Model) renderDashKPI(w int, plannedHr, elapsedHr string, done, remaining int, pct float64) string {
+	cardBg := lipgloss.NewStyle().Background(m.Theme.PanelBg)
+	kpis := []struct {
+		label string
+		value string
+		color lipgloss.Color
+	}{
+		{"Planned", plannedHr, m.Theme.Muted},
+		{"Logged", elapsedHr, m.Theme.Accent},
+		{"Done", fmt.Sprintf("%d tasks", done), m.Theme.SuccessColor},
+		{"Remaining", fmt.Sprintf("%d tasks", remaining), m.Theme.P1Color},
+		{"Completion", fmt.Sprintf("%.0f%%", pct), m.Theme.FocusPurple},
+	}
+
+	cardWidth := (w - 4) / len(kpis)
+	if cardWidth < 12 {
+		cardWidth = 12
+	}
+	var cards []string
+	for _, k := range kpis {
+		label := lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render(k.label)
+		value := lipgloss.NewStyle().Foreground(k.color).Bold(true).Render(k.value)
+		card := cardBg.
+			Width(cardWidth - 1).
+			Padding(0, 1).
+			Render(label + "\n" + value)
+		cards = append(cards, card)
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Top, cards...)
+}
+
+// renderWeeklyCapacityChart renders a horizontal bar chart of weekly task load.
+func (m Model) renderWeeklyCapacityChart(w int) string {
+	today := time.Now()
 	weeklyPoints := make(map[time.Weekday]int)
 	startOfWeek := today.AddDate(0, 0, -int(today.Weekday()))
 	for i := 0; i < 7; i++ {
 		day := startOfWeek.AddDate(0, 0, i)
 		for _, t := range m.Tasks {
-			if t.TimeWindow.Start.Year() == day.Year() && t.TimeWindow.Start.Month() == day.Month() && t.TimeWindow.Start.Day() == day.Day() {
+			if t.TimeWindow.Start.Year() == day.Year() &&
+				t.TimeWindow.Start.Month() == day.Month() &&
+				t.TimeWindow.Start.Day() == day.Day() {
 				weeklyPoints[day.Weekday()] += t.StoryPoints
 			}
 		}
 	}
 
-	chartLines := []string{hdrStyle.Render("W E E K L Y   C A P A C I T Y") + "\n"}
+	chartMaxW := w - 16
+	if chartMaxW < 10 {
+		chartMaxW = 10
+	}
 	weekdays := []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday, time.Sunday}
 	weekdayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 
-	maxPoints := 0
+	maxPoints := 1
 	for _, wd := range weekdays {
 		if weeklyPoints[wd] > maxPoints {
 			maxPoints = weeklyPoints[wd]
 		}
 	}
-	if maxPoints == 0 {
-		maxPoints = 1
-	}
+
+	var lines []string
+	lines = append(lines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("WEEKLY CAPACITY"))
+	lines = append(lines, "")
 
 	for idx, wd := range weekdays {
 		pts := weeklyPoints[wd]
-		barWidth := int(math.Round(float64(pts) * 18.0 / float64(maxPoints)))
+		barWidth := int(math.Round(float64(pts) * float64(chartMaxW) / float64(maxPoints)))
 		bar := strings.Repeat("█", barWidth)
 		if bar == "" && pts > 0 {
 			bar = "▏"
 		}
-		color := m.Theme.Accent
+
+		isToday := wd == today.Weekday()
+		nameColor := m.Theme.Muted
+		barColor := m.Theme.Accent
+		if isToday {
+			nameColor = m.Theme.Fg
+			barColor = m.Theme.FocusPurple
+		}
 		if pts >= 9 {
-			color = m.Theme.P0Color
-		} else if pts <= 2 {
-			color = m.Theme.Muted
+			barColor = m.Theme.P0Color
+		} else if pts == 0 {
+			barColor = m.Theme.Muted
 		}
 
-		coloredBar := lipgloss.NewStyle().Foreground(color).Render(bar)
-		chartLines = append(chartLines, fmt.Sprintf("%s   │ %s (%d SP)", weekdayNames[idx], coloredBar, pts))
+		nameStr := lipgloss.NewStyle().Foreground(nameColor).Bold(isToday).Render(weekdayNames[idx])
+		barStr := lipgloss.NewStyle().Foreground(barColor).Render(bar)
+		ptStr := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("%d SP", pts))
+		lines = append(lines, fmt.Sprintf("  %s  │ %s %s", nameStr, barStr, ptStr))
 	}
 
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) dashboardContentWidth() int {
 	sidebarWidth := int(float64(m.Width) * 0.13)
 	if sidebarWidth < 18 {
 		sidebarWidth = 18
 	} else if sidebarWidth > 26 {
 		sidebarWidth = 26
 	}
-	workspaceWidth := m.Width - sidebarWidth - 3
-	if workspaceWidth < 30 {
-		workspaceWidth = 30
+	w := m.Width - sidebarWidth - 8
+	if w < 40 {
+		w = 40
 	}
+	return w
+}
 
-	rightWidth := workspaceWidth - 48
-	if rightWidth < 20 {
-		rightWidth = 20
+func (m Model) priorityColor(p model.Priority) lipgloss.Color {
+	switch p {
+	case model.P0:
+		return m.Theme.P0Color
+	case model.P1:
+		return m.Theme.P1Color
+	case model.P3:
+		return m.Theme.P3Color
+	default:
+		return m.Theme.P2Color
 	}
+}
 
-	chartWidget := m.Theme.PanelStyle.
-		Width(rightWidth).
-		Height(12).
-		Render(strings.Join(chartLines, "\n"))
+func planned(secs int) string {
+	d := time.Duration(secs) * time.Second
+	h := int(d.Hours())
+	min := int(d.Minutes()) % 60
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm", h, min)
+	}
+	return fmt.Sprintf("%dm", min)
+}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftPane, "   ", chartWidget)
+func elapsed(secs int) string {
+	return planned(secs)
 }

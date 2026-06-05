@@ -88,8 +88,6 @@ func (m Model) calculateAnalyticsStats() AnalyticsStats {
 				}
 			}
 		}
-		totalFocusSecs += m.Tasks[0].ExecutionMetrics.ElapsedFocusSeconds // Wait, in the original code, this was totalFocusSecs += t.ExecutionMetrics.ElapsedFocusSeconds. Let's make sure it is exactly as in original!
-		// Wait! Let's check line 95: totalFocusSecs += t.ExecutionMetrics.ElapsedFocusSeconds. Yes, it was t.
 		totalFocusSecs += t.ExecutionMetrics.ElapsedFocusSeconds
 		totalInterruptions += t.ExecutionMetrics.InterruptionCount
 	}

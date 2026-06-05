@@ -29,7 +29,7 @@ func (m Model) View() string {
 		sidebarContentWidth = 10
 	}
 
-	workspaceWidth := m.Width - sidebarWidth - 3
+	workspaceWidth := m.Width - sidebarWidth - 1
 	if workspaceWidth < 30 {
 		workspaceWidth = 30
 	}
@@ -57,21 +57,24 @@ func (m Model) View() string {
 		content = m.overlayMiniZen(content, workspaceWidth)
 	}
 
-	// 5. Join Left Arc Sidebar and Right Workspace Content
+	// 5. Join Left Arc Sidebar (1px right border) and Workspace Content
 	sidebarStyle := lipgloss.NewStyle().
 		Width(sidebarWidth).
 		Height(workspaceHeight).
 		Background(m.Theme.PanelBg).
+		BorderRight(true).
+		BorderStyle(lipgloss.Border{Right: "│"}).
+		BorderForeground(lipgloss.Color("#2a2c37")).
 		Padding(1, 1)
 
 	workspaceStyle := lipgloss.NewStyle().
 		Width(workspaceWidth).
 		Height(workspaceHeight).
-		Background(m.Theme.CanvasBg)
+		Background(m.Theme.CanvasBg).
+		Padding(0, 2)
 
 	canvas := lipgloss.JoinHorizontal(lipgloss.Top,
 		sidebarStyle.Render(sidebar),
-		"   ",
 		workspaceStyle.Render(content),
 	)
 
@@ -115,70 +118,103 @@ func (m Model) View() string {
 }
 
 func (m Model) renderArcSidebar(width int) string {
+	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", width))
+	mutedStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
+	accentStyle := lipgloss.NewStyle().Foreground(m.Theme.Accent)
+
 	var sb []string
 
-	// 1. Logo
-	sb = append(sb, lipgloss.NewStyle().
-		Foreground(m.Theme.Accent).
-		Bold(true).
-		Render("▲  s t r e a m"))
+	// 1. Wordmark Logo
+	sb = append(sb, accentStyle.Bold(true).Render("▲ stream"))
+	sb = append(sb, mutedStyle.Render("workspace"))
+	sb = append(sb, "")
+	sb = append(sb, sep)
 	sb = append(sb, "")
 
-	// 2. Navigation Spaces (Tabs)
-	sb = append(sb, lipgloss.NewStyle().
-		Foreground(m.Theme.Muted).
+	// 2. Navigation label
+	sb = append(sb, mutedStyle.
 		Bold(true).
-		Padding(0, 2).
-		Render("SPACES"))
+		Render("VIEWS"))
+	sb = append(sb, "")
 
-	viewNames := []string{"dashboard", "month grid", "week lanes", "day timeline", "analytics"}
-	for i, name := range viewNames {
-		if int(m.CurrentView) == i {
-			activeBorder := lipgloss.Border{Left: "┃"}
+	// Nav items
+	type navItem struct {
+		label string
+		key   string
+		view  ViewType
+	}
+	navItems := []navItem{
+		{"Dashboard", "1", DashboardView},
+		{"Month", "2", MonthView},
+		{"Week", "3", WeekView},
+		{"Day", "4", DayView},
+		{"Analytics", "5", AnalyticsView},
+	}
+
+	for _, item := range navItems {
+		if m.CurrentView == item.view {
+			activeBorder := lipgloss.Border{Left: "▎"}
 			activeStyle := lipgloss.NewStyle().
 				Background(m.Theme.SelectedBg).
-				Foreground(m.Theme.Accent).
+				Foreground(m.Theme.Fg).
 				Bold(true).
 				Border(activeBorder, false, false, false, true).
 				BorderForeground(m.Theme.Accent).
 				Padding(0, 1).
 				Width(width - 1)
-			sb = append(sb, activeStyle.Render(strings.ToUpper(name)))
+			keyLabel := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(item.key)
+			sb = append(sb, activeStyle.Render(keyLabel+" "+item.label))
 		} else {
 			inactiveStyle := lipgloss.NewStyle().
 				Foreground(m.Theme.Muted).
-				Padding(0, 2). // Align text with active tab (border width 1 + padding 1)
+				Padding(0, 2).
 				Width(width)
-			sb = append(sb, inactiveStyle.Render(strings.ToUpper(name)))
+			keyLabel := mutedStyle.Render(item.key)
+			sb = append(sb, inactiveStyle.Render(keyLabel+" "+item.label))
 		}
 	}
 
 	sb = append(sb, "")
+	sb = append(sb, sep)
+	sb = append(sb, "")
 
 	// 3. Fill spacing dynamically to push footer elements down
-	occupiedRows := len(sb) + 2
-	remainingRows := m.Height - occupiedRows - 4
+	occupiedRows := len(sb) + 4
+	remainingRows := m.Height - occupiedRows
 	if remainingRows > 0 {
 		sb = append(sb, strings.Repeat("\n", remainingRows))
 	}
 
-	// 4. Sidebar Status Utilities (Mode, GCal sync, time)
+	// 4. Footer: mode + gcal + clock
 	syncColor := m.Theme.Muted
 	if m.Sync.IsOnline() {
 		syncColor = m.Theme.SuccessColor
 	}
 	gcalBadge := lipgloss.NewStyle().Foreground(syncColor).Render("● gcal")
 
+	modeColor := m.Theme.Muted
+	switch m.CurrentMode {
+	case ModeNormal:
+		modeColor = m.Theme.Muted
+	case ModeZen:
+		modeColor = m.Theme.FocusPurple
+	case ModeCommand:
+		modeColor = m.Theme.P1Color
+	case ModeForm:
+		modeColor = m.Theme.Accent
+	}
 	modeBadge := lipgloss.NewStyle().
-		Foreground(m.Theme.FocusPurple).
+		Foreground(modeColor).
 		Bold(true).
 		Render(strings.ToLower(string(m.CurrentMode)))
 
 	timeStr := time.Now().Format("15:04")
+	clockStr := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(timeStr)
 
-	sb = append(sb, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", width)))
-	sb = append(sb, modeBadge+"  •  "+gcalBadge)
-	sb = append(sb, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(timeStr))
+	sb = append(sb, sep)
+	sb = append(sb, modeBadge+"  "+gcalBadge)
+	sb = append(sb, clockStr)
+	sb = append(sb, mutedStyle.Render("? for help"))
 
 	return strings.Join(sb, "\n")
 }

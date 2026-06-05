@@ -45,6 +45,54 @@ func tickCmd() tea.Cmd {
 	})
 }
 
+// Layout holds all pre-computed column dimensions for the current terminal size.
+// It is the single source of truth — view functions must NOT recompute these.
+type Layout struct {
+	SidebarW  int // Arc sidebar width
+	TimelineW int // Day timeline column width (day view)
+	TodoW     int // Todo shelf column width (day view)
+	WorkspaceW int // Full workspace width (non-day views = TimelineW + TodoW)
+	Height    int // Total terminal height
+}
+
+// computeLayout calculates all column widths from terminal dimensions.
+// Sidebar: 15% of width, clamped [12, 18]
+// Todo shelf: 20% of workspace
+// Timeline: remaining workspace space
+func computeLayout(w, h int) Layout {
+	sidebarW := w * 15 / 100
+	if sidebarW < 14 {
+		sidebarW = 14
+	} else if sidebarW > 20 {
+		sidebarW = 20
+	}
+
+	workspaceW := w - sidebarW - 1 // 1 for the sidebar right border
+	if workspaceW < 40 {
+		workspaceW = 40
+	}
+
+	todoW := workspaceW * 22 / 100
+	if todoW < 22 {
+		todoW = 22
+	} else if todoW > 36 {
+		todoW = 36
+	}
+
+	timelineW := workspaceW - todoW - 2 // 2 for gutter between columns
+	if timelineW < 30 {
+		timelineW = 30
+	}
+
+	return Layout{
+		SidebarW:   sidebarW,
+		TimelineW:  timelineW,
+		TodoW:      todoW,
+		WorkspaceW: workspaceW,
+		Height:     h,
+	}
+}
+
 type TaskForm struct {
 	Title          string
 	Description    string
@@ -106,21 +154,23 @@ func NewTaskForm() TaskForm {
 }
 
 type Model struct {
-	DB               *db.JSONDB
-	Sync             *sync.SyncEngine
-	Theme            Theme
-	CurrentView      ViewType
-	CurrentMode      UIState
-	Width            int
-	Height           int
-	Tasks            []model.Task
-	SelectedDay      time.Time
-	StatusMsg        string
-	LastSyncTime     time.Time
-	SyncLogs         []string
+	DB           *db.JSONDB
+	Sync         *sync.SyncEngine
+	Theme        Theme
+	Layout       Layout
+	CurrentView  ViewType
+	CurrentMode  UIState
+	Width        int
+	Height       int
+	Tasks        []model.Task
+	SelectedDay  time.Time
+	StatusMsg    string
+	LastSyncTime time.Time
+	SyncLogs     []string
+
 	SelectedTaskUUID string
 	TodoShelfFocus   bool // DayView specific: toggle between timeline and todo shelf
-	TimelineHour     int  // DayView specific: selected hour on timeline (8 to 20)
+	TimelineHour     int  // DayView specific: selected hour on timeline (0-23)
 
 	// Command Palette
 	CommandInput textinput.Model
@@ -160,6 +210,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		DB:             database,
 		Sync:           syncEngine,
 		Theme:          NewTheme(),
+		Layout:         computeLayout(120, 40), // sensible default before first WindowSizeMsg
 		CurrentView:    DayView,
 		CurrentMode:    ModeNormal,
 		SelectedDay:    time.Now(),

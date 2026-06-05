@@ -148,6 +148,11 @@ type Model struct {
 	ReviewTasksCompleted int
 	ReviewTasksDeferred  int
 	ReviewFocusSeconds   int
+
+	// Scrolling & Help View States
+	HelpOpen          bool
+	ScrollOffset      int
+	ShelfScrollOffset int
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
@@ -261,6 +266,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.HelpOpen {
+			switch msg.String() {
+			case "esc", "enter", "q", " ", "?":
+				m.HelpOpen = false
+				return m, nil
+			}
+			return m, nil
+		}
+
 		if m.PromptOpen {
 			switch msg.String() {
 			case "enter":
@@ -358,25 +372,66 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	// Global View Selectors
 	switch key {
 	case "1":
 		m.CurrentView = DashboardView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 		return m, nil
 	case "2":
 		m.CurrentView = MonthView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 		return m, nil
 	case "3":
 		m.CurrentView = WeekView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 		return m, nil
 	case "4":
 		m.CurrentView = DayView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 		return m, nil
 	case "5":
 		m.CurrentView = AnalyticsView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
+		return m, nil
+	case "ctrl+d":
+		if m.CurrentView == DayView && m.TodoShelfFocus {
+			m.ShelfScrollOffset += 2
+			shelfTasks := m.getTodoShelfTasks()
+			if m.ShelfScrollOffset > len(shelfTasks)-3 {
+				m.ShelfScrollOffset = len(shelfTasks) - 3
+			}
+			if m.ShelfScrollOffset < 0 {
+				m.ShelfScrollOffset = 0
+			}
+		} else {
+			m.ScrollOffset += 2
+		}
+		return m, nil
+	case "ctrl+u":
+		if m.CurrentView == DayView && m.TodoShelfFocus {
+			m.ShelfScrollOffset -= 2
+			if m.ShelfScrollOffset < 0 {
+				m.ShelfScrollOffset = 0
+			}
+		} else {
+			m.ScrollOffset -= 2
+			if m.ScrollOffset < 0 {
+				m.ScrollOffset = 0
+			}
+		}
+		return m, nil
+	case "?":
+		m.HelpOpen = true
+		m.StatusMsg = "Help opened. Press Esc/Enter to exit."
 		return m, nil
 	case ":":
 		m.CurrentMode = ModeCommand
@@ -415,16 +470,6 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", task.Title)
 		}
 		return m, nil
-	case " ":
-		// Check for Zen Mode Trigger
-		// PRD: Space during Zen pauses/resumes, but in Normal, let's see:
-		// Actually, standard PRD says: Space on selected task block in Normal does detail slide out, or leader + x starts Zen
-		// Let's implement leader+x by checking combo or just using Space then x, or 'g' 'x'.
-		// Let's implement a hotkey like `z` or `g x` or just `ctrl+x` or `g` then `x`.
-		// Let's use `ctrl+x` or `g` followed by `x` or just check if they press `x` inside NORMAL mode?
-		// Wait, the PRD says: "leader + x -> Activates Zen Mode, initializing the greedy Pomodoro generator layout."
-		// Let's support `g` followed by `x` or we can support press `z` to trigger it easily, or Space then x!
-		// Let's support both 'z' (easy) and 'space' followed by 'x'. Let's check for 'z' directly for ease.
 	case "z":
 		task, exists := m.getActiveTask()
 		if exists {
@@ -452,7 +497,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleMonthNav(key string) {
+func (m *Model) handleMonthNav(key string) {
 	switch key {
 	case "h":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -1)
@@ -471,7 +516,7 @@ func (m Model) handleMonthNav(key string) {
 	}
 }
 
-func (m Model) handleWeekNav(key string) {
+func (m *Model) handleWeekNav(key string) {
 	switch key {
 	case "h":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -1)
@@ -484,7 +529,7 @@ func (m Model) handleWeekNav(key string) {
 	}
 }
 
-func (m Model) handleDayNav(key string) {
+func (m *Model) handleDayNav(key string) {
 	switch key {
 	case "h", "l", "tab":
 		m.TodoShelfFocus = !m.TodoShelfFocus
@@ -614,7 +659,7 @@ func (m *Model) moveTaskSelection(dir int) {
 	m.SelectedTaskUUID = shelf[idx].UUID
 }
 
-func (m Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.ZenTimer == nil {
 		m.CurrentMode = ModeNormal
 		return m, nil
@@ -652,7 +697,7 @@ func (m Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		val := m.CommandInput.Value()
@@ -668,7 +713,7 @@ func (m Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) runCommand(val string) (tea.Model, tea.Cmd) {
+func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 	val = strings.TrimSpace(val)
 	if val == "" {
 		return m, nil
@@ -683,19 +728,32 @@ func (m Model) runCommand(val string) (tea.Model, tea.Cmd) {
 
 	case "dashboard":
 		m.CurrentView = DashboardView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 		m.StatusMsg = "Switched to Dashboard view."
 	case "month":
 		m.CurrentView = MonthView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 		m.StatusMsg = "Switched to Month view."
 	case "week":
 		m.CurrentView = WeekView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 		m.StatusMsg = "Switched to Week view."
 	case "day":
 		m.CurrentView = DayView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 		m.StatusMsg = "Switched to Day view."
 	case "analytics":
 		m.CurrentView = AnalyticsView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 		m.StatusMsg = "Switched to Analytics view."
+	case "help", "h", "?":
+		m.HelpOpen = true
+		m.StatusMsg = "Help opened. Press Esc/Enter to exit."
 
 	case "create", "todo":
 		if len(parts) < 2 {
@@ -791,7 +849,7 @@ func (m Model) runCommand(val string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
 	switch key {

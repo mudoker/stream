@@ -13,20 +13,19 @@ import (
 
 func (m Model) View() string {
 	if m.Width == 0 || m.Height == 0 {
-		return "Initializing canvas..."
+		return "Initializing workspace..."
 	}
 
-	// 1. Zen Mode takes over full viewport
+	// 1. Zen Mode takes over the workspace
 	if m.CurrentMode == ModeZen {
 		return m.renderZenMode()
 	}
 
-	// 2. Normal View layout construction
+	// 2. Multi-column workspace composition (Header + Content + Footer)
 	header := m.renderHeader()
 	footer := m.renderFooter()
 
-	// Available height for main content
-	mainHeight := m.Height - lipgloss.Height(header) - lipgloss.Height(footer) - 1
+	mainHeight := m.Height - lipgloss.Height(header) - lipgloss.Height(footer)
 	if mainHeight < 5 {
 		mainHeight = 5
 	}
@@ -45,29 +44,32 @@ func (m Model) View() string {
 		content = m.renderAnalyticsView(mainHeight)
 	}
 
-	// If Detail panel is open, slide it in on the right
+	// Slide-over drawer on the right
 	if m.DetailOpen {
 		detailPanel := m.renderDetailPanel(mainHeight)
-		rightWidth := 35
-		leftWidth := m.Width - rightWidth - 2
+		drawerWidth := int(float64(m.Width) * 0.35)
+		if drawerWidth < 25 {
+			drawerWidth = 25
+		}
+		leftWidth := m.Width - drawerWidth - 3
 		if leftWidth < 20 {
 			leftWidth = 20
 		}
 		leftContent := lipgloss.NewStyle().Width(leftWidth).Render(content)
-		rightContent := lipgloss.NewStyle().Width(rightWidth).Render(detailPanel)
-		content = lipgloss.JoinHorizontal(lipgloss.Top, leftContent, "  ", rightContent)
+		rightContent := lipgloss.NewStyle().Width(drawerWidth).Render(detailPanel)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, leftContent, "   ", rightContent)
 	}
 
-	// If Wizard is active, draw it as a modal overlay on top of main content
+	// Centered floating modal overlay for Task Wizard
 	if m.CurrentMode == ModeForm {
 		formModal := m.renderFormModal()
-		// Simple mock of modal overlay center alignment
 		contentHeight := lipgloss.Height(content)
 		formHeight := lipgloss.Height(formModal)
 		paddingTop := (contentHeight - formHeight) / 2
 		if paddingTop < 0 {
 			paddingTop = 0
 		}
+		// Render modal centered
 		content = lipgloss.JoinVertical(lipgloss.Center,
 			strings.Repeat("\n", paddingTop),
 			formModal,
@@ -75,122 +77,107 @@ func (m Model) View() string {
 		)
 	}
 
-	// Join all parts vertically
 	canvas := lipgloss.JoinVertical(lipgloss.Left, header, content, footer)
 
-	// Add Command Palette at the very bottom if active
+	// Floating Command Palette Overlay at the bottom
 	if m.CurrentMode == ModeCommand {
-		cmdBar := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(m.Theme.Focus).
-			Width(m.Width - 2).
-			Render(m.CommandInput.View())
-		canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, cmdBar)
+		cmdPalette := m.renderCommandPalette()
+		canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, cmdPalette)
 	}
 
 	return canvas
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 func (m Model) renderHeader() string {
-	viewNames := []string{" Dashboard ", " Month ", " Week ", " Day ", " Analytics "}
+	viewNames := []string{"DASHBOARD", "MONTH GRID", "WEEKLY LANES", "DAILY TIMELINE", "ANALYTICS"}
 	var tabs []string
 
 	for i, name := range viewNames {
 		if int(m.CurrentView) == i {
-			// Highlighted active tab
 			tabs = append(tabs, lipgloss.NewStyle().
-				Foreground(m.Theme.Bg).
-				Background(m.Theme.Focus).
+				Foreground(m.Theme.FocusPurple).
 				Bold(true).
-				Render(name))
+				Render(fmt.Sprintf("● %s", name)))
 		} else {
 			tabs = append(tabs, lipgloss.NewStyle().
 				Foreground(m.Theme.Muted).
-				Background(m.Theme.PanelBg).
-				Render(name))
+				Render(fmt.Sprintf("  %s", name)))
 		}
 	}
 
 	tabsJoined := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
 
-	// Mode badge
+	modeLabel := fmt.Sprintf(" %s ", m.CurrentMode)
 	modeColor := m.Theme.Accent
 	if m.CurrentMode == ModeZen {
-		modeColor = m.Theme.Critical
+		modeColor = m.Theme.P0Color
 	} else if m.CurrentMode == ModeForm {
-		modeColor = m.Theme.Warning
+		modeColor = m.Theme.P1Color
 	}
-	modeBadge := lipgloss.NewStyle().
-		Foreground(m.Theme.Bg).
-		Background(modeColor).
-		Bold(true).
-		Padding(0, 1).
-		Render(fmt.Sprintf(" %s ", m.CurrentMode))
 
-	timeStr := time.Now().Format("2006-01-02 15:04:05")
+	modeBadge := lipgloss.NewStyle().
+		Background(modeColor).
+		Foreground(m.Theme.CanvasBg).
+		Bold(true).
+		Render(modeLabel)
+
+	timeStr := time.Now().Format("Jan _2 15:04")
 	timeDisplay := lipgloss.NewStyle().
-		Foreground(m.Theme.Success).
+		Foreground(m.Theme.SuccessColor).
 		Render(timeStr)
 
-	// Combine components
-	gapWidth := m.Width - lipgloss.Width(tabsJoined) - lipgloss.Width(modeBadge) - lipgloss.Width(timeDisplay) - 2
+	gapWidth := m.Width - lipgloss.Width(tabsJoined) - lipgloss.Width(modeBadge) - lipgloss.Width(timeDisplay) - 4
 	if gapWidth < 2 {
 		gapWidth = 2
 	}
 	gap := strings.Repeat(" ", gapWidth)
 
-	headerLine := lipgloss.JoinHorizontal(lipgloss.Center, tabsJoined, gap, modeBadge, " ", timeDisplay)
+	headerLine := lipgloss.JoinHorizontal(lipgloss.Center, tabsJoined, gap, modeBadge, "  ", timeDisplay)
 
 	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(m.Theme.Muted).
+		Background(m.Theme.PanelBg).
 		Width(m.Width).
-		Render(headerLine)
+		Padding(1, 2).
+		Render(headerLine) + "\n"
 }
 
 func (m Model) renderFooter() string {
-	shortcuts := "1-5: Views | i: New Task | Enter: Detail | z: Zen Mode | : CMD | Ctrl+C: Quit"
+	shortcuts := "1-5 Views | i New Task | Enter Drawer | z Zen Mode | : Palette"
 	status := m.StatusMsg
 	if status == "" {
-		status = "Ready."
+		status = "IDLE"
 	}
-	if len(status) > 40 {
-		status = status[:37] + "..."
+	if len(status) > 35 {
+		status = status[:32] + "..."
 	}
 
-	syncState := "GCal: Offline"
+	syncState := "Offline"
 	if m.Sync.IsOnline() {
-		syncState = "GCal: Online ✓"
+		syncState = "Online"
 	}
+	syncDisplay := lipgloss.NewStyle().
+		Foreground(m.Theme.SuccessColor).
+		Render(fmt.Sprintf("GCal: %s", syncState))
 
 	left := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(shortcuts)
-	center := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("  " + status)
-	right := lipgloss.NewStyle().Foreground(m.Theme.Success).Render(syncState)
+	center := lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Bold(true).Render("  " + status)
 
-	gapWidth := m.Width - lipgloss.Width(left) - lipgloss.Width(center) - lipgloss.Width(right) - 4
+	gapWidth := m.Width - lipgloss.Width(left) - lipgloss.Width(center) - lipgloss.Width(syncDisplay) - 4
 	if gapWidth < 2 {
 		gapWidth = 2
 	}
 	gap := strings.Repeat(" ", gapWidth)
 
-	footerLine := lipgloss.JoinHorizontal(lipgloss.Center, left, center, gap, right)
+	footerLine := lipgloss.JoinHorizontal(lipgloss.Center, left, center, gap, syncDisplay)
 
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, false, false, false).
-		BorderForeground(m.Theme.Muted).
+	return "\n" + lipgloss.NewStyle().
+		Background(m.Theme.PanelBg).
 		Width(m.Width).
+		Padding(0, 2).
 		Render(footerLine)
 }
 
 func (m Model) renderDashboard(height int) string {
-	// 1. Calculate statistics
 	today := time.Now()
 	var todayTasks []model.Task
 	var completedCount int
@@ -204,7 +191,6 @@ func (m Model) renderDashboard(height int) string {
 				t.TimeWindow.Start.Month() == today.Month() &&
 				t.TimeWindow.Start.Day() == today.Day()
 		} else {
-			// Unscheduled but created today
 			isToday = t.CreatedAt.Year() == today.Year() &&
 				t.CreatedAt.Month() == today.Month() &&
 				t.CreatedAt.Day() == today.Day()
@@ -220,26 +206,23 @@ func (m Model) renderDashboard(height int) string {
 		}
 	}
 
-	// 2. Render Left Panel (Summary & Next Scheduled Tasks)
-	summary := fmt.Sprintf(
-		"Tasks Today:       %d\n"+
-			"Completed:         %d\n"+
-			"Planned Focus:     %s\n"+
-			"Completed Focus:   %s\n",
-		len(todayTasks),
-		completedCount,
+	// Widgets are borderless panels separated by background
+	todayWidgetContent := fmt.Sprintf(
+		"Focus Planned        %-8s\n"+
+			"Focus Completed      %-8s\n"+
+			"Tasks Remaining      %-8d\n"+
+			"Current Task         %-15s\n",
 		time.Duration(plannedFocusSecs)*time.Second,
 		time.Duration(elapsedFocusSecs)*time.Second,
+		len(todayTasks)-completedCount,
+		"Refactor Auth Pipeline", // placeholder
 	)
 
-	summaryBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.Accent).
-		Padding(1, 2).
-		Width(35).
-		Render(" Today Summary \n\n" + summary)
+	todayWidget := m.Theme.PanelStyle.
+		Width(38).
+		Render("TODAY SUMMARY\n\n" + todayWidgetContent)
 
-	upcomingLines := []string{" Upcoming Tasks:\n"}
+	upcomingLines := []string{"UPCOMING TASKS\n"}
 	var upcomingTasks []model.Task
 	for _, t := range m.Tasks {
 		if t.SchedulingType == model.Anchored && t.TimeWindow.Start.After(today) && t.LifecycleState != model.StateCompleted {
@@ -248,26 +231,23 @@ func (m Model) renderDashboard(height int) string {
 	}
 
 	if len(upcomingTasks) == 0 {
-		upcomingLines = append(upcomingLines, "  No upcoming tasks scheduled.")
+		upcomingLines = append(upcomingLines, "No upcoming tasks scheduled.")
 	} else {
 		for i, t := range upcomingTasks {
-			if i >= 4 {
+			if i >= 3 {
 				break
 			}
-			upcomingLines = append(upcomingLines, fmt.Sprintf("  • %s (%s)", t.Title, t.TimeWindow.Start.Format("15:04")))
+			upcomingLines = append(upcomingLines, fmt.Sprintf("%-5s  %s", t.TimeWindow.Start.Format("15:04"), strings.ToUpper(t.Title)))
 		}
 	}
 
-	upcomingBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.Muted).
-		Padding(1, 2).
-		Width(35).
+	upcomingWidget := m.Theme.PanelStyle.
+		Width(38).
 		Render(strings.Join(upcomingLines, "\n"))
 
-	leftPane := lipgloss.JoinVertical(lipgloss.Left, summaryBox, "\n", upcomingBox)
+	leftPane := lipgloss.JoinVertical(lipgloss.Left, todayWidget, "\n", upcomingWidget)
 
-	// 3. Render Right Panel (Weekly Workload Chart)
+	// Workload Chart Widget
 	weeklyPoints := make(map[time.Weekday]int)
 	startOfWeek := today.AddDate(0, 0, -int(today.Weekday()))
 	for i := 0; i < 7; i++ {
@@ -279,7 +259,7 @@ func (m Model) renderDashboard(height int) string {
 		}
 	}
 
-	chartLines := []string{" Weekly Workload (Story Points)\n"}
+	chartLines := []string{"WEEKLY WORKLOAD (STORY POINTS)\n"}
 	weekdays := []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday, time.Sunday}
 	weekdayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 
@@ -295,72 +275,64 @@ func (m Model) renderDashboard(height int) string {
 
 	for idx, wd := range weekdays {
 		pts := weeklyPoints[wd]
-		barWidth := int(math.Round(float64(pts) * 15.0 / float64(maxPoints)))
+		barWidth := int(math.Round(float64(pts) * 18.0 / float64(maxPoints)))
 		bar := strings.Repeat("█", barWidth)
 		if bar == "" && pts > 0 {
 			bar = "▏"
 		}
-		color := m.Theme.Success
+		color := m.Theme.SuccessColor
 		if pts >= 9 {
-			color = m.Theme.Critical
+			color = m.Theme.P0Color
 		} else if pts >= 6 {
-			color = m.Theme.Warning
+			color = m.Theme.P1Color
 		} else if pts <= 2 {
 			color = m.Theme.Muted
 		}
 
 		coloredBar := lipgloss.NewStyle().Foreground(color).Render(bar)
-		chartLines = append(chartLines, fmt.Sprintf("  %s │ %s (%d SP)", weekdayNames[idx], coloredBar, pts))
+		chartLines = append(chartLines, fmt.Sprintf("%s  │ %s (%d SP)", weekdayNames[idx], coloredBar, pts))
 	}
 
-	rightWidth := m.Width - 42
+	rightWidth := m.Width - 46
 	if rightWidth < 20 {
 		rightWidth = 20
 	}
 
-	chartBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.Focus).
-		Padding(1, 2).
+	chartWidget := m.Theme.PanelStyle.
 		Width(rightWidth).
 		Height(12).
 		Render(strings.Join(chartLines, "\n"))
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftPane, "   ", chartBox)
+	return lipgloss.JoinHorizontal(lipgloss.Top, leftPane, "   ", chartWidget)
 }
 
 func (m Model) renderMonthView(height int) string {
 	today := time.Now()
 	year, month, _ := m.SelectedDay.Date()
 
-	// Find the start date of the monthly calendar grid (Monday of the first week of the month)
 	firstOfMonth := time.Date(year, month, 1, 0, 0, 0, 0, today.Location())
-	offset := int(firstOfMonth.Weekday()) - 1 // Monday offset
+	offset := int(firstOfMonth.Weekday()) - 1
 	if offset < 0 {
 		offset = 6
 	}
 	gridStart := firstOfMonth.AddDate(0, 0, -offset)
 
 	var sb strings.Builder
-	title := fmt.Sprintf("   Strategic Calendar Grid: %s %d   ", month.String(), year)
-	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Focus).Bold(true).Render(title) + "\n\n")
+	title := fmt.Sprintf("%s %d", strings.ToUpper(month.String()), year)
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Bold(true).Render("  "+title) + "\n\n")
 
-	// Print Weekday headers
-	sb.WriteString("  Mon   Tue   Wed   Thu   Fri   Sat   Sun  \n")
-	sb.WriteString(" ╭─────┬─────┬─────┬─────┬─────┬─────┬─────╮\n")
+	sb.WriteString("  Mon    Tue    Wed    Thu    Fri    Sat    Sun\n")
+	sb.WriteString("  ─────────────────────────────────────────────\n")
 
 	cellDay := gridStart
 	for week := 0; week < 6; week++ {
 		var rowDays []string
-		var rowMetrics []string
-
 		for wday := 0; wday < 7; wday++ {
 			dayNum := cellDay.Day()
 			isCurrentMonth := cellDay.Month() == month
 			isToday := cellDay.Year() == today.Year() && cellDay.Month() == today.Month() && cellDay.Day() == today.Day()
 			isSelected := cellDay.Year() == m.SelectedDay.Year() && cellDay.Month() == m.SelectedDay.Month() && cellDay.Day() == m.SelectedDay.Day()
 
-			// Get daily SP workload
 			dailySP := 0
 			for _, t := range m.Tasks {
 				if t.TimeWindow.Start.Year() == cellDay.Year() &&
@@ -370,58 +342,48 @@ func (m Model) renderMonthView(height int) string {
 				}
 			}
 
-			// Color coding according to SP load
-			var numColor lipgloss.TerminalColor = m.Theme.Muted
-			if isCurrentMonth {
-				numColor = m.Theme.Fg
-				if dailySP >= 9 {
-					numColor = m.Theme.Critical
-				} else if dailySP >= 6 {
-					numColor = m.Theme.Warning
-				} else if dailySP >= 3 {
-					numColor = m.Theme.Success
-				}
-			}
-
-			numStyle := lipgloss.NewStyle().Foreground(numColor)
+			var valStr string
 			if isToday {
-				numStyle = numStyle.Background(m.Theme.Accent).Foreground(m.Theme.Bg).Bold(true)
+				valStr = fmt.Sprintf("[%2d]", dayNum)
 			} else if isSelected {
-				numStyle = numStyle.Background(m.Theme.Focus).Foreground(m.Theme.Bg).Bold(true)
+				valStr = fmt.Sprintf("❮%2d❯", dayNum)
+			} else {
+				valStr = fmt.Sprintf(" %2d ", dayNum)
 			}
 
-			rowDays = append(rowDays, fmt.Sprintf(" %-3s", numStyle.Render(fmt.Sprintf("%2d", dayNum))))
-
-			metricStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
-			if dailySP > 0 {
-				metricColor := m.Theme.Success
+			var dayColor lipgloss.TerminalColor = m.Theme.Muted
+			if isCurrentMonth {
+				dayColor = m.Theme.Fg
 				if dailySP >= 9 {
-					metricColor = m.Theme.Critical
+					dayColor = m.Theme.P0Color
 				} else if dailySP >= 6 {
-					metricColor = m.Theme.Warning
+					dayColor = m.Theme.P1Color
+				} else if dailySP >= 3 {
+					dayColor = m.Theme.SuccessColor
 				}
-				metricStyle = lipgloss.NewStyle().Foreground(metricColor)
 			}
-			rowMetrics = append(rowMetrics, metricStyle.Render(fmt.Sprintf("%2dSP", dailySP)))
 
+			style := lipgloss.NewStyle().Foreground(dayColor)
+			if isToday {
+				style = style.Foreground(m.Theme.Accent).Bold(true)
+			} else if isSelected {
+				style = style.Foreground(m.Theme.FocusPurple).Bold(true)
+			}
+
+			rowDays = append(rowDays, fmt.Sprintf("%-6s", style.Render(valStr)))
 			cellDay = cellDay.AddDate(0, 0, 1)
 		}
-
-		sb.WriteString(" │" + strings.Join(rowDays, "│") + "│\n")
-		sb.WriteString(" │" + strings.Join(rowMetrics, "│") + "│\n")
-
-		if week < 5 {
-			sb.WriteString(" ├─────┼─────┼─────┼─────┼─────┼─────┼─────┤\n")
-		}
+		sb.WriteString("  " + strings.Join(rowDays, "") + "\n\n")
 	}
-	sb.WriteString(" ╰─────┴─────┴─────┴─────┴─────┴─────┴─────╯\n")
 
-	return sb.String()
+	return m.Theme.PanelStyle.
+		Width(m.Width - 4).
+		Height(height).
+		Render(sb.String())
 }
 
 func (m Model) renderWeekView(height int) string {
 	today := time.Now()
-	// Find starting Monday of SelectedDay's week
 	offset := int(m.SelectedDay.Weekday()) - 1
 	if offset < 0 {
 		offset = 6
@@ -430,6 +392,11 @@ func (m Model) renderWeekView(height int) string {
 
 	weekdayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
 	var columns []string
+
+	colWidth := (m.Width - 10) / 7
+	if colWidth < 12 {
+		colWidth = 12
+	}
 
 	for i := 0; i < 7; i++ {
 		day := weekStart.AddDate(0, 0, i)
@@ -446,42 +413,57 @@ func (m Model) renderWeekView(height int) string {
 			}
 		}
 
-		// Header for the column
-		colStyle := lipgloss.NewStyle().Width(18).Height(height - 2).Border(lipgloss.RoundedBorder())
+		colStyle := lipgloss.NewStyle().
+			Width(colWidth).
+			Height(height - 2).
+			Background(m.Theme.PanelBg).
+			Padding(1, 1)
+
 		if isToday {
-			colStyle = colStyle.BorderForeground(m.Theme.Accent)
-		} else if isSelected {
-			colStyle = colStyle.BorderForeground(m.Theme.Focus)
-		} else {
-			colStyle = colStyle.BorderForeground(m.Theme.Muted)
+			colStyle = colStyle.Background(m.Theme.SelectedBg)
 		}
 
 		var dayContent []string
 		headerText := fmt.Sprintf("%s %02d/%02d", weekdayNames[i], day.Month(), day.Day())
 		if isToday {
 			headerText = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(headerText)
+		} else if isSelected {
+			headerText = lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Render(headerText)
+		} else {
+			headerText = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(headerText)
 		}
-		dayContent = append(dayContent, headerText, strings.Repeat("─", 16))
+		dayContent = append(dayContent, headerText, "")
 
-		// Render overlap splits
 		resolved := ResolveOverlaps(dayTasks)
 		if len(resolved) == 0 {
-			dayContent = append(dayContent, "\n  No Events")
+			dayContent = append(dayContent, "\nNo Events")
 		} else {
-			// Print event blocks inside the vertical column
 			for _, rc := range resolved {
 				timeText := fmt.Sprintf("%s-%s", rc.Task.TimeWindow.Start.Format("15:04"), rc.Task.TimeWindow.End.Format("15:04"))
-				card := fmt.Sprintf("[%s]\n%s", timeText, rc.Task.Title)
-				if len(card) > 16 {
-					card = card[:13] + "..."
-				}
-				cardStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg).Padding(0, 1).Border(lipgloss.NormalBorder())
+
+				// Solid block bar representation
+				var blockColor lipgloss.Color = m.Theme.P2Color
 				if rc.Task.Priority == model.P0 {
-					cardStyle = cardStyle.BorderForeground(m.Theme.Critical)
-				} else {
-					cardStyle = cardStyle.BorderForeground(m.Theme.Muted)
+					blockColor = m.Theme.P0Color
+				} else if rc.Task.Priority == model.P1 {
+					blockColor = m.Theme.P1Color
+				} else if rc.Task.Priority == model.P3 {
+					blockColor = m.Theme.P3Color
 				}
-				dayContent = append(dayContent, cardStyle.Render(card))
+
+				title := strings.ToUpper(rc.Task.Title)
+				if len(title) > colWidth-3 {
+					title = title[:colWidth-5] + ".."
+				}
+
+				block := lipgloss.NewStyle().
+					Background(blockColor).
+					Foreground(m.Theme.CanvasBg).
+					Padding(0, 1).
+					Bold(true).
+					Render(fmt.Sprintf("%s\n%s", timeText, title))
+
+				dayContent = append(dayContent, "\n"+block)
 			}
 		}
 
@@ -492,13 +474,16 @@ func (m Model) renderWeekView(height int) string {
 }
 
 func (m Model) renderDayView(height int) string {
-	// Day timeline on left, Todo Shelf on right
-	leftWidth := m.Width - 30
-	if leftWidth < 30 {
-		leftWidth = 30
+	// 75% Timeline, 25% Todo Shelf
+	timelineWidth := int(float64(m.Width) * 0.73)
+	shelfWidth := m.Width - timelineWidth - 4
+	if timelineWidth < 30 {
+		timelineWidth = 30
+	}
+	if shelfWidth < 20 {
+		shelfWidth = 20
 	}
 
-	// 1. Fetch tasks for selected day
 	var anchoredTasks []model.Task
 	for _, t := range m.Tasks {
 		if t.SchedulingType == model.Anchored &&
@@ -509,217 +494,253 @@ func (m Model) renderDayView(height int) string {
 		}
 	}
 
-	// Resolve overlaps
 	cols := ResolveOverlaps(anchoredTasks)
 
-	// Create hourly schedule content
 	var timelineLines []string
-	timelineLines = append(timelineLines, fmt.Sprintf("   Timeline for %s\n", m.SelectedDay.Format("Monday, 2006-01-02")))
+	headerText := fmt.Sprintf("TIMELINE FOR %s", strings.ToUpper(m.SelectedDay.Format("Monday, 2006-01-02")))
+	timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Bold(true).Render(headerText)+"\n")
 
-	// Current local time
 	now := time.Now()
 	isToday := m.SelectedDay.Year() == now.Year() && m.SelectedDay.Month() == now.Month() && m.SelectedDay.Day() == now.Day()
 
 	for h := 8; h <= 20; h++ {
-		// If live cursor matches this hour slot
-		if isToday && now.Hour() == h && now.Minute() < 30 && (h > 8) {
-			// Display live cursor line
-			line := fmt.Sprintf("─────────── %02d:%02d LIVE NOW ───────────", now.Hour(), now.Minute())
-			timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Success).Bold(true).Render(line))
+		// Slice live cursor line cleanly through timeline
+		if isToday && now.Hour() == h && now.Minute() < 30 && h > 8 {
+			lineText := fmt.Sprintf("───────────── %02d:%02d NOW ─────────────", now.Hour(), now.Minute())
+			timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(lineText))
 		}
 
-		// Render task cells at hour 'h'
-		var activeTasksAtHour []ScheduledColumn
+		var tasksAtHour []ScheduledColumn
 		for _, rc := range cols {
 			startH := rc.Task.TimeWindow.Start.Hour()
 			endH := rc.Task.TimeWindow.End.Hour()
 			if h >= startH && h < endH {
-				activeTasksAtHour = append(activeTasksAtHour, rc)
+				tasksAtHour = append(tasksAtHour, rc)
 			}
 		}
 
 		isSelectedHour := !m.TodoShelfFocus && m.TimelineHour == h
 		hourLabel := fmt.Sprintf("%02d:00", h)
 		if isSelectedHour {
-			hourLabel = lipgloss.NewStyle().Background(m.Theme.Focus).Foreground(m.Theme.Bg).Bold(true).Render(hourLabel)
+			hourLabel = lipgloss.NewStyle().Background(m.Theme.FocusPurple).Foreground(m.Theme.CanvasBg).Bold(true).Render(hourLabel)
 		} else {
 			hourLabel = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(hourLabel)
 		}
 
-		if len(activeTasksAtHour) == 0 {
-			timelineLines = append(timelineLines, fmt.Sprintf("  %s │", hourLabel))
+		if len(tasksAtHour) == 0 {
+			timelineLines = append(timelineLines, fmt.Sprintf("  %s  │", hourLabel))
 		} else {
-			// Draw tasks split into columns
 			var colBlocks []string
-			cellWidth := (leftWidth - 12) / len(activeTasksAtHour)
-			if cellWidth < 10 {
-				cellWidth = 10
+			cellWidth := (timelineWidth - 14) / len(tasksAtHour)
+			if cellWidth < 12 {
+				cellWidth = 12
 			}
 
-			for _, col := range activeTasksAtHour {
+			for _, col := range tasksAtHour {
 				t := col.Task
-				title := t.Title
-				if len(title) > cellWidth-4 {
-					title = title[:cellWidth-7] + "..."
+				title := strings.ToUpper(t.Title)
+				if len(title) > cellWidth-6 {
+					title = title[:cellWidth-9] + "..."
 				}
 
 				isActiveBlock := isToday && now.Hour() >= t.TimeWindow.Start.Hour() && now.Hour() < t.TimeWindow.End.Hour()
 
-				var blockStyle lipgloss.Style
-				if isActiveBlock {
-					blockStyle = m.Theme.ActiveCard
-				} else {
-					blockStyle = m.Theme.PanelStyle
-				}
-
-				// Color-code based on priority
+				// Premium card styling without surround border: left priority accent line + elevated bg
+				var pBarColor lipgloss.Color = m.Theme.P2Color
 				if t.Priority == model.P0 {
-					blockStyle = blockStyle.BorderForeground(m.Theme.Critical)
+					pBarColor = m.Theme.P0Color
 				} else if t.Priority == model.P1 {
-					blockStyle = blockStyle.BorderForeground(m.Theme.Warning)
+					pBarColor = m.Theme.P1Color
+				} else if t.Priority == model.P3 {
+					pBarColor = m.Theme.P3Color
 				}
 
-				cardText := fmt.Sprintf("❪%dSP❫ %s", t.StoryPoints, title)
+				cardStyle := lipgloss.NewStyle().
+					Background(m.Theme.PanelBg).
+					Foreground(m.Theme.Fg).
+					Padding(1, 2)
+
 				if isActiveBlock {
-					cardText = "▌ ACTIVE NOW\n" + cardText
+					cardStyle = cardStyle.Background(m.Theme.SelectedBg)
 				}
-				colBlocks = append(colBlocks, blockStyle.Width(cellWidth).Render(cardText))
+
+				// Build the card contents
+				var cardLines []string
+				pBadge := lipgloss.NewStyle().Foreground(pBarColor).Bold(true).Render("▲ " + string(t.Priority))
+				spBadge := fmt.Sprintf("• %d SP", t.StoryPoints)
+				cardLines = append(cardLines, fmt.Sprintf("%s %s", pBadge, spBadge))
+
+				if isActiveBlock {
+					activeTimer := ""
+					if m.CurrentMode == ModeZen && m.ZenTimer != nil {
+						hVal := int(m.ZenTimer.TimeRemaining.Hours())
+						mVal := int(m.ZenTimer.TimeRemaining.Minutes()) % 60
+						sVal := int(m.ZenTimer.TimeRemaining.Seconds()) % 60
+						activeTimer = fmt.Sprintf(" • %02d:%02d:%02d", hVal, mVal, sVal)
+					}
+					cardLines = append(cardLines, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("▌ ACTIVE"+activeTimer))
+				}
+
+				cardLines = append(cardLines, "", lipgloss.NewStyle().Bold(true).Render(title))
+				cardLines = append(cardLines, fmt.Sprintf("%s → %s", t.TimeWindow.Start.Format("15:04"), t.TimeWindow.End.Format("15:04")))
+
+				renderedCard := cardStyle.Width(cellWidth - 4).Render(strings.Join(cardLines, "\n"))
+
+				// Fuse a solid left vertical priority line
+				leftBar := lipgloss.NewStyle().
+					Foreground(pBarColor).
+					Background(m.Theme.PanelBg).
+					Height(lipgloss.Height(renderedCard)).
+					Render("▌")
+
+				colBlocks = append(colBlocks, lipgloss.JoinHorizontal(lipgloss.Top, leftBar, renderedCard))
 			}
 
 			joinedBlocks := lipgloss.JoinHorizontal(lipgloss.Top, colBlocks...)
-			timelineLines = append(timelineLines, fmt.Sprintf("  %s │ %s", hourLabel, joinedBlocks))
+			timelineLines = append(timelineLines, fmt.Sprintf("  %s  │ %s", hourLabel, joinedBlocks))
 		}
 	}
 
-	leftBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.Muted).
-		Width(leftWidth).
+	leftBox := m.Theme.PanelStyle.
+		Width(timelineWidth).
 		Height(height).
 		Render(strings.Join(timelineLines, "\n"))
 
-	// 2. Render Todo Shelf
+	// Todo Shelf (Command Center)
 	var shelfLines []string
-	shelfLines = append(shelfLines, " Todo Shelf (Floating) \n")
+	shelfLines = append(shelfLines, "TODO COMMAND CENTER\n")
 
 	shelfTasks := m.getTodoShelfTasks()
-	if len(shelfTasks) == 0 {
-		shelfLines = append(shelfLines, "  No floating tasks.")
-	} else {
+
+	// Group tasks by priority
+	priorities := []model.Priority{model.P0, model.P1, model.P2, model.P3}
+	pTitles := []string{"P0 URGENT", "P1 HIGH", "P2 MEDIUM", "P3 LOW"}
+	pColors := []lipgloss.Color{m.Theme.P0Color, m.Theme.P1Color, m.Theme.P2Color, m.Theme.P3Color}
+
+	for idx, prio := range priorities {
+		var list []model.Task
 		for _, t := range shelfTasks {
+			if t.Priority == prio {
+				list = append(list, t)
+			}
+		}
+
+		if len(list) == 0 && prio != model.P0 {
+			continue
+		}
+
+		header := lipgloss.NewStyle().Foreground(pColors[idx]).Bold(true).Render(pTitles[idx])
+		shelfLines = append(shelfLines, "\n"+header)
+
+		if len(list) == 0 {
+			shelfLines = append(shelfLines, "  ● No tasks")
+			continue
+		}
+
+		for _, t := range list {
 			isSelected := m.TodoShelfFocus && t.UUID == m.SelectedTaskUUID
+			bullet := lipgloss.NewStyle().Foreground(pColors[idx]).Render("●")
 
-			var pMark string
-			pColor := m.Theme.Muted
-			switch t.Priority {
-			case model.P0:
-				pMark = "▲ P0"
-				pColor = m.Theme.Critical
-			case model.P1:
-				pMark = "▲ P1"
-				pColor = m.Theme.Warning
-			case model.P2:
-				pMark = "■ P2"
-				pColor = m.Theme.Accent
-			case model.P3:
-				pMark = "▼ P3"
-				pColor = m.Theme.Muted
+			title := strings.ToUpper(t.Title)
+			if len(title) > shelfWidth-14 {
+				title = title[:shelfWidth-16] + ".."
 			}
 
-			title := t.Title
-			if len(title) > 18 {
-				title = title[:15] + "..."
-			}
-
-			pBadge := lipgloss.NewStyle().Foreground(pColor).Bold(true).Render(pMark)
-			line := fmt.Sprintf("%s ❪%d SP❫ %s", pBadge, t.StoryPoints, title)
-
-			cardStyle := m.Theme.PanelStyle
+			line := fmt.Sprintf("  %s %s", bullet, title)
 			if isSelected {
-				cardStyle = m.Theme.SelectedStyle
+				line = lipgloss.NewStyle().
+					Background(m.Theme.SelectedBg).
+					Foreground(m.Theme.FocusPurple).
+					Bold(true).
+					Padding(0, 1).
+					Render(line)
+			} else {
+				line = lipgloss.NewStyle().Foreground(m.Theme.Fg).Render(line)
 			}
-
-			shelfLines = append(shelfLines, cardStyle.Width(24).Render(line))
+			shelfLines = append(shelfLines, line)
 		}
 	}
 
-	rightBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.Muted).
-		Width(28).
+	rightBox := m.Theme.PanelStyle.
+		Width(shelfWidth).
 		Height(height).
 		Render(strings.Join(shelfLines, "\n"))
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, " ", rightBox)
+	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, "    ", rightBox)
 }
 
 func (m Model) renderZenMode() string {
 	if m.ZenTimer == nil {
-		return "No Active Focus timer."
+		return "No Focus timer initialized."
 	}
 
 	t := m.ZenTimer.Task
 	sess := m.ZenTimer.Sessions[m.ZenTimer.CurrentSessionIdx]
 
-	var sb strings.Builder
-	sb.WriteString("\n")
-	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Critical).Bold(true).Render(fmt.Sprintf(" [Zen Mode] Active Task: %s (%s)", t.Title, t.Priority)) + "\n\n")
+	var sb []string
+	sb = append(sb, "")
+	sb = append(sb, lipgloss.NewStyle().
+		Foreground(m.Theme.FocusPurple).
+		Bold(true).
+		Align(lipgloss.Center).
+		Width(m.Width).
+		Render(strings.ToUpper(t.Title)))
 
-	// Render Large Clock
+	pBadge := lipgloss.NewStyle().Foreground(m.Theme.P0Color).Bold(true).Render("▲ " + string(t.Priority))
+	spBadge := fmt.Sprintf("• %d SP", t.StoryPoints)
+	sb = append(sb, lipgloss.NewStyle().
+		Align(lipgloss.Center).
+		Width(m.Width).
+		Render(fmt.Sprintf("%s %s", pBadge, spBadge)))
+
+	sb = append(sb, "")
+
+	// Center-aligned large block countdown clock
 	clockStr := RenderLargeTime(m.ZenTimer.TimeRemaining)
 	clockBox := lipgloss.NewStyle().
 		Foreground(m.Theme.Accent).
 		Align(lipgloss.Center).
 		Width(m.Width).
 		Render(clockStr)
-	sb.WriteString(clockBox + "\n\n")
+	sb = append(sb, clockBox)
 
-	// Render Session Info
-	sessInfo := fmt.Sprintf("[ Session %d / %d: %s ]", m.ZenTimer.CurrentSessionIdx+1, len(m.ZenTimer.Sessions), sess.Type)
-	sessInfoBox := lipgloss.NewStyle().
-		Foreground(m.Theme.Success).
+	sb = append(sb, "")
+	sessInfo := fmt.Sprintf("[ Session %d / %d: %s ]", m.ZenTimer.CurrentSessionIdx+1, len(m.ZenTimer.Sessions), strings.ToUpper(string(sess.Type)))
+	sb = append(sb, lipgloss.NewStyle().
+		Foreground(m.Theme.SuccessColor).
 		Bold(true).
 		Align(lipgloss.Center).
 		Width(m.Width).
-		Render(sessInfo)
-	sb.WriteString(sessInfoBox + "\n\n")
+		Render(sessInfo))
 
-	// Render Progress Bar
-	totalSecs := sess.Duration.Seconds()
-	remSecs := m.ZenTimer.TimeRemaining.Seconds()
-	percent := 1.0 - (remSecs / totalSecs)
-	if percent < 0 {
-		percent = 0
-	}
+	sb = append(sb, "")
 
-	barWidth := m.Width - 10
+	// Center progress bar
+	pct := 1.0 - (m.ZenTimer.TimeRemaining.Seconds() / sess.Duration.Seconds())
+	barWidth := int(float64(m.Width) * 0.70)
 	if barWidth < 20 {
 		barWidth = 20
 	}
-	progBar := RenderProgressBar(barWidth, percent)
-	pctStr := fmt.Sprintf("%d%% Completed", int(percent*100))
-	progBox := lipgloss.NewStyle().
+	progBar := RenderProgressBar(barWidth, pct)
+	sb = append(sb, lipgloss.NewStyle().
 		Align(lipgloss.Center).
 		Width(m.Width).
-		Render(fmt.Sprintf("%s %s", progBar, pctStr))
-	sb.WriteString(progBox + "\n\n\n")
+		Render(fmt.Sprintf("%s %d%%", progBar, int(pct*100))))
 
-	// Instructions
-	instructions := "[Space] Pause/Resume   [+] Add 5m   [b] Force Break   [Esc] Terminate Session"
-	instBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.Muted).
-		Padding(1, 2).
-		Align(lipgloss.Center).
-		Render(instructions)
-
-	instContainer := lipgloss.NewStyle().
+	sb = append(sb, "\n")
+	instructions := "Space Pause/Resume   + Add 5m   b Force Break   Esc Exit Focus"
+	sb = append(sb, lipgloss.NewStyle().
+		Foreground(m.Theme.Muted).
 		Align(lipgloss.Center).
 		Width(m.Width).
-		Render(instBox)
-	sb.WriteString(instContainer + "\n")
+		Render(instructions))
 
-	return sb.String()
+	return strings.Join(sb, "\n")
+}
+
+// Help helper for string arrays
+func (m Model) writeStringAndAppend(arr *[]string, s string) {
+	*arr = append(*arr, s)
 }
 
 func (m Model) renderAnalyticsView(height int) string {
@@ -743,12 +764,12 @@ func (m Model) renderAnalyticsView(height int) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("   Focus Execution Analytics \n\n")
+	sb.WriteString("EXECUTION ANALYTICS & FOCUS METRICS\n")
+	sb.WriteString("───────────────────────────────────\n\n")
 	sb.WriteString(fmt.Sprintf("  Total Focus Logged:      %s\n", time.Duration(totalFocusSecs)*time.Second))
 	sb.WriteString(fmt.Sprintf("  Total Interruptions:     %d\n", totalInterruptions))
 	sb.WriteString(fmt.Sprintf("  Task Completion Rate:    %.1f%% (%d/%d Tasks)\n\n", rate, completedCount, totalCount))
 
-	// Simple Productivity heatmap preview
 	sb.WriteString("  Productivity Heatmap Preview (Story Points Completed):\n")
 	sb.WriteString("  Mon ██████████ 10 SP\n")
 	sb.WriteString("  Tue ██████ 6 SP\n")
@@ -756,10 +777,7 @@ func (m Model) renderAnalyticsView(height int) string {
 	sb.WriteString("  Thu ████ 4 SP\n")
 	sb.WriteString("  Fri ████████ 8 SP\n")
 
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.Muted).
-		Padding(1, 2).
+	return m.Theme.PanelStyle.
 		Width(m.Width - 4).
 		Height(height).
 		Render(sb.String())
@@ -769,36 +787,37 @@ func (m Model) renderDetailPanel(height int) string {
 	t := m.DetailTask
 
 	var sb strings.Builder
-	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Focus).Bold(true).Render(t.Title) + "\n")
-	sb.WriteString(strings.Repeat("─", 30) + "\n\n")
+	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Bold(true).Render(strings.ToUpper(t.Title)) + "\n")
+	sb.WriteString(strings.Repeat("─", 32) + "\n\n")
 
-	sb.WriteString(fmt.Sprintf("Priority:     %s\n", t.Priority))
-	sb.WriteString(fmt.Sprintf("Story Points: %d\n", t.StoryPoints))
-	sb.WriteString(fmt.Sprintf("State:        %s\n", t.LifecycleState))
-	sb.WriteString(fmt.Sprintf("Type:         %s\n\n", t.SchedulingType))
+	sb.WriteString(fmt.Sprintf("Priority      %s\n", t.Priority))
+	sb.WriteString(fmt.Sprintf("Story Points  %d\n", t.StoryPoints))
+	sb.WriteString(fmt.Sprintf("Lifecycle     %s\n", t.LifecycleState))
+	sb.WriteString(fmt.Sprintf("Schedule      %s\n\n", t.SchedulingType))
 
 	if t.SchedulingType == model.Anchored {
-		sb.WriteString(fmt.Sprintf("Start:        %s\n", t.TimeWindow.Start.Format("2006-01-02 15:04")))
-		sb.WriteString(fmt.Sprintf("End:          %s\n\n", t.TimeWindow.End.Format("15:04")))
+		sb.WriteString(fmt.Sprintf("Start Time    %s\n", t.TimeWindow.Start.Format("2006-01-02 15:04")))
+		sb.WriteString(fmt.Sprintf("End Time      %s\n\n", t.TimeWindow.End.Format("15:04")))
 	}
 
-	sb.WriteString("Description:\n")
+	sb.WriteString("DESCRIPTION\n")
 	desc := t.Description
 	if desc == "" {
-		desc = "(No description)"
+		desc = "(No description provided)"
 	}
 	sb.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(desc) + "\n\n")
 
-	sb.WriteString("Execution Metrics:\n")
+	sb.WriteString("EXECUTION METRICS\n")
 	sb.WriteString(fmt.Sprintf(" • Focus Logged:    %s\n", time.Duration(t.ExecutionMetrics.ElapsedFocusSeconds)*time.Second))
 	sb.WriteString(fmt.Sprintf(" • Pomodoros:       %d/%d\n", t.ExecutionMetrics.TotalCompletedPomodoros, t.ExecutionMetrics.TargetPomodoros))
 	sb.WriteString(fmt.Sprintf(" • Interruptions:   %d\n", t.ExecutionMetrics.InterruptionCount))
 
+	// drawer container with separate elevated background (Layer 2)
 	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.Focus).
+		Background(m.Theme.SelectedBg).
+		Foreground(m.Theme.Fg).
 		Padding(1, 2).
-		Height(height).
+		Height(height - 2).
 		Render(sb.String())
 }
 
@@ -806,12 +825,12 @@ func (m Model) renderFormModal() string {
 	f := m.Form
 
 	var fields []string
-	fields = append(fields, "  Create New Work Item \n")
+	fields = append(fields, "  CREATE WORK ITEM TASK\n  ─────────────────────\n")
 
 	renderField := func(label string, input string, index int) string {
 		style := lipgloss.NewStyle().Foreground(m.Theme.Fg)
 		if f.ActiveField == index {
-			style = style.Foreground(m.Theme.Focus).Bold(true)
+			style = style.Foreground(m.Theme.FocusPurple).Bold(true)
 		}
 		return fmt.Sprintf("  %-15s %s", style.Render(label), input)
 	}
@@ -826,16 +845,45 @@ func (m Model) renderFormModal() string {
 
 	submitText := " [SUBMIT] "
 	if f.ActiveField == 7 {
-		submitText = lipgloss.NewStyle().Background(m.Theme.Success).Foreground(m.Theme.Bg).Bold(true).Render(submitText)
+		submitText = lipgloss.NewStyle().Background(m.Theme.SuccessColor).Foreground(m.Theme.CanvasBg).Bold(true).Render(submitText)
 	} else {
-		submitText = lipgloss.NewStyle().Foreground(m.Theme.Success).Render(submitText)
+		submitText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render(submitText)
 	}
 	fields = append(fields, "\n  "+submitText)
 
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.Warning).
-		Padding(1, 2).
-		Width(45).
+	return m.Theme.ModalStyle.
+		Width(48).
 		Render(strings.Join(fields, "\n"))
+}
+
+func (m Model) renderCommandPalette() string {
+	// Raycast-stylecentered floating palette using ModalBg (Layer 3)
+	var sb strings.Builder
+	sb.WriteString(m.CommandInput.View() + "\n")
+	sb.WriteString("  ────────────────────────────────────────────\n")
+
+	// Print fuzzy commands preview helper
+	val := strings.ToLower(m.CommandInput.Value())
+	cmds := []string{"create", "todo", "complete", "delete", "sync", "auth", "dashboard", "month", "week", "day", "analytics", "quit"}
+
+	count := 0
+	for _, c := range cmds {
+		if strings.Contains(c, val) {
+			bullet := lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("❯")
+			sb.WriteString(fmt.Sprintf("  %s %-12s  %s\n", bullet, c, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("command action")))
+			count++
+			if count >= 4 {
+				break
+			}
+		}
+	}
+
+	return lipgloss.NewStyle().
+		Background(m.Theme.ModalBg).
+		Foreground(m.Theme.Fg).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(m.Theme.FocusPurple).
+		Width(m.Width - 4).
+		Padding(1, 2).
+		Render(sb.String())
 }

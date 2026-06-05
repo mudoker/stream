@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -778,18 +779,99 @@ func (m Model) renderZenMode() string {
 }
 
 func (m Model) renderAnalyticsView(height int) string {
+	today := time.Now()
+
+	completionsByDate := make(map[string]bool)
 	var totalFocusSecs int
 	var totalInterruptions int
 	var completedCount int
 	var totalCount int
+	var workSecs int
+	var personalSecs int
+	var effectiveSessions int
+	var completedWithNoInterruptionCount int
+
+	// Tag duration tracking
+	tagSecs := make(map[string]int)
 
 	for _, t := range m.Tasks {
 		totalCount++
 		if t.LifecycleState == model.StateCompleted {
 			completedCount++
+			dateStr := t.UpdatedAt.Format("2006-01-02")
+			completionsByDate[dateStr] = true
+
+			if t.ExecutionMetrics.InterruptionCount == 0 {
+				completedWithNoInterruptionCount++
+			}
+
+			isPersonal := false
+			for _, tag := range t.Tags {
+				if strings.ToLower(tag) == "personal" {
+					isPersonal = true
+					break
+				}
+			}
+			if strings.Contains(strings.ToLower(t.Title), "personal") || strings.Contains(strings.ToLower(t.Description), "personal") {
+				isPersonal = true
+			}
+
+			dur := t.ExecutionMetrics.ElapsedFocusSeconds
+			if dur == 0 && t.SchedulingType == model.Anchored {
+				dur = int(t.TimeWindow.End.Sub(t.TimeWindow.Start).Seconds())
+			} else if dur == 0 {
+				dur = t.StoryPoints * 45 * 60
+			}
+
+			if isPersonal {
+				personalSecs += dur
+			} else {
+				workSecs += dur
+			}
+
+			effectiveSessions += t.ExecutionMetrics.TotalCompletedPomodoros
+
+			// Track tags
+			for _, tag := range t.Tags {
+				normalized := strings.TrimSpace(tag)
+				if normalized != "" {
+					tagSecs[normalized] += dur
+				}
+			}
 		}
 		totalFocusSecs += t.ExecutionMetrics.ElapsedFocusSeconds
 		totalInterruptions += t.ExecutionMetrics.InterruptionCount
+	}
+
+	// Calculate Streak
+	streak := 0
+	checkDate := today
+	todayStr := today.Format("2006-01-02")
+	if completionsByDate[todayStr] {
+		for {
+			dateStr := checkDate.Format("2006-01-02")
+			if completionsByDate[dateStr] {
+				streak++
+				checkDate = checkDate.AddDate(0, 0, -1)
+			} else {
+				break
+			}
+		}
+	} else {
+		yesterday := today.AddDate(0, 0, -1)
+		yesterdayStr := yesterday.Format("2006-01-02")
+		if completionsByDate[yesterdayStr] {
+			checkDate = yesterday
+			for {
+				dateStr := checkDate.Format("2006-01-02")
+				if completionsByDate[dateStr] {
+					streak++
+					checkDate = checkDate.AddDate(0, 0, -1)
+				} else {
+					break
+				}
+			}
+		}
 	}
 
 	rate := 0.0
@@ -797,24 +879,306 @@ func (m Model) renderAnalyticsView(height int) string {
 		rate = float64(completedCount) / float64(totalCount) * 100
 	}
 
-	var sb strings.Builder
-	sb.WriteString("EXECUTION ANALYTICS & PRODUCTIVITY DATA\n")
-	sb.WriteString("───────────────────────────────────────\n\n")
-	sb.WriteString(fmt.Sprintf("  Total Focus Logged:      %s\n", time.Duration(totalFocusSecs)*time.Second))
-	sb.WriteString(fmt.Sprintf("  Total Interruptions:     %d\n", totalInterruptions))
-	sb.WriteString(fmt.Sprintf("  Task Completion Rate:    %.1f%% (%d/%d Tasks)\n\n", rate, completedCount, totalCount))
+	workHrs := float64(workSecs) / 3600.0
+	personalHrs := float64(personalSecs) / 3600.0
+	totalHrs := workHrs + personalHrs
 
-	sb.WriteString("  Productivity Heatmap Preview (Story Points Completed):\n")
-	sb.WriteString("  Mon ██████████ 10 SP\n")
-	sb.WriteString("  Tue ██████ 6 SP\n")
-	sb.WriteString("  Wed ████████████ 12 SP\n")
-	sb.WriteString("  Thu ████ 4 SP\n")
-	sb.WriteString("  Fri ████████ 8 SP\n")
+	// 1. Top KPI Row Cards
+	cardStyle := lipgloss.NewStyle().
+		Background(m.Theme.PanelBg).
+		Padding(0, 2).
+		Height(3)
+
+	card1 := cardStyle.Render(fmt.Sprintf(
+		"%s\n%s\n%s",
+		lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("STREAK"),
+		lipgloss.NewStyle().Foreground(m.Theme.P1Color).Bold(true).Render(fmt.Sprintf("🔥 %d DAYS", streak)),
+		lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("Consecutive"),
+	))
+
+	card2 := cardStyle.Render(fmt.Sprintf(
+		"%s\n%s\n%s",
+		lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("SESSIONS"),
+		lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(fmt.Sprintf("🎯 %d BLOCKS", effectiveSessions)),
+		lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("Pomodoros"),
+	))
+
+	card3 := cardStyle.Render(fmt.Sprintf(
+		"%s\n%s\n%s",
+		lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("FOCUS TIME"),
+		lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(fmt.Sprintf("⏱️ %.1f HRS", totalHrs)),
+		lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("Work + Pers"),
+	))
+
+	workspaceWidth := m.Width - 25
+	if workspaceWidth < 40 {
+		workspaceWidth = 40
+	}
+
+	var kpiRow string
+	if workspaceWidth >= 60 {
+		kpiRow = lipgloss.JoinHorizontal(lipgloss.Top, card1, "  ", card2, "  ", card3)
+	} else {
+		kpiRow = lipgloss.JoinVertical(lipgloss.Left, card1, "\n", card2, "\n", card3)
+	}
+
+	// 2. Left Column: Daily timeline & focus purity
+	var timelineLines []string
+	timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("DAILY PRODUCTIVITY TIMELINE"))
+
+	// Compute last 7 days daily focus
+	maxDaySecs := 0
+	daySecsList := make([]int, 7)
+	daysList := make([]time.Time, 7)
+	for i := 0; i < 7; i++ {
+		day := today.AddDate(0, 0, -6+i)
+		daysList[i] = day
+		daySecs := 0
+		for _, t := range m.Tasks {
+			if t.LifecycleState == model.StateCompleted &&
+				t.UpdatedAt.Year() == day.Year() && t.UpdatedAt.Month() == day.Month() && t.UpdatedAt.Day() == day.Day() {
+				dur := t.ExecutionMetrics.ElapsedFocusSeconds
+				if dur == 0 && t.SchedulingType == model.Anchored {
+					dur = int(t.TimeWindow.End.Sub(t.TimeWindow.Start).Seconds())
+				} else if dur == 0 {
+					dur = t.StoryPoints * 45 * 60
+				}
+				daySecs += dur
+			}
+		}
+		daySecsList[i] = daySecs
+		if daySecs > maxDaySecs {
+			maxDaySecs = daySecs
+		}
+	}
+	if maxDaySecs == 0 {
+		maxDaySecs = 1
+	}
+
+	timelineBarWidth := 15
+	for i := 0; i < 7; i++ {
+		day := daysList[i]
+		daySecs := daySecsList[i]
+		dayHrs := float64(daySecs) / 3600.0
+
+		pct := float64(daySecs) / float64(maxDaySecs)
+		barLen := int(math.Round(pct * float64(timelineBarWidth)))
+		barStr := strings.Repeat("█", barLen)
+		if barStr == "" && dayHrs > 0 {
+			barStr = "▏"
+		}
+		if len(barStr) < timelineBarWidth {
+			barStr += strings.Repeat("░", timelineBarWidth-len(barStr))
+		}
+
+		var barColor lipgloss.Color
+		if dayHrs == 0 {
+			barColor = m.Theme.Muted
+		} else if dayHrs <= 2.0 {
+			barColor = m.Theme.P2Color
+		} else if dayHrs <= 5.0 {
+			barColor = m.Theme.Accent
+		} else {
+			barColor = m.Theme.SuccessColor
+		}
+
+		coloredBar := lipgloss.NewStyle().Foreground(barColor).Render(barStr)
+		timelineLines = append(timelineLines, fmt.Sprintf("  %s │ %s %.1fh", day.Format("Jan _2"), coloredBar, dayHrs))
+	}
+
+	purityPct := 0.0
+	if completedCount > 0 {
+		purityPct = (float64(completedWithNoInterruptionCount) / float64(completedCount)) * 100
+	}
+
+	var statsLines []string
+	statsLines = append(statsLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("FOCUS HEALTH & DISTRACTION"))
+	statsLines = append(statsLines, fmt.Sprintf("  Purity (No Interrupt): %.1f%%", purityPct))
+	statsLines = append(statsLines, fmt.Sprintf("  Total Focus Logged:    %s", time.Duration(totalFocusSecs)*time.Second))
+	statsLines = append(statsLines, fmt.Sprintf("  Total Interruptions:   %d times", totalInterruptions))
+	statsLines = append(statsLines, fmt.Sprintf("  Completed Tasks Rate:  %d/%d (%.1f%%)", completedCount, totalCount, rate))
+
+	// 3. Right Column: Time distribution ratios & Top tags & 30-Day Trend
+	var ratioLines []string
+	ratioLines = append(ratioLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("TIME ALLOCATION RATIOS"))
+
+	totalHrsForRatio := totalHrs
+	if totalHrsForRatio == 0 {
+		totalHrsForRatio = 1.0
+	}
+	workPct := workHrs / totalHrsForRatio
+	personalPct := personalHrs / totalHrsForRatio
+
+	ratioBarWidth := 20
+	workBarLen := int(math.Round(workPct * float64(ratioBarWidth)))
+	workBarStr := strings.Repeat("█", workBarLen)
+	if workBarStr == "" && workHrs > 0 {
+		workBarStr = "▏"
+	}
+	if len(workBarStr) < ratioBarWidth {
+		workBarStr += strings.Repeat("░", ratioBarWidth-len(workBarStr))
+	}
+	coloredWorkBar := lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(workBarStr)
+	ratioLines = append(ratioLines, fmt.Sprintf("  Work     %s %.0f%% (%.1fh)", coloredWorkBar, workPct*100, workHrs))
+
+	persBarLen := int(math.Round(personalPct * float64(ratioBarWidth)))
+	persBarStr := strings.Repeat("█", persBarLen)
+	if persBarStr == "" && personalHrs > 0 {
+		persBarStr = "▏"
+	}
+	if len(persBarStr) < ratioBarWidth {
+		persBarStr += strings.Repeat("░", ratioBarWidth-len(persBarStr))
+	}
+	coloredPersBar := lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render(persBarStr)
+	ratioLines = append(ratioLines, fmt.Sprintf("  Personal %s %.0f%% (%.1fh)", coloredPersBar, personalPct*100, personalHrs))
+
+	// Top Tags
+	type TagVal struct {
+		Tag  string
+		Secs int
+	}
+	var tags []TagVal
+	for k, v := range tagSecs {
+		tags = append(tags, TagVal{Tag: k, Secs: v})
+	}
+	sort.Slice(tags, func(i, j int) bool {
+		return tags[i].Secs > tags[j].Secs
+	})
+
+	var tagLines []string
+	tagLines = append(tagLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("TOP TAGS BY FOCUS TIME"))
+	if len(tags) == 0 {
+		tagLines = append(tagLines, "  No tagged sessions logged.")
+	} else {
+		maxSecs := tags[0].Secs
+		if maxSecs == 0 {
+			maxSecs = 1
+		}
+		for idx, tv := range tags {
+			if idx >= 3 {
+				break
+			}
+			hrs := float64(tv.Secs) / 3600.0
+			pct := float64(tv.Secs) / float64(maxSecs)
+			barLen := int(math.Round(pct * 12))
+			barStr := strings.Repeat("█", barLen)
+			if barStr == "" && tv.Secs > 0 {
+				barStr = "▏"
+			}
+			if len(barStr) < 12 {
+				barStr += strings.Repeat("░", 12-len(barStr))
+			}
+			coloredBar := lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Render(barStr)
+
+			tagName := tv.Tag
+			if len(tagName) > 8 {
+				tagName = tagName[:7] + "…"
+			}
+			tagLines = append(tagLines, fmt.Sprintf("  %-8s %s %.1fh", tagName, coloredBar, hrs))
+		}
+	}
+
+	// 30-Day activity trend sparkline
+	dailyFocusSecs := make(map[string]int)
+	for _, t := range m.Tasks {
+		if t.LifecycleState == model.StateCompleted {
+			dateStr := t.UpdatedAt.Format("2006-01-02")
+			dur := t.ExecutionMetrics.ElapsedFocusSeconds
+			if dur == 0 && t.SchedulingType == model.Anchored {
+				dur = int(t.TimeWindow.End.Sub(t.TimeWindow.Start).Seconds())
+			} else if dur == 0 {
+				dur = t.StoryPoints * 45 * 60
+			}
+			dailyFocusSecs[dateStr] += dur
+		}
+	}
+
+	var heatmapLines []string
+	heatmapLines = append(heatmapLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("30-DAY FOCUS TREND"))
+
+	var trendSB strings.Builder
+	trendSB.WriteString("  [ ")
+	for i := 29; i >= 0; i-- {
+		date := today.AddDate(0, 0, -i)
+		dateStr := date.Format("2006-01-02")
+		secs := dailyFocusSecs[dateStr]
+		hrs := float64(secs) / 3600.0
+
+		var cellColor lipgloss.Color
+		if hrs == 0 {
+			cellColor = m.Theme.Muted
+		} else if hrs <= 1.5 {
+			cellColor = m.Theme.P2Color
+		} else if hrs <= 4.0 {
+			cellColor = m.Theme.Accent
+		} else {
+			cellColor = m.Theme.SuccessColor
+		}
+
+		char := "■"
+		if hrs == 0 {
+			char = "·"
+		}
+		trendSB.WriteString(lipgloss.NewStyle().Foreground(cellColor).Render(char) + " ")
+	}
+	trendSB.WriteString("]")
+	heatmapLines = append(heatmapLines, trendSB.String())
+
+	legendSB := strings.Builder{}
+	legendSB.WriteString("    Less ")
+	legendSB.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("·") + " ")
+	legendSB.WriteString(lipgloss.NewStyle().Foreground(m.Theme.P2Color).Render("■") + " ")
+	legendSB.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("■") + " ")
+	legendSB.WriteString(lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render("■") + " ")
+	legendSB.WriteString(" More")
+	heatmapLines = append(heatmapLines, legendSB.String())
+
+	// Assemble final content layout
+	var contentSB strings.Builder
+	contentSB.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("▲  E X E C U T I O N   A N A L Y T I C S") + "\n")
+	contentSB.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", workspaceWidth-4)) + "\n\n")
+
+	contentSB.WriteString(kpiRow + "\n\n")
+
+	if workspaceWidth >= 75 {
+		leftColContent := lipgloss.JoinVertical(lipgloss.Left,
+			strings.Join(timelineLines, "\n"),
+			"\n",
+			strings.Join(statsLines, "\n"),
+		)
+
+		rightColContent := lipgloss.JoinVertical(lipgloss.Left,
+			strings.Join(ratioLines, "\n"),
+			"\n",
+			strings.Join(tagLines, "\n"),
+			"\n",
+			strings.Join(heatmapLines, "\n"),
+		)
+
+		leftStyled := lipgloss.NewStyle().Width(36).Render(leftColContent)
+		rightStyled := lipgloss.NewStyle().Width(workspaceWidth - 40).Render(rightColContent)
+
+		columns := lipgloss.JoinHorizontal(lipgloss.Top, leftStyled, "    ", rightStyled)
+		contentSB.WriteString(columns)
+	} else {
+		stacked := lipgloss.JoinVertical(lipgloss.Left,
+			strings.Join(timelineLines, "\n"),
+			"\n",
+			strings.Join(statsLines, "\n"),
+			"\n",
+			strings.Join(ratioLines, "\n"),
+			"\n",
+			strings.Join(tagLines, "\n"),
+			"\n",
+			strings.Join(heatmapLines, "\n"),
+		)
+		contentSB.WriteString(stacked)
+	}
 
 	return m.Theme.PanelStyle.
 		Width(m.Width - 28).
 		Height(height).
-		Render(sb.String())
+		Render(contentSB.String())
 }
 
 func (m Model) renderDetailPanel(height int) string {

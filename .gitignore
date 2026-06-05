@@ -1,0 +1,8 @@
+# Compiled binary
+tuical
+
+# Local config cache (if run locally)
+credentials.json
+data.json
+ledger.json
+client_secrets.json

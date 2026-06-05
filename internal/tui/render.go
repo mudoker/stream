@@ -62,59 +62,36 @@ func (m Model) View() string {
 		content = lipgloss.JoinHorizontal(lipgloss.Top, leftContent, "   ", rightContent)
 	}
 
-	// Modal overlays for prompts and wizard forms
-	if m.CurrentMode == ModeForm {
-		formModal := m.renderFormModal()
-		contentHeight := lipgloss.Height(content)
-		formHeight := lipgloss.Height(formModal)
-		paddingTop := (contentHeight - formHeight) / 2
+	// Centered floating modal overlay handling
+	if m.CurrentMode == ModeForm || m.PromptOpen || m.ReviewOpen || m.HelpOpen {
+		var modalStr string
+		if m.CurrentMode == ModeForm {
+			modalStr = m.renderFormModal()
+		} else if m.PromptOpen {
+			modalStr = m.renderPromptModal()
+		} else if m.ReviewOpen {
+			modalStr = m.renderReviewModal()
+		} else if m.HelpOpen {
+			modalStr = m.renderHelpModal()
+		}
+
+		modalWidth := lipgloss.Width(modalStr)
+		modalHeight := lipgloss.Height(modalStr)
+
+		paddingTop := (workspaceHeight - modalHeight) / 2
 		if paddingTop < 0 {
 			paddingTop = 0
 		}
-		content = lipgloss.JoinVertical(lipgloss.Center,
-			strings.Repeat("\n", paddingTop),
-			formModal,
-			strings.Repeat("\n", max(0, contentHeight-formHeight-paddingTop)),
-		)
-	} else if m.PromptOpen {
-		promptModal := m.renderPromptModal()
-		contentHeight := lipgloss.Height(content)
-		formHeight := lipgloss.Height(promptModal)
-		paddingTop := (contentHeight - formHeight) / 2
-		if paddingTop < 0 {
-			paddingTop = 0
+		paddingLeft := (workspaceWidth - modalWidth) / 2
+		if paddingLeft < 0 {
+			paddingLeft = 0
 		}
-		content = lipgloss.JoinVertical(lipgloss.Center,
-			strings.Repeat("\n", paddingTop),
-			promptModal,
-			strings.Repeat("\n", max(0, contentHeight-formHeight-paddingTop)),
-		)
-	} else if m.ReviewOpen {
-		reviewModal := m.renderReviewModal()
-		contentHeight := lipgloss.Height(content)
-		formHeight := lipgloss.Height(reviewModal)
-		paddingTop := (contentHeight - formHeight) / 2
-		if paddingTop < 0 {
-			paddingTop = 0
-		}
-		content = lipgloss.JoinVertical(lipgloss.Center,
-			strings.Repeat("\n", paddingTop),
-			reviewModal,
-			strings.Repeat("\n", max(0, contentHeight-formHeight-paddingTop)),
-		)
-	} else if m.HelpOpen {
-		helpModal := m.renderHelpModal()
-		contentHeight := lipgloss.Height(content)
-		formHeight := lipgloss.Height(helpModal)
-		paddingTop := (contentHeight - formHeight) / 2
-		if paddingTop < 0 {
-			paddingTop = 0
-		}
-		content = lipgloss.JoinVertical(lipgloss.Center,
-			strings.Repeat("\n", paddingTop),
-			helpModal,
-			strings.Repeat("\n", max(0, contentHeight-formHeight-paddingTop)),
-		)
+
+		modalStyle := lipgloss.NewStyle().
+			MarginTop(paddingTop).
+			MarginLeft(paddingLeft)
+
+		content = modalStyle.Render(modalStr)
 	}
 
 	// Join Left Arc Sidebar and Right Workspace Content
@@ -155,17 +132,27 @@ func (m Model) renderArcSidebar() string {
 	sb = append(sb, "")
 
 	// 2. Navigation Spaces (Tabs)
+	sb = append(sb, lipgloss.NewStyle().
+		Foreground(m.Theme.Muted).
+		Bold(true).
+		Render("SPACES"))
+
 	viewNames := []string{"dashboard", "month grid", "week lanes", "day timeline", "analytics"}
 	for i, name := range viewNames {
 		if int(m.CurrentView) == i {
-			sb = append(sb, lipgloss.NewStyle().
+			activeStyle := lipgloss.NewStyle().
+				Background(m.Theme.SelectedBg).
 				Foreground(m.Theme.Accent).
 				Bold(true).
-				Render(fmt.Sprintf("● %s", name)))
+				Padding(0, 1).
+				Width(20)
+			sb = append(sb, activeStyle.Render(strings.ToUpper(name)))
 		} else {
-			sb = append(sb, lipgloss.NewStyle().
+			inactiveStyle := lipgloss.NewStyle().
 				Foreground(m.Theme.Muted).
-				Render(fmt.Sprintf("  %s", name)))
+				Padding(0, 1).
+				Width(20)
+			sb = append(sb, inactiveStyle.Render(strings.ToUpper(name)))
 		}
 	}
 
@@ -709,8 +696,8 @@ func (m Model) renderDayView(height int) string {
 	}
 
 	leftBox := m.Theme.PanelStyle.
-		Width(timelineWidth).
-		Height(height).
+		Width(timelineWidth - 4).
+		Height(height - 2).
 		Render(strings.Join(timelineLines, "\n"))
 
 	// Todo Shelf (Command Center)
@@ -790,8 +777,8 @@ func (m Model) renderDayView(height int) string {
 	}
 
 	rightBox := m.Theme.PanelStyle.
-		Width(shelfWidth).
-		Height(height).
+		Width(shelfWidth - 4).
+		Height(height - 2).
 		Render(strings.Join(visibleShelfList, "\n"))
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, "    ", rightBox)

@@ -102,6 +102,19 @@ func (m Model) View() string {
 			reviewModal,
 			strings.Repeat("\n", max(0, contentHeight-formHeight-paddingTop)),
 		)
+	} else if m.HelpOpen {
+		helpModal := m.renderHelpModal()
+		contentHeight := lipgloss.Height(content)
+		formHeight := lipgloss.Height(helpModal)
+		paddingTop := (contentHeight - formHeight) / 2
+		if paddingTop < 0 {
+			paddingTop = 0
+		}
+		content = lipgloss.JoinVertical(lipgloss.Center,
+			strings.Repeat("\n", paddingTop),
+			helpModal,
+			strings.Repeat("\n", max(0, contentHeight-formHeight-paddingTop)),
+		)
 	}
 
 	// Join Left Arc Sidebar and Right Workspace Content
@@ -517,7 +530,28 @@ func (m Model) renderWeekView(height int) string {
 		columns = append(columns, colStyle.Render(strings.Join(dayContent, "\n")))
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, columns...)
+	joined := lipgloss.JoinHorizontal(lipgloss.Top, columns...)
+	lines := strings.Split(joined, "\n")
+	
+	if m.ScrollOffset >= len(lines) {
+		m.ScrollOffset = len(lines) - 1
+	}
+	if m.ScrollOffset < 0 {
+		m.ScrollOffset = 0
+	}
+	
+	var visibleList []string
+	if m.ScrollOffset > 0 {
+		visibleList = append(visibleList, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("▲ ", m.Width/4)))
+	}
+	visibleList = append(visibleList, lines[m.ScrollOffset:]...)
+	
+	if len(visibleList) > height {
+		visibleList = visibleList[:height-1]
+		visibleList = append(visibleList, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("▼ ", m.Width/4)))
+	}
+	
+	return strings.Join(visibleList, "\n")
 }
 
 func (m Model) renderDayView(height int) string {
@@ -550,7 +584,33 @@ func (m Model) renderDayView(height int) string {
 	now := time.Now()
 	isToday := m.SelectedDay.Year() == now.Year() && m.SelectedDay.Month() == now.Month() && m.SelectedDay.Day() == now.Day()
 
-	for h := 8; h <= 20; h++ {
+	// Scroll timeline dynamically based on terminal height centering m.TimelineHour
+	timelineStartHour := 8
+	timelineEndHour := 20
+	maxHoursVisible := height - 6
+	if maxHoursVisible < 5 {
+		maxHoursVisible = 5
+	}
+	if 13 > maxHoursVisible {
+		timelineStartHour = m.TimelineHour - maxHoursVisible/2
+		if timelineStartHour < 8 {
+			timelineStartHour = 8
+		}
+		timelineEndHour = timelineStartHour + maxHoursVisible - 1
+		if timelineEndHour > 20 {
+			timelineEndHour = 20
+			timelineStartHour = timelineEndHour - maxHoursVisible + 1
+			if timelineStartHour < 8 {
+				timelineStartHour = 8
+			}
+		}
+	}
+
+	if timelineStartHour > 8 {
+		timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("      ▲  (scroll up)"))
+	}
+
+	for h := timelineStartHour; h <= timelineEndHour; h++ {
 		if isToday && now.Hour() == h && now.Minute() < 30 && h > 8 {
 			lineText := fmt.Sprintf("───────────────────── %02d:%02d NOW ─────────────────────", now.Hour(), now.Minute())
 			timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(lineText))
@@ -644,6 +704,10 @@ func (m Model) renderDayView(height int) string {
 		}
 	}
 
+	if timelineEndHour < 20 {
+		timelineLines = append(timelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("      ▼  (scroll down)"))
+	}
+
 	leftBox := m.Theme.PanelStyle.
 		Width(timelineWidth).
 		Height(height).
@@ -703,10 +767,32 @@ func (m Model) renderDayView(height int) string {
 		}
 	}
 
+	// Apply Shelf scroll offset
+	shelfLinesRendered := strings.Join(shelfLines, "\n")
+	shelfLinesList := strings.Split(shelfLinesRendered, "\n")
+	
+	if m.ShelfScrollOffset >= len(shelfLinesList) {
+		m.ShelfScrollOffset = len(shelfLinesList) - 1
+	}
+	if m.ShelfScrollOffset < 0 {
+		m.ShelfScrollOffset = 0
+	}
+	
+	var visibleShelfList []string
+	if m.ShelfScrollOffset > 0 {
+		visibleShelfList = append(visibleShelfList, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  ▲  (scroll up)"))
+	}
+	visibleShelfList = append(visibleShelfList, shelfLinesList[m.ShelfScrollOffset:]...)
+	
+	if len(visibleShelfList) > height-2 {
+		visibleShelfList = visibleShelfList[:height-2]
+		visibleShelfList = append(visibleShelfList, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  ▼  (scroll down)"))
+	}
+
 	rightBox := m.Theme.PanelStyle.
 		Width(shelfWidth).
 		Height(height).
-		Render(strings.Join(shelfLines, "\n"))
+		Render(strings.Join(visibleShelfList, "\n"))
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, "    ", rightBox)
 }
@@ -1312,5 +1398,37 @@ func (m Model) renderReviewModal() string {
 	return m.Theme.ModalStyle.
 		Width(48).
 		BorderForeground(m.Theme.SuccessColor).
+		Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) renderHelpModal() string {
+	var lines []string
+	lines = append(lines, "  ▲ S T R E A M   C O M M A N D   R E F E R E N C E\n  ────────────────────────────────────────────────\n")
+	lines = append(lines, "  KEYBOARD SHORTCUTS")
+	lines = append(lines, "    1 - 5       Switch views (Dashboard, Month, Week, Day, Stats)")
+	lines = append(lines, "    Tab / h / l Toggle Focus between Panels (Timeline / Shelf)")
+	lines = append(lines, "    j / k       Navigate items or timeline hours")
+	lines = append(lines, "    H / L       Navigate days backward / forward")
+	lines = append(lines, "    ctrl+d / u  Scroll active pane down / up")
+	lines = append(lines, "    i           Open task creation wizard form")
+	lines = append(lines, "    x           Complete selected task")
+	lines = append(lines, "    d           Delete selected task")
+	lines = append(lines, "    z           Start Zen Mode focus session for task")
+	lines = append(lines, "    :           Enter Command Palette mode")
+	lines = append(lines, "    ?           Toggle this help documentation modal")
+	lines = append(lines, "")
+	lines = append(lines, "  COMMAND PALETTE (:command)")
+	lines = append(lines, "    :create <t> Anchor a new task for today at 9:00 AM")
+	lines = append(lines, "    :todo <t>   Add a floating task to the Backlog Shelf")
+	lines = append(lines, "    :complete   Complete active task")
+	lines = append(lines, "    :delete     Delete active task")
+	lines = append(lines, "    :sync       Force Google Calendar sync")
+	lines = append(lines, "    :review     Open Daily Shutdown Review checklist")
+	lines = append(lines, "    :quit       Exit the stream application")
+	lines = append(lines, "\n  Press [Esc / Enter / ?] to dismiss this help window")
+
+	return m.Theme.ModalStyle.
+		Width(54).
+		BorderForeground(m.Theme.Accent).
 		Render(strings.Join(lines, "\n"))
 }

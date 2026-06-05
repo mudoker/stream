@@ -3,126 +3,105 @@ package tui
 import "github.com/charmbracelet/lipgloss"
 
 type Theme struct {
-	Bg          lipgloss.TerminalColor
-	PanelBg     lipgloss.TerminalColor
-	Fg          lipgloss.TerminalColor
-	Accent      lipgloss.TerminalColor
-	Focus       lipgloss.TerminalColor
-	Success     lipgloss.TerminalColor
-	Warning     lipgloss.TerminalColor
-	Critical    lipgloss.TerminalColor
-	Muted       lipgloss.TerminalColor
-	BorderColor lipgloss.TerminalColor
+	// Colors
+	CanvasBg    lipgloss.Color // Layer 0: Dark Canvas (#1a1b26)
+	PanelBg     lipgloss.Color // Layer 1: Panel Background (#1f2335)
+	SelectedBg  lipgloss.Color // Layer 2: Selected/Active (#24283b)
+	ModalBg     lipgloss.Color // Layer 3: Modal/Elevated (#2f354f)
+	Fg          lipgloss.Color // Primary Text (#c0caf5)
+	Muted       lipgloss.Color // Secondary/Muted (#565f89)
+	Accent      lipgloss.Color // Active Accent (#7aa2f7)
+	FocusPurple lipgloss.Color // Focused Accent (#bb9af7)
 
-	NormalBorder   lipgloss.Border
-	ActiveBorder   lipgloss.Border
+	// Priorities
+	P0Color lipgloss.Color // Crimson/Red (#f7768e)
+	P1Color lipgloss.Color // Orange/Amber (#e0af68)
+	P2Color lipgloss.Color // Blue (#7aa2f7)
+	P3Color lipgloss.Color // Gray (#565f89)
+
+	// Statuses
+	SuccessColor lipgloss.Color // Muted Green (#9ece6a)
+
+	// Styling templates
+	BaseStyle      lipgloss.Style
+	PanelStyle     lipgloss.Style
+	SelectedPanel  lipgloss.Style
+	ModalStyle     lipgloss.Style
 	HeaderStyle    lipgloss.Style
 	FooterStyle    lipgloss.Style
-	PanelStyle     lipgloss.Style
-	SelectedStyle  lipgloss.Style
-	ActiveCard     lipgloss.Style
-	PausedCard     lipgloss.Style
-	CompletedCard  lipgloss.Style
-	OverdueCard    lipgloss.Style
+	TitleHeroStyle lipgloss.Style
+	MetadataStyle  lipgloss.Style
 }
 
 func NewTheme() Theme {
-	bg := lipgloss.Color("#1a1b26")      // Dark Tokyo Night canvas
-	panelBg := lipgloss.Color("#1f2335") // Tokyo Night panel
+	canvasBg := lipgloss.Color("#1a1b26")
+	panelBg := lipgloss.Color("#1f2335")
+	selectedBg := lipgloss.Color("#24283b")
+	modalBg := lipgloss.Color("#2f354f")
 	fg := lipgloss.Color("#c0caf5")
-	accent := lipgloss.Color("#7aa2f7")   // Tokyo Night blue
-	focus := lipgloss.Color("#bb9af7")    // Tokyo Night purple
-	success := lipgloss.Color("#9ece6a")  // Tokyo Night green (Sage)
-	warning := lipgloss.Color("#e0af68")  // Tokyo Night yellow/amber
-	critical := lipgloss.Color("#f7768e") // Tokyo Night red/crimson
 	muted := lipgloss.Color("#565f89")
+	accent := lipgloss.Color("#7aa2f7")
+	focusPurple := lipgloss.Color("#bb9af7")
+
+	p0 := lipgloss.Color("#f7768e")
+	p1 := lipgloss.Color("#e0af68")
+	p2 := lipgloss.Color("#7aa2f7")
+	p3 := lipgloss.Color("#565f89")
+
+	success := lipgloss.Color("#9ece6a")
 
 	return Theme{
-		Bg:          bg,
-		PanelBg:     panelBg,
-		Fg:          fg,
-		Accent:      accent,
-		Focus:       focus,
-		Success:     success,
-		Warning:     warning,
-		Critical:    critical,
-		Muted:       muted,
-		BorderColor: muted,
+		CanvasBg:     canvasBg,
+		PanelBg:      panelBg,
+		SelectedBg:   selectedBg,
+		ModalBg:      modalBg,
+		Fg:           fg,
+		Muted:        muted,
+		Accent:       accent,
+		FocusPurple:  focusPurple,
+		P0Color:      p0,
+		P1Color:      p1,
+		P2Color:      p2,
+		P3Color:      p3,
+		SuccessColor: success,
 
-		NormalBorder: lipgloss.RoundedBorder(),
-		ActiveBorder: lipgloss.Border{
-			Top:         "─",
-			Bottom:      "─",
-			Left:        "┃", // Thick left border
-			Right:       "│",
-			TopLeft:     "╭",
-			TopRight:    "╮",
-			BottomLeft:  "╰",
-			BottomRight: "╯",
-		},
+		BaseStyle: lipgloss.NewStyle().
+			Background(canvasBg).
+			Foreground(fg),
+
+		PanelStyle: lipgloss.NewStyle().
+			Background(panelBg).
+			Foreground(fg).
+			Padding(1, 2),
+
+		SelectedPanel: lipgloss.NewStyle().
+			Background(selectedBg).
+			Foreground(fg).
+			Padding(1, 2),
+
+		ModalStyle: lipgloss.NewStyle().
+			Background(modalBg).
+			Foreground(fg).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(accent).
+			Padding(1, 2),
 
 		HeaderStyle: lipgloss.NewStyle().
-			Foreground(fg).
 			Background(panelBg).
+			Foreground(fg).
 			Padding(0, 1).
 			Bold(true),
 
 		FooterStyle: lipgloss.NewStyle().
-			Foreground(fg).
 			Background(panelBg).
-			Padding(0, 1),
-
-		PanelStyle: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(muted).
-			Padding(0, 1),
-
-		SelectedStyle: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(focus).
-			Padding(0, 1),
-
-		ActiveCard: lipgloss.NewStyle().
-			Border(lipgloss.Border{
-				Top:         "─",
-				Bottom:      "─",
-				Left:        "▌", // Bold bar indicator on the left
-				Right:       "│",
-				TopLeft:     "╭",
-				TopRight:    "╮",
-				BottomLeft:  "╰",
-				BottomRight: "╯",
-			}).
-			BorderForeground(accent).
-			Foreground(accent).
-			Padding(0, 1).
-			Bold(true),
-
-		PausedCard: lipgloss.NewStyle().
-			Border(lipgloss.Border{
-				Top:         "─",
-				Bottom:      "─",
-				Left:        "▌",
-				Right:       "│",
-				TopLeft:     "╭",
-				TopRight:    "╮",
-				BottomLeft:  "╰",
-				BottomRight: "╯",
-			}).
-			BorderForeground(warning).
-			Foreground(warning).
-			Padding(0, 1),
-
-		CompletedCard: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(success).
 			Foreground(muted).
 			Padding(0, 1),
 
-		OverdueCard: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(critical).
-			Foreground(critical).
-			Padding(0, 1),
+		TitleHeroStyle: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(fg),
+
+		MetadataStyle: lipgloss.NewStyle().
+			Foreground(muted),
 	}
 }

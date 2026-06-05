@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"tuical/internal/db"
-	"tuical/internal/model"
+	"stream/internal/db"
+	"stream/internal/model"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -61,7 +61,7 @@ func NewSyncEngine(localDB *db.JSONDB, logCallback func(string)) (*SyncEngine, e
 func (s *SyncEngine) initOAuth() error {
 	secretPath := filepath.Join(s.localDB.GetConfigDir(), "client_secrets.json")
 	if _, err := os.Stat(secretPath); os.IsNotExist(err) {
-		return errors.New("client_secrets.json not found in ~/.config/tuical/")
+		return errors.New("client_secrets.json not found in ~/.config/stream/")
 	}
 
 	secretData, err := os.ReadFile(secretPath)

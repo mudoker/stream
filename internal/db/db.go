@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"tuical/internal/model"
+	"stream/internal/model"
 
 	"github.com/google/uuid"
 )
@@ -36,7 +36,7 @@ func NewJSONDB() (*JSONDB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get home dir: %w", err)
 	}
-	configDir := filepath.Join(home, ".config", "tuical")
+	configDir := filepath.Join(home, ".config", "stream")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return nil, fmt.Errorf("could not create config dir: %w", err)
 	}

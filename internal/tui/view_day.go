@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -11,232 +10,228 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) renderDayView(height int) string {
-	sidebarWidth := int(float64(m.Width) * 0.13)
-	if sidebarWidth < 18 {
-		sidebarWidth = 18
-	} else if sidebarWidth > 26 {
-		sidebarWidth = 26
-	}
-	workspaceWidth := m.Width - sidebarWidth - 3
-	if workspaceWidth < 30 {
-		workspaceWidth = 30
+const (
+	rowsPerHour  = 4  // 15-minute slots per hour
+	totalRows    = 96 // 24h * 4 rows
+	gutterWidth  = 7  // "HH:MM  " timestamp gutter
+)
+
+// renderDayTimeline renders the 24-hour timeline grid for the day view.
+// It uses a canvas-compositing approach:
+//  1. Build 96 empty grid rows
+//  2. For each task: render a full Lipgloss block → overlay onto canvas
+//  3. Insert the NOW indicator line at the exact row
+//  4. Slice to visible window and return
+func (m Model) renderDayTimeline() string {
+	l := m.Layout
+	now := time.Now()
+	isToday := sameDay(m.SelectedDay, now)
+
+	// Grid content width (timeline minus the timestamp gutter)
+	gridW := l.TimelineW - gutterWidth
+	if gridW < 10 {
+		gridW = 10
 	}
 
-	// 75% Timeline, 25% Todo Shelf
-	timelineWidth := int(float64(workspaceWidth) * 0.75)
-	shelfWidth := workspaceWidth - timelineWidth - 4
-	if timelineWidth < 30 {
-		timelineWidth = 30
+	// ── Header ──────────────────────────────────────────────────────
+	sep := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#2a2c37")).
+		Render(strings.Repeat("─", l.TimelineW-2))
+
+	dayName := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).
+		Render(m.SelectedDay.Format("Monday"))
+	dayDate := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).
+		Render(m.SelectedDay.Format("January 2, 2006"))
+	navHint := lipgloss.NewStyle().Foreground(m.Theme.Muted).
+		Render("H ◂ · ▸ L")
+
+	// Right-align navHint in the header line
+	usedW := lipgloss.Width(dayName) + 2 + lipgloss.Width(dayDate)
+	padW := (l.TimelineW - 2) - usedW - lipgloss.Width(navHint)
+	if padW < 1 {
+		padW = 1
 	}
-	if shelfWidth < 20 {
-		shelfWidth = 20
+	headerLine := dayName + "  " + dayDate + strings.Repeat(" ", padW) + navHint
+
+	// ── Build 96-row empty canvas ────────────────────────────────────
+	// Each canvas[r] holds the raw grid content (gridW chars wide) for row r.
+	// We start with empty/hour-separator rows, then overlay tasks.
+	canvas := make([]string, totalRows)
+
+	hourRowSep := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#2a2c37")).
+		Render(strings.Repeat("─", gridW))
+	emptyRow := strings.Repeat(" ", gridW)
+
+	for r := 0; r < totalRows; r++ {
+		if r%rowsPerHour == 0 {
+			canvas[r] = hourRowSep
+		} else {
+			canvas[r] = emptyRow
+		}
 	}
 
+	// ── Resolve overlapping tasks and overlay cards ──────────────────
 	var anchoredTasks []model.Task
 	for _, t := range m.Tasks {
-		if t.SchedulingType == model.Anchored &&
-			t.TimeWindow.Start.Year() == m.SelectedDay.Year() &&
-			t.TimeWindow.Start.Month() == m.SelectedDay.Month() &&
-			t.TimeWindow.Start.Day() == m.SelectedDay.Day() {
+		if t.SchedulingType == model.Anchored && sameDay(t.TimeWindow.Start, m.SelectedDay) {
 			anchoredTasks = append(anchoredTasks, t)
 		}
 	}
-
 	cols := ResolveOverlaps(anchoredTasks)
 
-	now := time.Now()
-	isToday := m.SelectedDay.Year() == now.Year() && m.SelectedDay.Month() == now.Month() && m.SelectedDay.Day() == now.Day()
+	for _, rc := range cols {
+		startRow := timeToRow(rc.Task.TimeWindow.Start)
+		endRow := timeToRow(rc.Task.TimeWindow.End)
+		if endRow > totalRows {
+			endRow = totalRows
+		}
+		h := endRow - startRow
+		if h < 1 {
+			h = 1
+		}
 
-	// Content area width for the timeline grid (excluding 6 char timestamp)
-	W := timelineWidth - 6
-	if W < 10 {
-		W = 10
+		// Column partition
+		colW := gridW / rc.TotalCol
+		colX := rc.ColIndex * colW
+		if rc.ColIndex == rc.TotalCol-1 {
+			colW = gridW - colX // last column takes remainder
+		}
+		if colW < 3 {
+			colW = 3
+		}
+
+		isActive := isToday && now.After(rc.Task.TimeWindow.Start) && now.Before(rc.Task.TimeWindow.End)
+		cardStr := m.renderTaskCard(rc.Task, colW, h, isActive)
+		cardLines := strings.Split(cardStr, "\n")
+
+		// Overlay card lines onto canvas rows
+		for i, line := range cardLines {
+			r := startRow + i
+			if r >= totalRows {
+				break
+			}
+			lineW := lipgloss.Width(line)
+			// Pad or trim to colW
+			if lineW < colW {
+				line += strings.Repeat(" ", colW-lineW)
+			}
+			// Place in the correct column position within the row
+			rowRunes := []rune(canvas[r])
+			// Ensure the row is wide enough
+			for len(rowRunes) < gridW {
+				rowRunes = append(rowRunes, ' ')
+			}
+			// Replace the slice [colX..colX+colW] with the card line
+			lineRunes := []rune(line)
+			for j := 0; j < colW && colX+j < gridW; j++ {
+				if j < len(lineRunes) {
+					rowRunes[colX+j] = lineRunes[j]
+				}
+			}
+			canvas[r] = string(rowRunes)
+		}
 	}
 
-	// Calculate 24 hours * 4 rows/hour = 96 rows total
-	var timelineLines []string
-
-	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", timelineWidth-6))
-
-	dayName := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(m.SelectedDay.Format("Monday"))
-	dayDate := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(m.SelectedDay.Format("January 2, 2006"))
-	navHint := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("H ◂ day ▸ L")
-
-	headerPad := timelineWidth - 6 - lipgloss.Width(dayName) - lipgloss.Width(dayDate) - lipgloss.Width(navHint) - 6
-	if headerPad < 1 {
-		headerPad = 1
-	}
-	headerLine := dayName + "  " + dayDate + strings.Repeat(" ", headerPad) + navHint
-
-	timelineLines = append(timelineLines, headerLine)
-	timelineLines = append(timelineLines, sep)
-	timelineLines = append(timelineLines, "")
-	// Calculate "NOW" indicator row index
+	// ── NOW indicator row ─────────────────────────────────────────────
 	nowRow := -1
 	if isToday {
-		nowRow = (now.Hour() * 4) + (now.Minute() / 15)
+		nowRow = timeToRow(now)
 	}
 
-	// Render the 96 rows (00:00 to 23:45)
-	for r := 0; r < 96; r++ {
-		// Find all active tasks overlapping row r
-		type ActiveTaskCol struct {
-			ColIndex int
-			TotalCol int
-			Task     model.Task
-		}
-		var activeTasks []ActiveTaskCol
-		for _, rc := range cols {
-			startRow := (rc.Task.TimeWindow.Start.Hour() * 4) + (rc.Task.TimeWindow.Start.Minute() / 15)
-			endRow := (rc.Task.TimeWindow.End.Hour() * 4) + (rc.Task.TimeWindow.End.Minute() / 15)
-			if r >= startRow && r < endRow {
-				activeTasks = append(activeTasks, ActiveTaskCol{
-					ColIndex: rc.ColIndex,
-					TotalCol: rc.TotalCol,
-					Task:     rc.Task,
-				})
-			}
-		}
-
-		// Partition W into segments
-		type RowSegment struct {
-			Start int
-			End   int
-			Text  string
-		}
-		var segments []RowSegment
-
-		for _, at := range activeTasks {
-			startRow := (at.Task.TimeWindow.Start.Hour() * 4) + (at.Task.TimeWindow.Start.Minute() / 15)
-			endRow := (at.Task.TimeWindow.End.Hour() * 4) + (at.Task.TimeWindow.End.Minute() / 15)
-			h := endRow - startRow
-
-			colStart := (at.ColIndex * W) / at.TotalCol
-			colEnd := ((at.ColIndex + 1) * W) / at.TotalCol
-			w := colEnd - colStart
-
-			isActiveBlock := isToday && now.After(at.Task.TimeWindow.Start) && now.Before(at.Task.TimeWindow.End)
-
-			// Render the segment of the task card at line relative to startRow
-			isNowRow := (r == nowRow)
-			isLeftmost := (colStart == 0)
-			lineText := m.renderTaskCardLine(at.Task, w, h, r-startRow, isActiveBlock, isNowRow, isLeftmost)
-			segments = append(segments, RowSegment{Start: colStart, End: colEnd, Text: lineText})
-		}
-
-		// Sort segments by Start position
-		sort.Slice(segments, func(i, j int) bool {
-			return segments[i].Start < segments[j].Start
-		})
-
-		// Fill in the gaps with guides/empty space
-		var rowParts []string
-		curr := 0
-		for _, seg := range segments {
-			if seg.Start > curr {
-				gapW := seg.Start - curr
-				var gapText string
-				if r == nowRow {
-					if curr == 0 {
-						badge := getNowBadge(gapW, now)
-						gapText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(badge + strings.Repeat("─", gapW-len(badge)))
-					} else {
-						gapText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(strings.Repeat("─", gapW))
-					}
-				} else if r%4 == 0 {
-					gapText = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", gapW))
-				} else {
-					gapText = strings.Repeat(" ", gapW)
-				}
-				rowParts = append(rowParts, gapText)
-			}
-			rowParts = append(rowParts, seg.Text)
-			curr = seg.End
-		}
-		if curr < W {
-			gapW := W - curr
-			var gapText string
-			if r == nowRow {
-				if curr == 0 {
-					badge := getNowBadge(gapW, now)
-					gapText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(badge + strings.Repeat("─", gapW-len(badge)))
-				} else {
-					gapText = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(strings.Repeat("─", gapW))
-				}
-			} else if r%4 == 0 {
-				gapText = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", gapW))
-			} else {
-				gapText = strings.Repeat(" ", gapW)
-			}
-			rowParts = append(rowParts, gapText)
-		}
-
-		// Clean left-aligned timestamp (removing vertical │)
-		var hourLabel string
-		isSelectedHour := !m.TodoShelfFocus && m.TimelineHour == (r/4) && (r%4 == 0)
+	// ── Assemble final rows: gutter + canvas ────────────────────────
+	allRows := make([]string, totalRows)
+	for r := 0; r < totalRows; r++ {
+		var gutter string
 		if r == nowRow {
-			timeLabel := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
-			hourLabel = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(timeLabel) + " "
-		} else if r%4 == 0 {
-			timeLabel := fmt.Sprintf("%02d:00", r/4)
+			label := fmt.Sprintf("%02d:%02d ", now.Hour(), now.Minute())
+			gutter = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render(label)
+		} else if r%rowsPerHour == 0 {
+			hour := r / rowsPerHour
+			label := fmt.Sprintf("%02d:00 ", hour)
+			isSelectedHour := !m.TodoShelfFocus && m.TimelineHour == hour
 			if isSelectedHour {
-				hourLabel = lipgloss.NewStyle().Background(m.Theme.Accent).Foreground(m.Theme.CanvasBg).Bold(true).Render(timeLabel) + " "
+				gutter = lipgloss.NewStyle().
+					Background(m.Theme.Accent).
+					Foreground(m.Theme.CanvasBg).
+					Bold(true).
+					Render(label)
 			} else {
-				hourLabel = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(timeLabel) + " "
+				gutter = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(label)
 			}
 		} else {
-			hourLabel = "      "
+			gutter = strings.Repeat(" ", gutterWidth)
 		}
 
-		timelineLines = append(timelineLines, hourLabel+strings.Join(rowParts, ""))
+		// Replace now row canvas content with the NOW line
+		rowContent := canvas[r]
+		if r == nowRow {
+			nowContent := buildNowLine(gridW, now)
+			rowContent = nowContent
+		}
+
+		allRows[r] = gutter + rowContent
 	}
 
-	// Scroll timeline dynamically centering around m.TimelineHour
-	timelineStartRow := 8 * 4 // Default start at 8:00 AM
-	maxRowsVisible := height - 4
-	if maxRowsVisible < 10 {
-		maxRowsVisible = 10
+	// ── Viewport slicing (scroll) ─────────────────────────────────────
+	visibleH := l.Height - 4 // reserve 4 rows for header+sep+spacer+scroll hints
+	if visibleH < 8 {
+		visibleH = 8
 	}
 
-	// Center around m.TimelineHour
-	targetCenterRow := m.TimelineHour * 4
-	timelineStartRow = targetCenterRow - maxRowsVisible/2
-	if timelineStartRow < 0 {
-		timelineStartRow = 0
+	centerRow := m.TimelineHour * rowsPerHour
+	startR := centerRow - visibleH/2
+	if startR < 0 {
+		startR = 0
 	}
-	timelineEndRow := timelineStartRow + maxRowsVisible - 1
-	if timelineEndRow > 95 {
-		timelineEndRow = 95
-		timelineStartRow = timelineEndRow - maxRowsVisible + 1
-		if timelineStartRow < 0 {
-			timelineStartRow = 0
+	endR := startR + visibleH - 1
+	if endR >= totalRows {
+		endR = totalRows - 1
+		startR = endR - visibleH + 1
+		if startR < 0 {
+			startR = 0
 		}
 	}
 
-	var visibleTimelineLines []string
-	visibleTimelineLines = append(visibleTimelineLines, timelineLines[0]) // day name header
-	visibleTimelineLines = append(visibleTimelineLines, timelineLines[1]) // separator
-	visibleTimelineLines = append(visibleTimelineLines, timelineLines[2]) // empty spacer
-	if timelineStartRow > 0 {
-		visibleTimelineLines = append(visibleTimelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("      ▲  (scroll up)"))
+	var visible []string
+	visible = append(visible, headerLine, sep, "")
+
+	if startR > 0 {
+		hint := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(
+			strings.Repeat(" ", gutterWidth) + "▲ scroll up")
+		visible = append(visible, hint)
 	}
 
-	const headerOffset = 3
-	for r := timelineStartRow; r <= timelineEndRow; r++ {
-		visibleTimelineLines = append(visibleTimelineLines, timelineLines[r+headerOffset])
+	for r := startR; r <= endR; r++ {
+		visible = append(visible, allRows[r])
 	}
 
-	if timelineEndRow < 95 {
-		visibleTimelineLines = append(visibleTimelineLines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("      ▼  (scroll down)"))
+	if endR < totalRows-1 {
+		hint := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(
+			strings.Repeat(" ", gutterWidth) + "▼ scroll down")
+		visible = append(visible, hint)
 	}
 
-	leftBox := m.Theme.PanelStyle.
-		Width(timelineWidth - 4).
-		Height(height - 2).
-		Render(strings.Join(visibleTimelineLines, "\n"))
+	return strings.Join(visible, "\n")
+}
 
-	rightBox := m.renderTodoShelf(shelfWidth, height)
+// buildNowLine renders the NOW indicator as a full-width accent line.
+func buildNowLine(width int, now time.Time) string {
+	badge := fmt.Sprintf("── NOW %02d:%02d ", now.Hour(), now.Minute())
+	if len(badge) > width {
+		badge = "NOW "
+	}
+	rest := strings.Repeat("─", width-len(badge))
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#10b981")).Bold(true).
+		Render(badge + rest)
+}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, "    ", rightBox)
+// timeToRow converts a time.Time to its 15-minute row index (0–95).
+func timeToRow(t time.Time) int {
+	return (t.Hour() * rowsPerHour) + (t.Minute() / 15)
+}
+
+// sameDay returns true if a and b are on the same calendar day.
+func sameDay(a, b time.Time) bool {
+	return a.Year() == b.Year() && a.Month() == b.Month() && a.Day() == b.Day()
 }

@@ -1,6 +1,6 @@
-# ▲ tuical — VIM-First TUI Calendar & Task Management Engine
+# ▲ stream — VIM-First TUI Calendar & Task Management Engine
 
-`tuical` is a terminal-native, keyboard-driven calendar and productivity engine. It is designed under the philosophy that every calendar event is a task and every task is a schedulable work item. 
+`stream` is a terminal-native, keyboard-driven calendar and productivity engine. It is designed under the philosophy that every calendar event is a task and every task is a schedulable work item. 
 
 Its design is heavily inspired by **Linear's** project management workspace and the **Arc Browser's** vertical sidebar layout, featuring true 24-bit color depth, elevated background layers, padded widget cards, and a docked focus session utility.
 
@@ -10,39 +10,39 @@ Its design is heavily inspired by **Linear's** project management workspace and 
 
 ### 📋 Prerequisites
 
-Before installing `tuical`, ensure you have the following toolchains installed:
+Before installing `stream`, ensure you have the following toolchains installed:
 * **Go**: Version 1.18 or higher (verify with `go version`).
 * **Git**: To clone the repository.
 
 ### 📥 1. Clone the Repository
 Clone the codebase from the remote repository:
 ```bash
-git clone https://github.com/mudoker/stream.git tuical
-cd tuical
+git clone https://github.com/mudoker/stream.git stream
+cd stream
 ```
 
 ### 🔨 2. Build the Optimized Binary
 Compile the Go project into a single native executable. We use linker flags (`-s -w`) to strip debug symbols and reduce the binary footprint to just **17MB**:
 ```bash
-go build -ldflags="-s -w" -o tuical
+go build -ldflags="-s -w" -o stream
 ```
 
 ### 📦 3. Install Globally
 Move the compiled binary to your local executables path (e.g., `/usr/local/bin` or `~/.local/bin`) so it can be launched from anywhere:
 ```bash
 # Move to system path
-sudo mv tuical /usr/local/bin/
+sudo mv stream /usr/local/bin/
 
 # Alternatively, move to local user path
 mkdir -p ~/.local/bin
-mv tuical ~/.local/bin/
+mv stream ~/.local/bin/
 ```
 Ensure your shell's `PATH` variable includes the directory where the binary is moved.
 
 ### 🚀 4. Run the Application
 Launch the TUI interface in fullscreen raw mode:
 ```bash
-tuical
+stream
 ```
 
 ---
@@ -58,7 +58,7 @@ go test ./...
 
 ## 📅 Google Calendar OAuth2 Setup
 
-`tuical` comes with a delta-sync daemon that operates fully offline, syncing local changes back to Google Calendar when connection is restored.
+`stream` comes with a delta-sync daemon that operates fully offline, syncing local changes back to Google Calendar when connection is restored.
 
 1. Go to the **[Google Cloud Console](https://console.cloud.google.com/)** and create a project.
 2. Search for and enable the **Google Calendar API**.
@@ -66,16 +66,16 @@ go test ./...
 4. Go to **Credentials** -> **Create Credentials** -> **OAuth Client ID**.
 5. Set Application Type to **Desktop Application**.
 6. Download the credentials file, rename it to `client_secrets.json`, and place it in the configuration folder:
-   * **Linux/macOS:** `~/.config/tuical/client_secrets.json`
-7. Start `tuical`, open the command palette by typing `:`, write `auth`, and press `Enter`.
-8. Copy the local authorization loop URL, open it in your browser, and authorize permissions. The sync engine will automatically initialize and save credentials to `~/.config/tuical/credentials.json`.
+   * **Linux/macOS:** `~/.config/stream/client_secrets.json`
+7. Start `stream`, open the command palette by typing `:`, write `auth`, and press `Enter`.
+8. Copy the local authorization loop URL, open it in your browser, and authorize permissions. The sync engine will automatically initialize and save credentials to `~/.config/stream/credentials.json`.
 
 ---
 
 ## 📂 Configuration & DB Directory
 
 All local databases and configuration credentials reside in the following folder:
-* **Path:** `~/.config/tuical/`
+* **Path:** `~/.config/stream/`
   * `data.json` — Main local task and calendar database.
   * `ledger.json` — Offline transaction ledger.
   * `credentials.json` — OAuth2 access and refresh tokens.

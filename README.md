@@ -1,88 +1,125 @@
-# VIM-First TUI Calendar & Task Management Engine (`tuical`)
+# ▲ tuical — VIM-First TUI Calendar & Task Management Engine
 
-`tuical` is a terminal-native calendar and focus-tracking productivity engine built for developers, system administrators, and keyboard-driven power users. It features custom Tokyonight/Catppuccin styling, fluid layout grids, a greedy Pomodoro partition engine, and an offline-first bi-directional Google Calendar sync daemon.
+`tuical` is a terminal-native, keyboard-driven calendar and productivity engine. It is designed under the philosophy that every calendar event is a task and every task is a schedulable work item. 
 
----
-
-## 🚀 Key Features
-
-* **VIM Modal Nav:** Zero-mouse dependency with distinct `NORMAL`, `INSERT`, `ZEN`, `WIZARD`, and `COMMAND` states.
-* **Tokyo Night Aesthetics:** True 24-bit color depth, rounded Unicode panels, and dynamic progress bar styling.
-* **Priority Execution Engine:** Automatic sorting based on `Weight = (Priority * 1000) + Story Points`. High-effort P0 tasks bubble up dynamically.
-* **Greedy Pomodoro Slicing:** Automatically segments task durations into custom focus and rest intervals (e.g. 90/20, 50/10, 25/5).
-* **Network-Isolation Safeguards:** Offline local transaction ledger that queues delta changes and syncs them automatically when connection resumes.
-* **Private Metadata Shielding:** Saves structured details like Story Points and Priorities in remote events using GCal extended properties.
+Its design is heavily inspired by **Linear's** project management workspace and the **Arc Browser's** vertical sidebar layout, featuring true 24-bit color depth, elevated background layers, padded widget cards, and a docked focus session utility.
 
 ---
 
-## 🛠️ Installation & Building
+## ⚡ Quick Start & Installation Guide
 
-To build the optimized native binary (approx. 17MB, zero runtime dependencies):
+### 📋 Prerequisites
 
+Before installing `tuical`, ensure you have the following toolchains installed:
+* **Go**: Version 1.18 or higher (verify with `go version`).
+* **Git**: To clone the repository.
+
+### 📥 1. Clone the Repository
+Clone the codebase from the remote repository:
 ```bash
-# Clone/navigate to project
+git clone https://github.com/mudoker/stream.git tuical
 cd tuical
+```
 
-# Build optimized binary
+### 🔨 2. Build the Optimized Binary
+Compile the Go project into a single native executable. We use linker flags (`-s -w`) to strip debug symbols and reduce the binary footprint to just **17MB**:
+```bash
 go build -ldflags="-s -w" -o tuical
+```
 
-# Run the TUI
-./tuical
+### 📦 3. Install Globally
+Move the compiled binary to your local executables path (e.g., `/usr/local/bin` or `~/.local/bin`) so it can be launched from anywhere:
+```bash
+# Move to system path
+sudo mv tuical /usr/local/bin/
+
+# Alternatively, move to local user path
+mkdir -p ~/.local/bin
+mv tuical ~/.local/bin/
+```
+Ensure your shell's `PATH` variable includes the directory where the binary is moved.
+
+### 🚀 4. Run the Application
+Launch the TUI interface in fullscreen raw mode:
+```bash
+tuical
 ```
 
 ---
 
-## ⌨️ Modal Keybindings
+## 🧪 Running Unit Tests
 
-### NORMAL Mode (Default Navigation)
-* `1` - Dashboard View
-* `2` - Month Grid View
-* `3` - Week Columnar View
-* `4` - Day Timeline View (Primary workspace)
-* `5` - Analytics View
-* `h` / `j` / `k` / `l` - Navigate cells/hours/tasks
-* `tab` - Day View: toggle focus between Timeline and Todo Shelf
-* `i` - Open Task Creation Wizard
-* `z` - Launch selected task in Zen Mode Focus Session
-* `Enter` - Slide out the Detail Panel
-* `x` - Mark selected task completed
-* `d` - Delete selected task
-* `:` - Open Command Palette
-
-### WIZARD Mode (Task Form Creation)
-* `Tab` / `Down` - Move focus to next input field
-* `Shift+Tab` / `Up` - Move focus to previous input field
-* `Enter` - Advance field or submit when focused on `[SUBMIT]`
-* `Esc` - Cancel and return to NORMAL mode
-
-### ZEN Mode (Pomodoro Timer)
-* `Space` - Pause / Resume countdown timer
-* `+` - Inject +5 minutes into current session duration
-* `b` - Skip current focus/break block
-* `Esc` - Terminate focus session early (saves elapsed work time)
+To verify the functional correctness of the Pomodoro partition engine and layout calculators, run the unit test suites:
+```bash
+go test ./...
+```
 
 ---
 
 ## 📅 Google Calendar OAuth2 Setup
 
-To sync your TUI with Google Calendar:
+`tuical` comes with a delta-sync daemon that operates fully offline, syncing local changes back to Google Calendar when connection is restored.
 
-1. Go to the **[Google Cloud Console](https://console.cloud.google.com/)** and create a new project.
-2. Enable the **Google Calendar API** for your project.
-3. Configure the OAuth Consent Screen (Internal or External).
-4. Go to **Credentials**, click **Create Credentials** -> **OAuth Client ID**, select **Desktop Application** as Application Type.
-5. Download the client secret JSON file.
-6. Rename it to `client_secrets.json` and save it to:
-   * **Linux:** `~/.config/tuical/client_secrets.json`
-7. Start `tuical`, open the command palette (`:`), type `auth`, and press `Enter`.
-8. Copy the link shown, paste it in your browser, approve permissions, and you are fully authorized!
+1. Go to the **[Google Cloud Console](https://console.cloud.google.com/)** and create a project.
+2. Search for and enable the **Google Calendar API**.
+3. Configure your **OAuth Consent Screen** (select user type as Internal or External).
+4. Go to **Credentials** -> **Create Credentials** -> **OAuth Client ID**.
+5. Set Application Type to **Desktop Application**.
+6. Download the credentials file, rename it to `client_secrets.json`, and place it in the configuration folder:
+   * **Linux/macOS:** `~/.config/tuical/client_secrets.json`
+7. Start `tuical`, open the command palette by typing `:`, write `auth`, and press `Enter`.
+8. Copy the local authorization loop URL, open it in your browser, and authorize permissions. The sync engine will automatically initialize and save credentials to `~/.config/tuical/credentials.json`.
 
 ---
 
-## 📂 Config Directory Files
+## 📂 Configuration & DB Directory
 
-All config and local storage files reside in `~/.config/tuical/`:
-* `data.json` - Core task database.
-* `ledger.json` - Offline transaction ledger logs.
-* `credentials.json` - Google OAuth2 access/refresh tokens.
-* `client_secrets.json` - Google OAuth2 client credentials (manually created).
+All local databases and configuration credentials reside in the following folder:
+* **Path:** `~/.config/tuical/`
+  * `data.json` — Main local task and calendar database.
+  * `ledger.json` — Offline transaction ledger.
+  * `credentials.json` — OAuth2 access and refresh tokens.
+  * `client_secrets.json` — OAuth2 client secrets.
+
+---
+
+## ⌨️ Modal Keybindings
+
+### NORMAL Mode (Navigation & Split Control)
+* `1` — Dashboard View
+* `2` — Month Grid View
+* `3` — Week Columns View
+* `4` — Day Timeline View
+* `5` — Analytics View
+* `h` / `j` / `k` / `l` — Navigate calendar cells, hours, or backlog tasks
+* `Tab` — Day View: toggle focus between Day Timeline and Todo Shelf
+* `i` — Open Task Creation Wizard
+* `z` — Launch selected task in Zen Mode Focus Session
+* `Enter` — Slide-over detailed task inspector panel
+* `x` — Complete selected task
+* `d` — Delete selected task
+* `:` — Open Command Palette
+
+### WIZARD Mode (Task Form Wizard)
+* `Tab` / `Down` — Move focus to next input field
+* `Shift+Tab` / `Up` — Move focus to previous input field
+* `Enter` — Advance to next field, or submit when on `[SUBMIT]`
+* `Esc` — Dismiss form wizard and return to NORMAL mode
+
+### ZEN Mode (Pomodoro countdown)
+* `Space` — Pause / Resume countdown timer (automatically logs interruptions)
+* `+` — Inject $+5$ minutes into active focus session
+* `b` — Force break (skip active block)
+* `Esc` — Terminate focus session early (saves elapsed work metrics)
+
+---
+
+## 🛠️ Command System Palette (`:`)
+
+Open the Raycast-style command palette by pressing `:` in `NORMAL` mode.
+* `:create <task title>` — Create a fixed scheduled task for today at 9:00 AM.
+* `:todo <task title>` — Create an unscheduled floating task on the Todo Shelf.
+* `:review` — Launch the Daily Shutdown Review (defer unfinished tasks to tomorrow).
+* `:sync` — Force run the Google Calendar delta-sync daemon.
+* `:auth` — Launch the local authorization callback server.
+* `:quit` / `:q` — Exit the application.

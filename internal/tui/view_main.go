@@ -7,143 +7,156 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// View is the root Bubble Tea render function.
+// It assembles the full-screen layout using JoinHorizontal with explicit Width()
+// on every column so Lipgloss clips and pads deterministically.
 func (m Model) View() string {
 	if m.Width == 0 || m.Height == 0 {
 		return "Initializing workspace..."
 	}
 
-	// 1. Zen Mode takes over the workspace only if in active fullscreen focus
+	// Zen Mode is a full-screen takeover
 	if m.CurrentMode == ModeZen {
 		return m.renderZenMode()
 	}
 
-	// 2. Calculate dynamic column dimensions
-	sidebarWidth := int(float64(m.Width) * 0.13)
-	if sidebarWidth < 18 {
-		sidebarWidth = 18
-	} else if sidebarWidth > 26 {
-		sidebarWidth = 26
-	}
-	sidebarContentWidth := sidebarWidth - 2
-	if sidebarContentWidth < 10 {
-		sidebarContentWidth = 10
-	}
+	l := m.Layout
 
-	workspaceWidth := m.Width - sidebarWidth - 1
-	if workspaceWidth < 30 {
-		workspaceWidth = 30
-	}
-	workspaceHeight := m.Height
-
-	// 3. Build the left Arc-style Sidebar
-	sidebar := m.renderArcSidebar(sidebarContentWidth)
-
-	var content string
-	switch m.CurrentView {
-	case DashboardView:
-		content = m.renderDashboard(workspaceHeight)
-	case MonthView:
-		content = m.renderMonthView(workspaceHeight)
-	case WeekView:
-		content = m.renderWeekView(workspaceHeight)
-	case DayView:
-		content = m.renderDayView(workspaceHeight)
-	case AnalyticsView:
-		content = m.renderAnalyticsView(workspaceHeight)
-	}
-
-	// 4. Overlay mini Zen Mode in top-right of workspace content
-	if m.ZenTimer != nil && m.ZenTimer.Running {
-		content = m.overlayMiniZen(content, workspaceWidth)
-	}
-
-	// 5. Join Left Arc Sidebar (1px right border) and Workspace Content
+	// ── Sidebar ─────────────────────────────────────────────────────
 	sidebarStyle := lipgloss.NewStyle().
-		Width(sidebarWidth).
-		Height(workspaceHeight).
+		Width(l.SidebarW).
+		Height(l.Height).
 		Background(m.Theme.PanelBg).
 		BorderRight(true).
 		BorderStyle(lipgloss.Border{Right: "│"}).
 		BorderForeground(lipgloss.Color("#2a2c37")).
 		Padding(1, 1)
 
+	// ── Workspace (non-day views use the full workspace width) ────────
 	workspaceStyle := lipgloss.NewStyle().
-		Width(workspaceWidth).
-		Height(workspaceHeight).
+		Width(l.WorkspaceW).
+		Height(l.Height).
 		Background(m.Theme.CanvasBg).
-		Padding(0, 2)
+		Padding(1, 2)
 
-	canvas := lipgloss.JoinHorizontal(lipgloss.Top,
-		sidebarStyle.Render(sidebar),
-		workspaceStyle.Render(content),
-	)
+	// ── Day View: three-column layout ────────────────────────────────
+	timelineStyle := lipgloss.NewStyle().
+		Width(l.TimelineW).
+		Height(l.Height).
+		Background(m.Theme.CanvasBg)
 
-	// Command Palette Overlay at the bottom
-	if m.CurrentMode == ModeCommand {
-		cmdPalette := m.renderCommandPalette()
-		canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, cmdPalette)
+	todoStyle := lipgloss.NewStyle().
+		Width(l.TodoW).
+		Height(l.Height).
+		Background(m.Theme.PanelBg).
+		BorderLeft(true).
+		BorderStyle(lipgloss.Border{Left: "│"}).
+		BorderForeground(lipgloss.Color("#2a2c37"))
+
+	var canvas string
+
+	if m.CurrentView == DayView {
+		// Three-column layout: sidebar | timeline | todo shelf
+		timelineContent := m.renderDayTimeline()
+		todoContent := m.renderTodoShelf()
+
+		// Overlay mini zen widget onto timeline if running
+		if m.ZenTimer != nil && m.ZenTimer.Running {
+			timelineContent = m.overlayMiniZen(timelineContent, l.TimelineW)
+		}
+
+		canvas = lipgloss.JoinHorizontal(lipgloss.Top,
+			sidebarStyle.Render(m.renderArcSidebar()),
+			timelineStyle.Render(timelineContent),
+			todoStyle.Render(todoContent),
+		)
+	} else {
+		// Two-column layout: sidebar | full workspace
+		var workspaceContent string
+		switch m.CurrentView {
+		case DashboardView:
+			workspaceContent = m.renderDashboard()
+		case MonthView:
+			workspaceContent = m.renderMonthView(l.Height)
+		case WeekView:
+			workspaceContent = m.renderWeekView(l.Height)
+		case AnalyticsView:
+			workspaceContent = m.renderAnalyticsView()
+		}
+
+		if m.ZenTimer != nil && m.ZenTimer.Running {
+			workspaceContent = m.overlayMiniZen(workspaceContent, l.WorkspaceW)
+		}
+
+		canvas = lipgloss.JoinHorizontal(lipgloss.Top,
+			sidebarStyle.Render(m.renderArcSidebar()),
+			workspaceStyle.Render(workspaceContent),
+		)
 	}
 
-	// Centered floating modal overlay handling over the entire canvas (sidebar + content)
+	// Command Palette overlaid at the bottom
+	if m.CurrentMode == ModeCommand {
+		canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, m.renderCommandPalette())
+	}
+
+	// Centered floating modal over the full canvas
 	if m.CurrentMode == ModeForm || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen {
 		var modalStr string
-		if m.CurrentMode == ModeForm {
+		switch {
+		case m.CurrentMode == ModeForm:
 			modalStr = m.renderFormModal()
-		} else if m.PromptOpen {
+		case m.PromptOpen:
 			modalStr = m.renderPromptModal()
-		} else if m.ReviewOpen {
+		case m.ReviewOpen:
 			modalStr = m.renderReviewModal()
-		} else if m.HelpOpen {
+		case m.HelpOpen:
 			modalStr = m.renderHelpModal()
-		} else if m.DetailOpen {
+		case m.DetailOpen:
 			modalStr = m.renderDetailModal()
 		}
 
-		modalWidth := lipgloss.Width(modalStr)
-		modalHeight := lipgloss.Height(modalStr)
-
-		paddingTop := (m.Height - modalHeight) / 2
-		if paddingTop < 0 {
-			paddingTop = 0
+		modalW := lipgloss.Width(modalStr)
+		modalH := lipgloss.Height(modalStr)
+		topPad := (m.Height - modalH) / 2
+		leftPad := (m.Width - modalW) / 2
+		if topPad < 0 {
+			topPad = 0
 		}
-		paddingLeft := (m.Width - modalWidth) / 2
-		if paddingLeft < 0 {
-			paddingLeft = 0
+		if leftPad < 0 {
+			leftPad = 0
 		}
-
-		canvas = overlayString(canvas, modalStr, paddingLeft, paddingTop, m.Width)
+		canvas = overlayString(canvas, modalStr, leftPad, topPad, m.Width)
 	}
 
 	return canvas
 }
 
-func (m Model) renderArcSidebar(width int) string {
-	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", width))
-	mutedStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
-	accentStyle := lipgloss.NewStyle().Foreground(m.Theme.Accent)
+// renderArcSidebar renders the left navigation panel.
+func (m Model) renderArcSidebar() string {
+	l := m.Layout
+	innerW := l.SidebarW - 2 // account for Padding(1,1)
+	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", innerW))
+	muted := lipgloss.NewStyle().Foreground(m.Theme.Muted)
 
-	var sb []string
+	var rows []string
 
-	// 1. Wordmark Logo
-	sb = append(sb, accentStyle.Bold(true).Render("▲ stream"))
-	sb = append(sb, mutedStyle.Render("workspace"))
-	sb = append(sb, "")
-	sb = append(sb, sep)
-	sb = append(sb, "")
+	// Wordmark
+	rows = append(rows,
+		lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("▲ stream"),
+		muted.Render("workspace"),
+		"",
+		sep,
+		"",
+		muted.Bold(true).Render("VIEWS"),
+		"",
+	)
 
-	// 2. Navigation label
-	sb = append(sb, mutedStyle.
-		Bold(true).
-		Render("VIEWS"))
-	sb = append(sb, "")
-
-	// Nav items
 	type navItem struct {
 		label string
 		key   string
 		view  ViewType
 	}
-	navItems := []navItem{
+	items := []navItem{
 		{"Dashboard", "1", DashboardView},
 		{"Month", "2", MonthView},
 		{"Week", "3", WeekView},
@@ -151,51 +164,46 @@ func (m Model) renderArcSidebar(width int) string {
 		{"Analytics", "5", AnalyticsView},
 	}
 
-	for _, item := range navItems {
+	for _, item := range items {
 		if m.CurrentView == item.view {
-			activeBorder := lipgloss.Border{Left: "▎"}
-			activeStyle := lipgloss.NewStyle().
+			bar := lipgloss.Border{Left: "▎"}
+			style := lipgloss.NewStyle().
 				Background(m.Theme.SelectedBg).
 				Foreground(m.Theme.Fg).
 				Bold(true).
-				Border(activeBorder, false, false, false, true).
+				Border(bar, false, false, false, true).
 				BorderForeground(m.Theme.Accent).
 				Padding(0, 1).
-				Width(width - 1)
-			keyLabel := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(item.key)
-			sb = append(sb, activeStyle.Render(keyLabel+" "+item.label))
+				Width(innerW - 1)
+			keyStr := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(item.key)
+			rows = append(rows, style.Render(keyStr+" "+item.label))
 		} else {
-			inactiveStyle := lipgloss.NewStyle().
+			style := lipgloss.NewStyle().
 				Foreground(m.Theme.Muted).
 				Padding(0, 2).
-				Width(width)
-			keyLabel := mutedStyle.Render(item.key)
-			sb = append(sb, inactiveStyle.Render(keyLabel+" "+item.label))
+				Width(innerW)
+			rows = append(rows, style.Render(item.key+" "+item.label))
 		}
 	}
 
-	sb = append(sb, "")
-	sb = append(sb, sep)
-	sb = append(sb, "")
+	rows = append(rows, "", sep, "")
 
-	// 3. Fill spacing dynamically to push footer elements down
-	occupiedRows := len(sb) + 4
-	remainingRows := m.Height - occupiedRows
-	if remainingRows > 0 {
-		sb = append(sb, strings.Repeat("\n", remainingRows))
+	// Push footer to the bottom
+	occupied := len(rows) + 4
+	remaining := m.Height - occupied
+	if remaining > 0 {
+		rows = append(rows, strings.Repeat("\n", remaining))
 	}
 
-	// 4. Footer: mode + gcal + clock
+	// Footer: mode badge + gcal + clock
 	syncColor := m.Theme.Muted
 	if m.Sync.IsOnline() {
 		syncColor = m.Theme.SuccessColor
 	}
-	gcalBadge := lipgloss.NewStyle().Foreground(syncColor).Render("● gcal")
+	gcal := lipgloss.NewStyle().Foreground(syncColor).Render("● gcal")
 
 	modeColor := m.Theme.Muted
 	switch m.CurrentMode {
-	case ModeNormal:
-		modeColor = m.Theme.Muted
 	case ModeZen:
 		modeColor = m.Theme.FocusPurple
 	case ModeCommand:
@@ -203,18 +211,15 @@ func (m Model) renderArcSidebar(width int) string {
 	case ModeForm:
 		modeColor = m.Theme.Accent
 	}
-	modeBadge := lipgloss.NewStyle().
-		Foreground(modeColor).
-		Bold(true).
+	modeBadge := lipgloss.NewStyle().Foreground(modeColor).Bold(true).
 		Render(strings.ToLower(string(m.CurrentMode)))
+	clock := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).
+		Render(time.Now().Format("15:04"))
 
-	timeStr := time.Now().Format("15:04")
-	clockStr := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(timeStr)
+	rows = append(rows, sep)
+	rows = append(rows, modeBadge+"  "+gcal)
+	rows = append(rows, clock)
+	rows = append(rows, muted.Render("? help"))
 
-	sb = append(sb, sep)
-	sb = append(sb, modeBadge+"  "+gcalBadge)
-	sb = append(sb, clockStr)
-	sb = append(sb, mutedStyle.Render("? for help"))
-
-	return strings.Join(sb, "\n")
+	return strings.Join(rows, "\n")
 }

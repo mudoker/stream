@@ -69,10 +69,35 @@ func (m Model) View() string {
 		if paddingTop < 0 {
 			paddingTop = 0
 		}
-		// Render modal centered
 		content = lipgloss.JoinVertical(lipgloss.Center,
 			strings.Repeat("\n", paddingTop),
 			formModal,
+			strings.Repeat("\n", max(0, contentHeight-formHeight-paddingTop)),
+		)
+	} else if m.PromptOpen {
+		promptModal := m.renderPromptModal()
+		contentHeight := lipgloss.Height(content)
+		formHeight := lipgloss.Height(promptModal)
+		paddingTop := (contentHeight - formHeight) / 2
+		if paddingTop < 0 {
+			paddingTop = 0
+		}
+		content = lipgloss.JoinVertical(lipgloss.Center,
+			strings.Repeat("\n", paddingTop),
+			promptModal,
+			strings.Repeat("\n", max(0, contentHeight-formHeight-paddingTop)),
+		)
+	} else if m.ReviewOpen {
+		reviewModal := m.renderReviewModal()
+		contentHeight := lipgloss.Height(content)
+		formHeight := lipgloss.Height(reviewModal)
+		paddingTop := (contentHeight - formHeight) / 2
+		if paddingTop < 0 {
+			paddingTop = 0
+		}
+		content = lipgloss.JoinVertical(lipgloss.Center,
+			strings.Repeat("\n", paddingTop),
+			reviewModal,
 			strings.Repeat("\n", max(0, contentHeight-formHeight-paddingTop)),
 		)
 	}
@@ -886,4 +911,33 @@ func (m Model) renderCommandPalette() string {
 		Width(m.Width - 4).
 		Padding(1, 2).
 		Render(sb.String())
+}
+
+func (m Model) renderPromptModal() string {
+	var lines []string
+	lines = append(lines, "  ⚡ TASK READY FOR FOCUS\n  ──────────────────────\n")
+	lines = append(lines, fmt.Sprintf("  Title:    %s", lipgloss.NewStyle().Bold(true).Render(strings.ToUpper(m.PromptTask.Title))))
+	lines = append(lines, fmt.Sprintf("  Priority: %s  •  Story Points: %d", m.PromptTask.Priority, m.PromptTask.StoryPoints))
+	lines = append(lines, fmt.Sprintf("  Time:     %s - %s", m.PromptTask.TimeWindow.Start.Format("15:04"), m.PromptTask.TimeWindow.End.Format("15:04")))
+	lines = append(lines, "\n  [Enter] Start Focus   [s] Snooze 5m   [d/Esc] Dismiss")
+
+	return m.Theme.ModalStyle.
+		Width(48).
+		BorderForeground(m.Theme.Accent).
+		Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) renderReviewModal() string {
+	var lines []string
+	lines = append(lines, "  📊 DAILY SHUTDOWN REVIEW\n  ────────────────────────\n")
+	lines = append(lines, fmt.Sprintf("  Completed Tasks:   %d", m.ReviewTasksCompleted))
+	lines = append(lines, fmt.Sprintf("  Deferred Tasks:    %d", m.ReviewTasksDeferred))
+	lines = append(lines, fmt.Sprintf("  Total Focus Logged: %v", time.Duration(m.ReviewFocusSeconds)*time.Second))
+	lines = append(lines, "\n  Move unfinished scheduled tasks to tomorrow?")
+	lines = append(lines, "  [y] Yes, defer them   [n/Esc] No, leave as overdue")
+
+	return m.Theme.ModalStyle.
+		Width(48).
+		BorderForeground(m.Theme.SuccessColor).
+		Render(strings.Join(lines, "\n"))
 }

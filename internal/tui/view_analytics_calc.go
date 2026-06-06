@@ -15,6 +15,8 @@ type TagVal struct {
 
 type AnalyticsStats struct {
 	streak                           int
+	longestStreak                    int
+	weeklySuccessRate                float64
 	effectiveSessions                int
 	totalHrs                         float64
 	workHrs                          float64
@@ -123,6 +125,60 @@ func (m Model) calculateAnalyticsStats() AnalyticsStats {
 		}
 	}
 
+	// Longest Streak calculation
+	longestStreak := 0
+	if len(completionsByDate) > 0 {
+		var dates []time.Time
+		for dateStr := range completionsByDate {
+			if t, err := time.Parse("2006-01-02", dateStr); err == nil {
+				dates = append(dates, t)
+			}
+		}
+		sort.Slice(dates, func(i, j int) bool {
+			return dates[i].Before(dates[j])
+		})
+
+		currentLongest := 1
+		longestStreak = 1
+		for i := 1; i < len(dates); i++ {
+			daysDiff := int(dates[i].Sub(dates[i-1]).Hours() / 24)
+			if daysDiff == 1 {
+				currentLongest++
+			} else if daysDiff > 1 {
+				if currentLongest > longestStreak {
+					longestStreak = currentLongest
+				}
+				currentLongest = 1
+			}
+		}
+		if currentLongest > longestStreak {
+			longestStreak = currentLongest
+		}
+	}
+
+	// Weekly Success Rate
+	sevenDaysAgo := today.AddDate(0, 0, -7)
+	completedInLast7Days := 0
+	totalInLast7Days := 0
+	for _, t := range m.Tasks {
+		inLast7Days := false
+		if t.SchedulingType == model.Anchored {
+			inLast7Days = t.TimeWindow.Start.After(sevenDaysAgo)
+		} else {
+			inLast7Days = t.CreatedAt.After(sevenDaysAgo)
+		}
+		if inLast7Days {
+			totalInLast7Days++
+			if t.LifecycleState == model.StateCompleted {
+				completedInLast7Days++
+			}
+		}
+	}
+	weeklySuccessRate := 100.0
+	if totalInLast7Days > 0 {
+		weeklySuccessRate = float64(completedInLast7Days) / float64(totalInLast7Days) * 100
+	}
+
 	rate := 0.0
 	if totalCount > 0 {
 		rate = float64(completedCount) / float64(totalCount) * 100
@@ -168,6 +224,8 @@ func (m Model) calculateAnalyticsStats() AnalyticsStats {
 
 	return AnalyticsStats{
 		streak:             streak,
+		longestStreak:      longestStreak,
+		weeklySuccessRate:  weeklySuccessRate,
 		effectiveSessions:  effectiveSessions,
 		totalHrs:           totalHrs,
 		workHrs:            workHrs,

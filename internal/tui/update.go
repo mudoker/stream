@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"stream/internal/model"
@@ -237,6 +238,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
 					m.Form.DurationInput.SetValue("60")
 				}
+
+				m.Form.TagsInput.SetValue(strings.Join(m.DetailTask.Tags, ", "))
 
 				m.Form.ActiveField = 0
 				m.focusFormFields()

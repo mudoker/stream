@@ -104,11 +104,12 @@ type TaskForm struct {
 	StartHour      int
 	StartMin       int
 	DurationMins   int
-	ActiveField    int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Anchored (Y/N), 5: Start Time, 6: Duration, 7: Submit
+	ActiveField    int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Anchored (Y/N), 5: Start Time, 6: Duration, 7: Tags, 8: Submit
 	TitleInput     textinput.Model
 	DescInput      textinput.Model
 	StartTimeInput textinput.Model
 	DurationInput  textinput.Model
+	TagsInput      textinput.Model
 }
 
 func NewTaskForm() TaskForm {
@@ -128,6 +129,9 @@ func NewTaskForm() TaskForm {
 	dur.Placeholder = "60"
 	dur.SetValue("60")
 
+	tags := textinput.New()
+	tags.Placeholder = "engineering, refactor, admin"
+
 	return TaskForm{
 		PriorityIdx:    2,
 		SPIdx:          2,
@@ -140,6 +144,7 @@ func NewTaskForm() TaskForm {
 		DescInput:      d,
 		StartTimeInput: st,
 		DurationInput:  dur,
+		TagsInput:      tags,
 	}
 }
 
@@ -241,6 +246,10 @@ type Model struct {
 	ShelfScrollOffset    int
 	CommandSelectedIndex int
 	WorkspacePickerIdx   int
+	DashboardFocusCol    int
+	DashboardFocusRow    int
+	AnalyticsFocusCol    int
+	AnalyticsFocusRow    int
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {

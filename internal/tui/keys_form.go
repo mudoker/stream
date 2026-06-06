@@ -20,11 +20,11 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "tab", "down":
-		m.Form.ActiveField = (m.Form.ActiveField + 1) % 8
+		m.Form.ActiveField = (m.Form.ActiveField + 1) % 9
 		m.focusFormFields()
 		return m, nil
 	case "shift+tab", "up":
-		m.Form.ActiveField = (m.Form.ActiveField - 1 + 8) % 8
+		m.Form.ActiveField = (m.Form.ActiveField - 1 + 9) % 9
 		m.focusFormFields()
 		return m, nil
 	case "left":
@@ -52,12 +52,12 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case "enter":
-		if m.Form.ActiveField == 7 { // Submit
+		if m.Form.ActiveField == 8 { // Submit
 			m.submitForm()
 			m.CurrentMode = ModeNormal
 			return m, nil
 		}
-		m.Form.ActiveField = (m.Form.ActiveField + 1) % 8
+		m.Form.ActiveField = (m.Form.ActiveField + 1) % 9
 		m.focusFormFields()
 		return m, nil
 	case "esc":
@@ -77,6 +77,8 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
 	case 6:
 		m.Form.DurationInput, cmd = m.Form.DurationInput.Update(msg)
+	case 7:
+		m.Form.TagsInput, cmd = m.Form.TagsInput.Update(msg)
 	}
 
 	return m, cmd
@@ -87,6 +89,7 @@ func (m *Model) focusFormFields() {
 	m.Form.DescInput.Blur()
 	m.Form.StartTimeInput.Blur()
 	m.Form.DurationInput.Blur()
+	m.Form.TagsInput.Blur()
 
 	switch m.Form.ActiveField {
 	case 0:
@@ -97,6 +100,8 @@ func (m *Model) focusFormFields() {
 		m.Form.StartTimeInput.Focus()
 	case 6:
 		m.Form.DurationInput.Focus()
+	case 7:
+		m.Form.TagsInput.Focus()
 	}
 }
 
@@ -129,17 +134,7 @@ func (m *Model) submitForm() {
 		timeStr := m.Form.StartTimeInput.Value()
 		durStr := m.Form.DurationInput.Value()
 
-		hour, min := 9, 0
-		if parts := strings.Split(timeStr, ":"); len(parts) == 2 {
-			h, _ := strconv.Atoi(parts[0])
-			mVal, _ := strconv.Atoi(parts[1])
-			if h >= 0 && h < 24 {
-				hour = h
-			}
-			if mVal >= 0 && mVal < 60 {
-				min = mVal
-			}
-		}
+		hour, min := ParseFlexibleTime(timeStr, 9, 0)
 
 		if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
 			duration = d
@@ -160,6 +155,15 @@ func (m *Model) submitForm() {
 		}
 	}
 
+	tagsStr := m.Form.TagsInput.Value()
+	var tags []string
+	for _, part := range strings.Split(tagsStr, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			tags = append(tags, trimmed)
+		}
+	}
+
 	newTask := model.Task{
 		UUID:          uuid.New().String(),
 		WorkspaceUUID: m.ActiveWorkspaceUUID,
@@ -167,6 +171,7 @@ func (m *Model) submitForm() {
 		Description:   m.Form.DescInput.Value(),
 		Priority:      priorityVal,
 		StoryPoints:   spVal,
+		Tags:          tags,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}

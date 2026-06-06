@@ -152,13 +152,14 @@ func (m Model) renderFormModal() string {
 	fields = append(fields, renderDropdown("5", "Anchored", anchoredValStr, 4))
 	fields = append(fields, renderField("6", "Start Time", f.StartTimeInput.View(), 5))
 	fields = append(fields, renderField("7", "Duration (min)", f.DurationInput.View(), 6))
+	fields = append(fields, renderField("8", "Tags (csv)", f.TagsInput.View(), 7))
 	fields = append(fields, "")
 	fields = append(fields, m.modalSep(innerW))
 	fields = append(fields, "")
 
 	submitFg := m.Theme.Muted
 	submitText := "  Submit  "
-	if f.ActiveField == 7 {
+	if f.ActiveField == 8 {
 		submitFg = m.Theme.SuccessColor
 		submitText = "[ Submit ]"
 	}

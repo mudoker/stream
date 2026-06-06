@@ -42,7 +42,7 @@ func assertClosedRectangle(t *testing.T, card string, width, height int) {
 		}
 		runes := []rune(line)
 		if row == 0 {
-			if len(runes) < 2 || runes[0] != '┌' || runes[len(runes)-1] != '┐' {
+			if len(runes) < 2 || (runes[0] != '┌' && runes[0] != '╭') || (runes[len(runes)-1] != '┐' && runes[len(runes)-1] != '╮') {
 				t.Fatalf("top border malformed on row %d: %q", row, line)
 			}
 			for i := 1; i < len(runes)-1; i++ {
@@ -51,7 +51,7 @@ func assertClosedRectangle(t *testing.T, card string, width, height int) {
 				}
 			}
 		} else if row == height-1 {
-			if len(runes) < 2 || runes[0] != '└' || runes[len(runes)-1] != '┘' {
+			if len(runes) < 2 || (runes[0] != '└' && runes[0] != '╰') || (runes[len(runes)-1] != '┘' && runes[len(runes)-1] != '╯') {
 				t.Fatalf("bottom border malformed on row %d: %q", row, line)
 			}
 			for i := 1; i < len(runes)-1; i++ {

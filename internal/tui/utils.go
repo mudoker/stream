@@ -2,6 +2,8 @@ package tui
 
 import (
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"stream/internal/model"
@@ -206,4 +208,36 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 	}
 
 	return results
+}
+
+// ParseFlexibleTime parses time input in multiple formats:
+// - "14" -> 14:00
+// - "14:30" -> 14:30
+// - "9" -> 09:00
+// - "09:30" -> 09:30
+// If parsing fails, returns the provided default values.
+func ParseFlexibleTime(timeStr string, defaultHour, defaultMin int) (int, int) {
+	hour, min := defaultHour, defaultMin
+
+	if strings.Contains(timeStr, ":") {
+		// Format: HH:MM - only apply if both hour and minute are valid
+		parts := strings.Split(timeStr, ":")
+		if len(parts) == 2 {
+			h, errH := strconv.Atoi(parts[0])
+			m, errM := strconv.Atoi(parts[1])
+			// Only update if both parse successfully and are in valid ranges
+			if errH == nil && errM == nil && h >= 0 && h < 24 && m >= 0 && m < 60 {
+				hour = h
+				min = m
+			}
+		}
+	} else {
+		// Format: H or HH
+		if h, err := strconv.Atoi(strings.TrimSpace(timeStr)); err == nil && h >= 0 && h < 24 {
+			hour = h
+			min = 0
+		}
+	}
+
+	return hour, min
 }

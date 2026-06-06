@@ -17,7 +17,7 @@ func (m Model) renderDashboard(height int) string {
 	
 	// We want to calculate layout widths and heights
 	workspaceWidth := m.Layout.WorkspaceW - 4
-	appContentHeight := height - 6 // minus Header & Banner
+	appContentHeight := height - 8 // minus Header + Banner + spacing
 	if appContentHeight < 10 {
 		appContentHeight = 10
 	}
@@ -329,7 +329,8 @@ func (m Model) renderAgendaPanel(w, h int) string {
 	}
 
 	borderCol := m.Theme.Muted
-	if !m.SidebarFocus && !m.TodoShelfFocus {
+	isFocused := !m.SidebarFocus && m.DashboardFocusCol == 0 && m.DashboardFocusRow == 0
+	if isFocused {
 		borderCol = m.Theme.Accent
 	}
 
@@ -375,9 +376,9 @@ func (m Model) renderCapacityPanel(w, h int) string {
 	isDetailed := innerH >= 10
 	isExpanded := innerH >= 7 && !isDetailed
 
-	barMaxW := innerW - 14
-	if barMaxW < 8 {
-		barMaxW = 8
+	barMaxW := innerW - 32
+	if barMaxW < 4 {
+		barMaxW = 4
 	}
 
 	for idx, wd := range weekdays {
@@ -428,10 +429,6 @@ func (m Model) renderCapacityPanel(w, h int) string {
 		}
 
 		rowContent := fmt.Sprintf("  %-5s %s  %s", nameStr, barStr, ptStr)
-		if lipgloss.Width(rowContent) > innerW {
-			runes := []rune(rowContent)
-			rowContent = string(runes[:innerW])
-		}
 		lines = append(lines, rowContent)
 	}
 
@@ -450,7 +447,12 @@ func (m Model) renderCapacityPanel(w, h int) string {
 		)
 	}
 
-	return m.renderPanel("📊 WEEKLY CAPACITY UTILIZATION", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.DashboardFocusCol == 1 && m.DashboardFocusRow == 0
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("📊 WEEKLY CAPACITY UTILIZATION", lines, w, h, borderCol)
 }
 
 func (m Model) renderUpcomingPanel(w, h int) string {
@@ -483,7 +485,6 @@ func (m Model) renderUpcomingPanel(w, h int) string {
 		return upcoming[i].Title < upcoming[j].Title
 	})
 
-	lines = append(lines, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("🎯 UPCOMING TARGETS:"))
 	if len(upcoming) == 0 {
 		lines = append(lines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(" • No future tasks scheduled."))
 	} else {
@@ -498,13 +499,25 @@ func (m Model) renderUpcomingPanel(w, h int) string {
 			pColor := m.priorityColor(t.Priority)
 			pBadge := lipgloss.NewStyle().Foreground(pColor).Render(fmt.Sprintf("[%s]", string(t.Priority)))
 			
-			row := fmt.Sprintf(" • %s %s", pBadge, sentenceCase(t.Title))
+			fixedW := 8
+			suffixStr := ""
 			if t.SchedulingType == model.Anchored {
-				row += fmt.Sprintf(" (%s)", t.TimeWindow.Start.Format("Mon Jan _2"))
+				suffixStr = fmt.Sprintf(" (%s)", t.TimeWindow.Start.Format("Mon Jan _2"))
+				fixedW = 21
 			}
-			if lipgloss.Width(row) > innerW {
-				row = string([]rune(row)[:innerW-2]) + "…"
+			
+			title := sentenceCase(t.Title)
+			maxTitleW := innerW - fixedW
+			if maxTitleW < 5 {
+				maxTitleW = 5
 			}
+			
+			titleRunes := []rune(title)
+			if len(titleRunes) > maxTitleW {
+				title = string(titleRunes[:maxTitleW-1]) + "…"
+			}
+			
+			row := fmt.Sprintf(" • %s %s%s", pBadge, title, suffixStr)
 			lines = append(lines, row)
 		}
 	}
@@ -556,7 +569,12 @@ func (m Model) renderUpcomingPanel(w, h int) string {
 		}
 	}
 
-	return m.renderPanel("🎯 TARGETS & LOAD DISTRIBUTION", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.DashboardFocusCol == 0 && m.DashboardFocusRow == 1
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("🎯 TARGETS & LOAD DISTRIBUTION", lines, w, h, borderCol)
 }
 
 func (m Model) renderBacklogHealthPanel(w, h int) string {
@@ -596,7 +614,6 @@ func (m Model) renderBacklogHealthPanel(w, h int) string {
 	}
 
 	lines = append(lines,
-		lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("📋 BACKLOG HEALTH DIAGNOSTICS:"),
 		fmt.Sprintf(" • Total Backlog Size:   %d Floating Tasks", totalBacklog),
 		fmt.Sprintf(" • Ready to Pull:        %d Tasks", readyCount),
 		fmt.Sprintf(" • Overdue / Blocked:    %d Overdue, %d Blocked", overdueCount, blockedCount),
@@ -618,7 +635,7 @@ func (m Model) renderBacklogHealthPanel(w, h int) string {
 				pct = float64(comp) / float64(tot) * 100
 			}
 
-			barW := innerW - 25
+			barW := innerW - 36
 			if barW < 4 {
 				barW = 4
 			}
@@ -627,15 +644,16 @@ func (m Model) renderBacklogHealthPanel(w, h int) string {
 			barStyled := lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(bar)
 
 			row := fmt.Sprintf("  %s %-12s %s  %d/%d (%2.0f%%)", ws.Icon, ws.Name, barStyled, comp, tot, pct)
-			if lipgloss.Width(row) > innerW {
-				rowRunes := []rune(row)
-				row = string(rowRunes[:innerW])
-			}
 			lines = append(lines, row)
 		}
 	}
 
-	return m.renderPanel("📋 BACKLOG & CATEGORIES", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.DashboardFocusCol == 1 && m.DashboardFocusRow == 1
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("📋 BACKLOG & CATEGORIES", lines, w, h, borderCol)
 }
 
 func (m Model) renderRecentActivityPanel(w, h int) string {
@@ -673,28 +691,6 @@ func (m Model) renderRecentActivityPanel(w, h int) string {
 		})
 	}
 
-	now := time.Now()
-	simLogs := []struct {
-		offset int
-		desc   string
-		color  lipgloss.Color
-	}{
-		{5, "Started Deep Work Block", m.Theme.FocusPurple},
-		{18, "Synced Google Calendar", m.Theme.Accent},
-		{32, "Reviewed Daily Goals", m.Theme.Accent},
-		{48, "Archived Stale Tickets", m.Theme.Muted},
-		{60, "Loaded Active Workspace", m.Theme.Accent},
-	}
-
-	for _, l := range simLogs {
-		logTime := now.Add(time.Duration(-l.offset) * time.Minute)
-		events = append(events, event{
-			timeStr: logTime.Format("15:04"),
-			desc:    l.desc,
-			color:   l.color,
-		})
-	}
-
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].timeStr > events[j].timeStr
 	})
@@ -703,19 +699,30 @@ func (m Model) renderRecentActivityPanel(w, h int) string {
 		if len(lines) >= innerH {
 			break
 		}
-		tStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(ev.timeStr)
-		dStyle := lipgloss.NewStyle().Foreground(ev.color).Render(ev.desc)
-		row := fmt.Sprintf(" %s  %s", tStyle, dStyle)
-		if lipgloss.Width(row) > innerW {
-			row = string([]rune(row)[:innerW-2]) + "…"
+		desc := ev.desc
+		maxDescW := innerW - 10
+		if maxDescW < 5 {
+			maxDescW = 5
 		}
+		descRunes := []rune(desc)
+		if len(descRunes) > maxDescW {
+			desc = string(descRunes[:maxDescW-1]) + "…"
+		}
+		tStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(ev.timeStr)
+		dStyle := lipgloss.NewStyle().Foreground(ev.color).Render(desc)
+		row := fmt.Sprintf(" %s  %s", tStyle, dStyle)
 		lines = append(lines, row)
 		if innerH > 12 && idx < len(events)-1 {
 			lines = append(lines, "")
 		}
 	}
 
-	return m.renderPanel("📜 RECENT ACTIVITY STREAM", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.DashboardFocusCol == 0 && m.DashboardFocusRow == 2
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("📜 RECENT ACTIVITY STREAM", lines, w, h, borderCol)
 }
 
 func (m Model) renderTelemetryPanel(w, h int) string {
@@ -732,7 +739,6 @@ func (m Model) renderTelemetryPanel(w, h int) string {
 	}
 
 	lines = append(lines,
-		lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("⚙️ TELEMETRY METRICS:"),
 		fmt.Sprintf(" • Engine Latency:     %dms (TUI Update)", 2),
 		fmt.Sprintf(" • Memory footprint:   %d MB (Active Pool)", 28),
 		fmt.Sprintf(" • Database Size:      %.2f KB", dbSizeKB),
@@ -765,7 +771,12 @@ func (m Model) renderTelemetryPanel(w, h int) string {
 		}
 	}
 
-	return m.renderPanel("⚙️ SYSTEM TELEMETRY", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.DashboardFocusCol == 1 && m.DashboardFocusRow == 2
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("⚙️ SYSTEM TELEMETRY", lines, w, h, borderCol)
 }
 
 func (m Model) getAgendaHealthStatus(tasks []model.Task) string {

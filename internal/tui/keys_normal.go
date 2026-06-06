@@ -238,20 +238,21 @@ func (m *Model) handleDashboardOrAnalyticsNav(key string) {
 			m.DashboardFocusRow = (m.DashboardFocusRow + 1) % 3
 		}
 
-		var yStart, yEnd int
-		switch m.DashboardFocusRow {
-		case 0:
-			yStart, yEnd = 0, 15
-		case 1:
-			yStart, yEnd = 15, 30
-		case 2:
-			yStart, yEnd = 30, 45
-		}
-
-		availH := m.Height - 6
+		availH := m.Height - 8
 		if availH < 10 {
 			availH = 10
 		}
+
+		rowHeights := []int{15, 15, 15}
+		if availH > 45 {
+			rowHeights = partitionHeights(availH, 3)
+		}
+
+		var yStart, yEnd int
+		for i := 0; i < m.DashboardFocusRow; i++ {
+			yStart += rowHeights[i]
+		}
+		yEnd = yStart + rowHeights[m.DashboardFocusRow]
 
 		if yStart < m.ScrollOffset {
 			m.ScrollOffset = yStart
@@ -277,10 +278,26 @@ func (m *Model) handleDashboardOrAnalyticsNav(key string) {
 		yStart := m.AnalyticsFocusRow * 13
 		yEnd := (m.AnalyticsFocusRow + 1) * 13
 
-		gridHeight := m.Height - 6
+		gridHeight := m.Height - 8
 		if gridHeight < 10 {
 			gridHeight = 10
 		}
+
+		rowHeights := make([]int, totalLayers)
+		if gridHeight > totalLayers*13 {
+			rowHeights = partitionHeights(gridHeight, totalLayers)
+		} else {
+			for i := range rowHeights {
+				rowHeights[i] = 13
+			}
+		}
+
+		var yStartAcc int
+		for i := 0; i < m.AnalyticsFocusRow; i++ {
+			yStartAcc += rowHeights[i]
+		}
+		yStart = yStartAcc
+		yEnd = yStartAcc + rowHeights[m.AnalyticsFocusRow]
 
 		if yStart < m.ScrollOffset {
 			m.ScrollOffset = yStart

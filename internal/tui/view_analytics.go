@@ -45,7 +45,7 @@ func (m Model) renderAnalyticsView(height int) string {
 		Align(lipgloss.Center).
 		Render(bannerStr)
 
-	gridHeight := height - 6 // Remaining space for layers
+	gridHeight := height - 8 // Remaining space after header/banner spacing
 	if gridHeight < 10 {
 		gridHeight = 10
 	}
@@ -155,9 +155,9 @@ func (m Model) renderDailyAllocationPanel(w, h int, stats AnalyticsStats) string
 	}
 
 	targetHrs := 8.0
-	barTotalW := innerW - 16
-	if barTotalW < 8 {
-		barTotalW = 8
+	barTotalW := innerW - 22
+	if barTotalW < 4 {
+		barTotalW = 4
 	}
 
 	var lines []string
@@ -201,15 +201,20 @@ func (m Model) renderDailyAllocationPanel(w, h int, stats AnalyticsStats) string
 		lines = append(lines, row)
 	}
 
-	return m.renderPanel("📅 DAILY FOCUS & ALLOCATION", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 0 && m.AnalyticsFocusRow == 0
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("📅 DAILY FOCUS & ALLOCATION", lines, w, h, borderCol)
 }
 
 func (m Model) renderTopTagsPanel(w, h int, stats AnalyticsStats) string {
 	innerW := w - 6
 
-	barTotalW := innerW - 20
-	if barTotalW < 8 {
-		barTotalW = 8
+	barTotalW := innerW - 24
+	if barTotalW < 4 {
+		barTotalW = 4
 	}
 
 	var lines []string
@@ -259,7 +264,12 @@ func (m Model) renderTopTagsPanel(w, h int, stats AnalyticsStats) string {
 		}
 	}
 
-	return m.renderPanel("🏷️ TOP CATEGORY TAGS", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 1 && m.AnalyticsFocusRow == 0
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("🏷️ TOP CATEGORY TAGS", lines, w, h, borderCol)
 }
 
 func (m Model) renderHealthMetricsPanel(w, h int, stats AnalyticsStats) string {
@@ -297,7 +307,12 @@ func (m Model) renderHealthMetricsPanel(w, h int, stats AnalyticsStats) string {
 		)
 	}
 
-	return m.renderPanel("📈 FOCUS HEALTH METRICS", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 0 && m.AnalyticsFocusRow == 1
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("📈 FOCUS HEALTH METRICS", lines, w, h, borderCol)
 }
 
 func (m Model) renderActivationTrendPanel(w, h int, stats AnalyticsStats) string {
@@ -359,7 +374,12 @@ func (m Model) renderActivationTrendPanel(w, h int, stats AnalyticsStats) string
 	}
 	lines = append(lines, centeredBlocks, "", centeredLegend)
 
-	return m.renderPanel("🧱 30-DAY ACTIVATION TREND", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 1 && m.AnalyticsFocusRow == 1
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("🧱 30-DAY ACTIVATION TREND", lines, w, h, borderCol)
 }
 
 func (m Model) renderWeekdayAnalysisPanel(w, h int, stats AnalyticsStats) string {
@@ -415,16 +435,21 @@ func (m Model) renderWeekdayAnalysisPanel(w, h int, stats AnalyticsStats) string
 		lines = append(lines, row)
 	}
 
-	return m.renderPanel("📊 WEEKDAY ANALYSIS", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 0 && m.AnalyticsFocusRow == 2
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("📊 WEEKDAY ANALYSIS", lines, w, h, borderCol)
 }
 
 func (m Model) renderHourHeatmapPanel(w, h int) string {
 	innerW := w - 6
 
 	// Focus by hour ranges
-	morningSecs := 4 * 3600
-	afternoonSecs := 3 * 3600
-	eveningSecs := 2 * 3600
+	morningSecs := 0
+	afternoonSecs := 0
+	eveningSecs := 0
 
 	for _, t := range m.Tasks {
 		if t.SchedulingType == model.Anchored {
@@ -478,16 +503,32 @@ func (m Model) renderHourHeatmapPanel(w, h int) string {
 		fmt.Sprintf("  Evening (18-00):   %s  %2.0f%%", renderBar(ePct, m.Theme.SuccessColor), ePct),
 	)
 
-	return m.renderPanel("🔥 HOURLY FOCUS HEATMAP", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 1 && m.AnalyticsFocusRow == 2
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("🔥 HOURLY FOCUS HEATMAP", lines, w, h, borderCol)
 }
 
 func (m Model) renderVelocityTrendPanel(w, h int, stats AnalyticsStats) string {
 	innerW := w - 6
 
-	compThisWeek := stats.completedCount
-	compLastWeek := int(float64(stats.completedCount) * 0.8) // high-fidelity comparison
-	if compLastWeek == 0 {
-		compLastWeek = 2
+	today := time.Now()
+	sevenDaysAgo := today.AddDate(0, 0, -7)
+	fourteenDaysAgo := today.AddDate(0, 0, -14)
+
+	compThisWeek := 0
+	compLastWeek := 0
+
+	for _, t := range m.Tasks {
+		if t.LifecycleState == model.StateCompleted {
+			if t.UpdatedAt.After(sevenDaysAgo) && t.UpdatedAt.Before(today) {
+				compThisWeek++
+			} else if t.UpdatedAt.After(fourteenDaysAgo) && t.UpdatedAt.Before(sevenDaysAgo) {
+				compLastWeek++
+			}
+		}
 	}
 
 	barMax := innerW - 18
@@ -525,7 +566,12 @@ func (m Model) renderVelocityTrendPanel(w, h int, stats AnalyticsStats) string {
 		lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("  Average weekly output: %.1f tasks completed", float64(compThisWeek+compLastWeek)/2.0)),
 	)
 
-	return m.renderPanel("🔥 FOCUS VELOCITY TREND", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 0 && m.AnalyticsFocusRow == 3
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("🔥 FOCUS VELOCITY TREND", lines, w, h, borderCol)
 }
 
 func (m Model) renderStreakPerformancePanel(w, h int, stats AnalyticsStats) string {
@@ -539,18 +585,32 @@ func (m Model) renderStreakPerformancePanel(w, h int, stats AnalyticsStats) stri
 		return title + strings.Repeat(" ", pad) + val
 	}
 
+	consistency := "NONE"
+	if stats.weeklySuccessRate >= 80 {
+		consistency = "EXCELLENT"
+	} else if stats.weeklySuccessRate >= 50 {
+		consistency = "GOOD"
+	} else if stats.weeklySuccessRate > 0 {
+		consistency = "FAIR"
+	}
+
 	var lines []string
 	lines = append(lines,
 		renderRow("Current Focus Streak:", fmt.Sprintf("%d Days", stats.streak)),
 		"",
-		renderRow("All-Time Longest Streak:", "14 Days"),
+		renderRow("All-Time Longest Streak:", fmt.Sprintf("%d Days", stats.longestStreak)),
 		"",
-		renderRow("Weekly Success Rate:", "85%"),
+		renderRow("Weekly Success Rate:", fmt.Sprintf("%.0f%%", stats.weeklySuccessRate)),
 		"",
-		renderRow("Operational consistency:", "EXCELLENT"),
+		renderRow("Operational consistency:", consistency),
 	)
 
-	return m.renderPanel("⚡ STREAK PERFORMANCE", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 1 && m.AnalyticsFocusRow == 3
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("⚡ STREAK PERFORMANCE", lines, w, h, borderCol)
 }
 
 func (m Model) renderMonthOverMonthPanel(w, h int, stats AnalyticsStats) string {
@@ -571,10 +631,6 @@ func (m Model) renderMonthOverMonthPanel(w, h int, stats AnalyticsStats) string 
 	maxHrs := 1.0
 	for _, mth := range months {
 		hrs := float64(monthlySecs[mth]) / 3600.0
-		// Default demonstration values
-		if hrs == 0 {
-			hrs = float64(30 + (int(mth)%3)*15)
-		}
 		if hrs > maxHrs {
 			maxHrs = hrs
 		}
@@ -588,9 +644,6 @@ func (m Model) renderMonthOverMonthPanel(w, h int, stats AnalyticsStats) string 
 	var lines []string
 	for idx, mth := range months {
 		hrs := float64(monthlySecs[mth]) / 3600.0
-		if hrs == 0 {
-			hrs = float64(30 + (int(mth)%3)*15)
-		}
 		fillW := int(math.Round(hrs * float64(barMax) / maxHrs))
 		if fillW > barMax {
 			fillW = barMax
@@ -603,26 +656,67 @@ func (m Model) renderMonthOverMonthPanel(w, h int, stats AnalyticsStats) string 
 		lines = append(lines, row)
 	}
 
-	return m.renderPanel("📅 MONTH-OVER-MONTH SUMMARY", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 0 && m.AnalyticsFocusRow == 4
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("📅 MONTH-OVER-MONTH SUMMARY", lines, w, h, borderCol)
 }
 
 func (m Model) renderProjectFocusRatiosPanel(w, h int, stats AnalyticsStats) string {
 	innerW := w - 6
 
-	projects := []struct {
+	wsTime := make(map[string]int)
+	totalWSTime := 0
+	for _, t := range m.Tasks {
+		if t.LifecycleState == model.StateCompleted {
+			dur := t.ExecutionMetrics.ElapsedFocusSeconds
+			if dur == 0 && t.SchedulingType == model.Anchored {
+				dur = int(t.TimeWindow.End.Sub(t.TimeWindow.Start).Seconds())
+			} else if dur == 0 {
+				dur = t.StoryPoints * 45 * 60
+			}
+			wsTime[t.WorkspaceUUID] += dur
+			totalWSTime += dur
+		}
+	}
+	if totalWSTime == 0 {
+		for _, t := range m.Tasks {
+			wsTime[t.WorkspaceUUID]++
+			totalWSTime++
+		}
+	}
+
+	type wsRatio struct {
 		name string
 		pct  float64
 		col  lipgloss.Color
-	}{
-		{"Memoir", 42.0, m.Theme.P0Color},
-		{"Stream", 31.0, m.Theme.Accent},
-		{"Backend", 18.0, m.Theme.FocusPurple},
-		{"Personal", 9.0, m.Theme.SuccessColor},
+	}
+	var projects []wsRatio
+	colors := []lipgloss.Color{m.Theme.P0Color, m.Theme.Accent, m.Theme.FocusPurple, m.Theme.SuccessColor, m.Theme.P1Color, m.Theme.P3Color}
+	colorIdx := 0
+
+	for _, ws := range m.Workspaces {
+		sec := wsTime[ws.UUID]
+		pct := 0.0
+		if totalWSTime > 0 {
+			pct = float64(sec) / float64(totalWSTime) * 100
+		}
+		
+		col := colors[colorIdx % len(colors)]
+		colorIdx++
+
+		projects = append(projects, wsRatio{
+			name: ws.Icon + " " + ws.Name,
+			pct:  pct,
+			col:  col,
+		})
 	}
 
-	barMax := innerW - 18
-	if barMax < 6 {
-		barMax = 6
+	barMax := innerW - 22
+	if barMax < 4 {
+		barMax = 4
 	}
 
 	var lines []string
@@ -642,7 +736,12 @@ func (m Model) renderProjectFocusRatiosPanel(w, h int, stats AnalyticsStats) str
 		lines = append(lines, row)
 	}
 
-	return m.renderPanel("💼 PROJECT FOCUS RATIOS", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 1 && m.AnalyticsFocusRow == 4
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("💼 PROJECT FOCUS RATIOS", lines, w, h, borderCol)
 }
 
 func (m Model) renderFocusSessionTimelinePanel(w, h int) string {
@@ -663,13 +762,7 @@ func (m Model) renderFocusSessionTimelinePanel(w, h int) string {
 
 	if len(timelineTasks) == 0 {
 		lines = []string{
-			"  08:00 ──────■  50 min Focus Block",
-			"",
-			"  09:30 ─────────────■  90 min Focus Block",
-			"",
-			"  11:00 ─────■  45 min Focus Block",
-			"",
-			"  14:00 ───────────────────■  120 min Focus Block",
+			lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  No focus blocks scheduled for today."),
 		}
 	} else {
 		for idx, t := range timelineTasks {
@@ -695,7 +788,12 @@ func (m Model) renderFocusSessionTimelinePanel(w, h int) string {
 		}
 	}
 
-	return m.renderPanel("󱎫 FOCUS SESSION TIMELINE", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 0 && m.AnalyticsFocusRow == 5
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("󱎫 FOCUS SESSION TIMELINE", lines, w, h, borderCol)
 }
 
 func (m Model) renderInterruptionSummaryPanel(w, h int, stats AnalyticsStats) string {
@@ -706,9 +804,9 @@ func (m Model) renderInterruptionSummaryPanel(w, h int, stats AnalyticsStats) st
 	meetingsCount := stats.totalInterruptions * 1 / 7
 	phoneCount := 0
 	if stats.totalInterruptions == 0 {
-		slackCount = 4
-		emailCount = 2
-		meetingsCount = 1
+		slackCount = 0
+		emailCount = 0
+		meetingsCount = 0
 		phoneCount = 0
 	}
 
@@ -752,5 +850,10 @@ func (m Model) renderInterruptionSummaryPanel(w, h int, stats AnalyticsStats) st
 		lines = append(lines, row)
 	}
 
-	return m.renderPanel("🛑 INTERRUPTION SUMMARY", lines, w, h, m.Theme.Muted)
+	borderCol := m.Theme.Muted
+	isFocused := !m.SidebarFocus && m.AnalyticsFocusCol == 1 && m.AnalyticsFocusRow == 5
+	if isFocused {
+		borderCol = m.Theme.Accent
+	}
+	return m.renderPanel("🛑 INTERRUPTION SUMMARY", lines, w, h, borderCol)
 }

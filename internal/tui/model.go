@@ -235,6 +235,7 @@ type Model struct {
 
 	// Scrolling & Help View States
 	HelpOpen             bool
+	HelpScrollOffset     int // scroll position inside the help modal
 	ScrollOffset         int
 	ShelfScrollOffset    int
 	CommandSelectedIndex int

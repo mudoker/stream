@@ -113,7 +113,8 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "?":
 		m.HelpOpen = true
-		m.StatusMsg = "Help opened. Press Esc/Enter to exit."
+		m.HelpScrollOffset = 0
+		m.StatusMsg = "Help opened. Press Esc/? to exit."
 		return m, nil
 	case ":":
 		m.CurrentMode = ModeCommand

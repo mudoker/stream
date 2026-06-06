@@ -137,7 +137,8 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 		m.StatusMsg = "Switched to Analytics view."
 	case "help", "h", "?":
 		m.HelpOpen = true
-		m.StatusMsg = "Help opened. Press Esc/Enter to exit."
+		m.HelpScrollOffset = 0
+		m.StatusMsg = "Help opened. Press Esc/? to exit."
 
 	case "create", "todo":
 		if len(parts) < 2 {

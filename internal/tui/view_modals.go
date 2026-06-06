@@ -350,106 +350,163 @@ func (m Model) renderConfirmModal() string {
 
 
 func (m Model) renderHelpModal() string {
-	modalW := 80
+	modalW := 82
 	if modalW > m.Width-4 {
 		modalW = m.Width - 4
 	}
-	if modalW < 40 {
-		modalW = 40
+	if modalW < 42 {
+		modalW = 42
 	}
 	const paddingL = 2
 	const paddingR = 2
 	const borderW = 2
 	innerW := modalW - paddingL - paddingR - borderW
 
+	// Visible content rows (excludes pinned header + footer)
+	// Reserve: 2 header lines + 1 blank + 3 footer lines = 6
+	termH := m.Height
+	if termH < 20 {
+		termH = 20
+	}
+	visibleRows := termH - 14 // how many body lines fit
+	if visibleRows < 5 {
+		visibleRows = 5
+	}
+
 	accent := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true)
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6adc8"))
 	sectStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
+	mutedStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
 
-	var lines []string
-
-	padLine := func(rendered string) string {
-		return rendered
-	}
-
-	// Title: ▲ s t r e a m   •   c o m m a n d   r e f e r e n c e
-	brand := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render("▲ s t r e a m")
-	midDot := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("   •   ")
-	cmdRef := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("c o m m a n d   r e f e r e n c e")
-	titleLine := brand + midDot + cmdRef
-	lines = append(lines, padLine(titleLine))
-
-	// Header Separator Divider
-	sepLine := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", innerW))
-	lines = append(lines, sepLine)
+	sepLine := mutedStyle.Render(strings.Repeat("─", innerW))
 
 	formatKeyVal := func(key, desc string) string {
-		// Keybind action: fixed-width matching longest string (exactly 16 characters wide)
-		keyStr := accent.Render(fmt.Sprintf("%-16s", key))
-		// Gutter spacing: exactly 4 blank spaces
-		gutter := "    "
-
-		// Text truncation guardrail
-		maxDescLen := innerW - 16 - 4
+		keyStr := accent.Render(fmt.Sprintf("%-18s", key))
+		gutter := "  "
+		maxDescLen := innerW - 18 - 2
 		descRunes := []rune(desc)
 		if len(descRunes) > maxDescLen {
 			desc = string(descRunes[:maxDescLen-3]) + "..."
 		}
-		descStr := descStyle.Render(desc)
-
-		rowContent := keyStr + gutter + descStr
-		return padLine(rowContent)
+		return keyStr + gutter + descStyle.Render(desc)
 	}
 
-	addSection := func(name string) {
-		lines = append(lines,
+	addSection := func(lines *[]string, name string) {
+		*lines = append(*lines,
 			"",
-			"  "+sectStyle.Render(strings.ToUpper(name)),
+			"  "+sectStyle.Bold(true).Render(strings.ToUpper(name)),
 			"",
 		)
 	}
 
-	addSection("NAVIGATION")
-	lines = append(lines, formatKeyVal("1 - 5", "Switch views"))
-	lines = append(lines, formatKeyVal("j / k", "Navigate tasks vertically"))
-	lines = append(lines, formatKeyVal("h / l", "Navigate overlapping tasks"))
-	lines = append(lines, formatKeyVal("J / K", "Scroll timeline hours"))
-	lines = append(lines, formatKeyVal("H / L", "Day backward / forward"))
-	lines = append(lines, formatKeyVal("t", "Jump to today"))
-	lines = append(lines, formatKeyVal("Tab", "Toggle timeline ↔ backlog shelf"))
-	lines = append(lines, formatKeyVal("ctrl+d / ctrl+u", "Scroll pane down / up"))
+	// ── Build full body lines ──────────────────────────────────────────────
+	var body []string
 
-	addSection("WORKSPACES")
-	lines = append(lines, formatKeyVal("w", "Next workspace →"))
-	lines = append(lines, formatKeyVal("W", "Previous workspace ←"))
-	lines = append(lines, formatKeyVal(":ws-create", "Create new workspace"))
-	lines = append(lines, formatKeyVal(":ws-edit", "Edit active workspace"))
-	lines = append(lines, formatKeyVal(":ws-delete", "Delete workspace"))
+	addSection(&body, "NAVIGATION")
+	body = append(body, formatKeyVal("1 - 5", "Switch views"))
+	body = append(body, formatKeyVal("j / k", "Navigate tasks vertically"))
+	body = append(body, formatKeyVal("h / l", "Navigate overlapping tasks"))
+	body = append(body, formatKeyVal("J / K", "Scroll timeline hours"))
+	body = append(body, formatKeyVal("H / L", "Day backward / forward"))
+	body = append(body, formatKeyVal("t", "Jump to today"))
+	body = append(body, formatKeyVal("Tab", "Toggle timeline ↔ backlog shelf"))
+	body = append(body, formatKeyVal("ctrl+d / ctrl+u", "Scroll pane down / up"))
 
-	addSection("TASK ACTIONS")
-	lines = append(lines, formatKeyVal("i", "Create new task"))
-	lines = append(lines, formatKeyVal("e", "Edit selected task"))
-	lines = append(lines, formatKeyVal("x", "Complete selected task"))
-	lines = append(lines, formatKeyVal("d", "Delete selected task"))
-	lines = append(lines, formatKeyVal("z", "Start / resume Zen session"))
-	lines = append(lines, formatKeyVal("Enter", "Inspect task details"))
+	addSection(&body, "WORKSPACES")
+	body = append(body, formatKeyVal("w", "Next workspace →"))
+	body = append(body, formatKeyVal("W", "Previous workspace ←"))
+	body = append(body, formatKeyVal(":ws-create", "Create new workspace"))
+	body = append(body, formatKeyVal(":ws-edit", "Edit active workspace"))
+	body = append(body, formatKeyVal(":ws-delete [name]", "Delete workspace"))
+	body = append(body, formatKeyVal(":ws-switch <name>", "Switch to named workspace"))
 
-	addSection("SYSTEM")
-	lines = append(lines, formatKeyVal(":", "Open command palette"))
-	lines = append(lines, formatKeyVal("?", "Toggle this help modal"))
-	lines = append(lines, formatKeyVal(":sync", "Force Google Calendar sync"))
-	lines = append(lines, formatKeyVal(":review", "Open shutdown review"))
-	lines = append(lines, formatKeyVal(":stop", "Abort Zen focus session"))
-	lines = append(lines, formatKeyVal(":quit", "Exit stream"))
+	addSection(&body, "TASK ACTIONS")
+	body = append(body, formatKeyVal("i", "Open task creation form"))
+	body = append(body, formatKeyVal("e", "Edit selected task"))
+	body = append(body, formatKeyVal("x", "Complete selected task"))
+	body = append(body, formatKeyVal("d", "Delete selected task"))
+	body = append(body, formatKeyVal("z", "Start / resume Zen session"))
+	body = append(body, formatKeyVal("Enter", "Inspect task details"))
 
-	lines = append(lines,
-		"",
-		sepLine,
-		"  💡 Press esc, enter, or ? to close",
-	)
+	addSection(&body, "ZEN FOCUS MODE")
+	body = append(body, formatKeyVal("Space", "Pause / resume timer"))
+	body = append(body, formatKeyVal("+", "Inject +5 min to session"))
+	body = append(body, formatKeyVal("b", "Skip current block"))
+	body = append(body, formatKeyVal("r", "Restart block timer"))
+	body = append(body, formatKeyVal("Esc", "Exit to background (timer runs)"))
+
+	addSection(&body, "SYSTEM")
+	body = append(body, formatKeyVal(":", "Open command palette"))
+	body = append(body, formatKeyVal("?", "Toggle this help modal"))
+	body = append(body, formatKeyVal(":create <title>", "Create anchored task (9:00 AM)"))
+	body = append(body, formatKeyVal(":todo <title>", "Create floating backlog task"))
+	body = append(body, formatKeyVal(":sync", "Force Google Calendar sync"))
+	body = append(body, formatKeyVal(":auth", "Authenticate Google Calendar"))
+	body = append(body, formatKeyVal(":review", "Open shutdown review"))
+	body = append(body, formatKeyVal(":stop", "Abort Zen focus session"))
+	body = append(body, formatKeyVal(":quit / :q", "Exit stream"))
+
+	// ── Clamp scroll offset ────────────────────────────────────────────────
+	maxScroll := len(body) - visibleRows
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	offset := m.HelpScrollOffset
+	if offset > maxScroll {
+		offset = maxScroll
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	// ── Slice the visible window ───────────────────────────────────────────
+	end := offset + visibleRows
+	if end > len(body) {
+		end = len(body)
+	}
+	visible := body[offset:end]
+
+	// Pad short pages so the modal height is stable
+	for len(visible) < visibleRows {
+		visible = append(visible, "")
+	}
+
+	// ── Scroll progress bar ────────────────────────────────────────────────
+	scrollPct := 0
+	if maxScroll > 0 {
+		scrollPct = (offset * 100) / maxScroll
+	}
+	barWidth := innerW - 14
+	if barWidth < 4 {
+		barWidth = 4
+	}
+	filled := (scrollPct * barWidth) / 100
+	progressBar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+	progressStr := mutedStyle.Render(fmt.Sprintf(" %3d%%  ", scrollPct)) +
+		lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(progressBar)
+
+	// ── Assemble final output ──────────────────────────────────────────────
+	var out []string
+
+	// Pinned header (always visible)
+	brand := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render("▲ s t r e a m")
+	midDot := mutedStyle.Render("   •   ")
+	cmdRef := mutedStyle.Render("c o m m a n d   r e f e r e n c e")
+	out = append(out, brand+midDot+cmdRef)
+	out = append(out, sepLine)
+
+	// Scrollable body
+	out = append(out, visible...)
+
+	// Pinned footer
+	out = append(out, sepLine)
+	out = append(out, progressStr)
+	navHint := mutedStyle.Render("  j/k scroll  ctrl+d/u page  g/G top/btm  esc close")
+	out = append(out, navHint)
 
 	return m.Theme.ModalStyle.
-		Render(m.prepareModalContent(strings.Join(lines, "\n"), innerW))
+		Width(innerW + 4).
+		Render(m.prepareModalContent(strings.Join(out, "\n"), innerW))
 }
 
 func (m Model) prepareModalContent(content string, innerW int) string {

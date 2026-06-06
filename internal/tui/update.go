@@ -94,8 +94,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.HelpOpen {
 			switch msg.String() {
-			case "esc", "enter", "q", " ", "?":
+			case "esc", "q", "?":
 				m.HelpOpen = false
+				m.HelpScrollOffset = 0
+				return m, nil
+			case "j", "down":
+				m.HelpScrollOffset++
+				return m, nil
+			case "k", "up":
+				if m.HelpScrollOffset > 0 {
+					m.HelpScrollOffset--
+				}
+				return m, nil
+			case "ctrl+d":
+				m.HelpScrollOffset += 5
+				return m, nil
+			case "ctrl+u":
+				m.HelpScrollOffset -= 5
+				if m.HelpScrollOffset < 0 {
+					m.HelpScrollOffset = 0
+				}
+				return m, nil
+			case "g":
+				m.HelpScrollOffset = 0
+				return m, nil
+			case "G":
+				m.HelpScrollOffset = 9999 // clamped inside renderer
 				return m, nil
 			}
 			return m, nil

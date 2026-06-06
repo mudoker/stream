@@ -45,8 +45,8 @@ func NewTheme() Theme {
 
 	p0 := lipgloss.Color("#f38ba8")
 	p1 := lipgloss.Color("#fab387")
-	p2 := lipgloss.Color("#89b4fa")
-	p3 := lipgloss.Color("#45475a")
+	p2 := lipgloss.Color("#f9e2af")
+	p3 := lipgloss.Color("#89dceb")
 
 	success := lipgloss.Color("#a6e3a1")
 

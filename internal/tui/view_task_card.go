@@ -57,9 +57,9 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 
 	// Priority badge
 	pName := string(task.Priority)
-	priorityBadge := fmt.Sprintf("▲ %s", pName)
+	priorityBadge := lipgloss.NewStyle().Foreground(pColor).Bold(true).Render("▲ " + pName)
 	if hasCollision {
-		priorityBadge = fmt.Sprintf("⚠️ %s", pName)
+		priorityBadge = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true).Render("⚠️ " + pName)
 	}
 
 	// Time range string
@@ -126,20 +126,23 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 	}
 
 	// Construct and scale metadata row to fit contentW-1
-	spStr := fmt.Sprintf("%d SP", task.StoryPoints)
-	metaStr := fmt.Sprintf("%s  •  %s  •  %s", priorityBadge, spStr, timeStr)
-	if len([]rune(metaStr)) > contentW-1 {
-		metaStr = fmt.Sprintf("%s  •  %s", priorityBadge, timeStr)
+	mutedStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
+	spStrStyled := mutedStyle.Render(fmt.Sprintf("%d SP", task.StoryPoints))
+	timeStrStyled := mutedStyle.Render(timeStr)
+	bulletStyled := mutedStyle.Render("  •  ")
+
+	metaStr := fmt.Sprintf("%s%s%s%s%s", priorityBadge, bulletStyled, spStrStyled, bulletStyled, timeStrStyled)
+	if lipgloss.Width(metaStr) > contentW-1 {
+		metaStr = fmt.Sprintf("%s%s%s", priorityBadge, bulletStyled, timeStrStyled)
 	}
-	if len([]rune(metaStr)) > contentW-1 {
-		metaStr = timeStr
+	if lipgloss.Width(metaStr) > contentW-1 {
+		metaStr = timeStrStyled
 	}
-	if len([]rune(metaStr)) > contentW-1 {
+	if lipgloss.Width(metaStr) > contentW-1 {
 		metaStr = priorityBadge
 	}
-	metaRunes := []rune(metaStr)
-	if len(metaRunes) > contentW-1 {
-		metaStr = string(metaRunes[:contentW-1])
+	if lipgloss.Width(metaStr) > contentW-1 {
+		metaStr = sliceAnsi(metaStr, 0, contentW-1)
 	}
 
 	titleStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true)
@@ -153,7 +156,7 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff0000"))
 	}
 	titleLine := titleStyle.Render(titleStr)
-	metaLine := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(metaStr)
+	metaLine := metaStr
 
 	innerWidth := contentW + (2 * paddingLeftRight)
 	if innerWidth < 1 {

@@ -73,18 +73,29 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 	rows = append(rows, row)
 	if h >= 2 {
 		pName := string(task.Priority)
+		var pBadge string
 		if hasCollision {
-			pName = "⚠️ " + pName
+			pBadge = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true).Render("⚠️ " + pName)
+		} else {
+			pBadge = lipgloss.NewStyle().Foreground(pColor).Bold(true).Render("▲ " + pName)
 		}
-		meta := " " + pName + "  " + timeStr
-		metaRunes := []rune(meta)
-		if len(metaRunes) > contentW {
-			meta = string(metaRunes[:contentW])
+		
+		timeStyled := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(timeStr)
+		meta := " " + pBadge + "  " + timeStyled
+		
+		if lipgloss.Width(meta) > contentW {
+			meta = " " + pBadge
 		}
-		metaLine := leftBorder + lipgloss.NewStyle().
-			Foreground(m.Theme.Muted).
-			Width(contentW).
-			Render(meta) + rightBorder
+		if lipgloss.Width(meta) > contentW {
+			meta = sliceAnsi(meta, 0, contentW)
+		}
+		
+		visualW := lipgloss.Width(meta)
+		if visualW < contentW {
+			meta += strings.Repeat(" ", contentW-visualW)
+		}
+		
+		metaLine := leftBorder + meta + rightBorder
 		rows = append(rows, metaLine)
 	}
 	if h >= 3 {

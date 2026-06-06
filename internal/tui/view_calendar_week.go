@@ -249,12 +249,5 @@ func (m *Model) getWeekViewMaxScroll() int {
 }
 
 func (m Model) getTaskCardColor(t model.Task) lipgloss.Color {
-	switch t.Priority {
-	case model.P0:
-		return m.Theme.P0Color
-	case model.P1:
-		return m.Theme.P1Color
-	default:
-		return m.Theme.P2Color
-	}
+	return m.priorityColor(t.Priority)
 }

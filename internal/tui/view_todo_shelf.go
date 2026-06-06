@@ -187,14 +187,5 @@ func (m Model) renderShelfTaskRow(t model.Task, innerW int) []string {
 }
 
 func (m Model) getPriorityColor(p model.Priority) lipgloss.Color {
-	switch p {
-	case model.P0:
-		return m.Theme.P0Color
-	case model.P1:
-		return m.Theme.P1Color
-	case model.P2:
-		return m.Theme.P2Color
-	default:
-		return m.Theme.P3Color
-	}
+	return m.priorityColor(p)
 }

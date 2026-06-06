@@ -262,9 +262,9 @@ func (m Model) priorityColor(p model.Priority) lipgloss.Color {
 		return m.Theme.P0Color
 	case model.P1:
 		return m.Theme.P1Color
-	case model.P3:
-		return m.Theme.P3Color
-	default:
+	case model.P2:
 		return m.Theme.P2Color
+	default:
+		return m.Theme.P3Color
 	}
 }

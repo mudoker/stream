@@ -205,8 +205,30 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 	rows = append(rows, profileCard, sep, "")
 
 	// WORKSPACES Section Divider (1 leading space)
-	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(" WORKSPACES"))
-	for _, ws := range m.Workspaces {
+	// Show index counter when multiple workspaces exist
+	wsHeaderText := " WORKSPACES"
+	if len(m.Workspaces) > 1 {
+		activeIdx := 0
+		for i, ws := range m.Workspaces {
+			if ws.UUID == m.ActiveWorkspaceUUID {
+				activeIdx = i
+				break
+			}
+		}
+		counterStr := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("%d/%d  w/W", activeIdx+1, len(m.Workspaces)))
+		headerLeft := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(wsHeaderText)
+		heatWL := lipgloss.Width(headerLeft)
+		heatWR := lipgloss.Width(counterStr)
+		heatPad := innerW - heatWL - heatWR
+		if heatPad < 0 {
+			heatPad = 0
+		}
+		rows = append(rows, headerLeft+strings.Repeat(" ", heatPad)+counterStr)
+	} else {
+		rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(wsHeaderText))
+	}
+
+	for i, ws := range m.Workspaces {
 		wsIcon := ws.Icon
 		if wsIcon == "" {
 			wsIcon = "💼"
@@ -215,28 +237,30 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 		wsBadge := ws.Badge
 
 		isActive := ws.UUID == m.ActiveWorkspaceUUID
+
+		// Active cursor: ›, inactive: space-aligned
+		cursor := "  "
 		var rowStyle lipgloss.Style
 		if isActive {
-			rowStyle = lipgloss.NewStyle().
-				Foreground(m.Theme.Accent).
-				Bold(true)
+			cursor = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("›")
+			rowStyle = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true)
 		} else {
-			rowStyle = lipgloss.NewStyle().
-				Foreground(m.Theme.Fg)
+			cursor = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("%d", i+1))
+			rowStyle = lipgloss.NewStyle().Foreground(m.Theme.Fg)
 		}
 
-		wsTextLeft := fmt.Sprintf("  %s %s", wsIcon, wsLabel)
+		wsTextLeft := fmt.Sprintf(" %s %s %s", cursor, wsIcon, wsLabel)
 		wsTextRight := wsBadge
 		wsLeftW := lipgloss.Width(wsTextLeft)
 		wsRightW := lipgloss.Width(wsTextRight)
 		if wsLeftW+wsRightW+1 > innerW {
-			maxLabelW := innerW - lipgloss.Width("  💼 ") - wsRightW - 2
+			maxLabelW := innerW - lipgloss.Width(" › 💼 ") - wsRightW - 2
 			if maxLabelW > 3 {
 				wsLabel = string([]rune(wsLabel)[:maxLabelW-3]) + "..."
 			} else if maxLabelW > 0 {
 				wsLabel = string([]rune(wsLabel)[:maxLabelW])
 			}
-			wsTextLeft = fmt.Sprintf("  %s %s", wsIcon, wsLabel)
+			wsTextLeft = fmt.Sprintf(" %s %s %s", cursor, wsIcon, wsLabel)
 			wsLeftW = lipgloss.Width(wsTextLeft)
 		}
 		wsPad := innerW - wsLeftW - wsRightW - 1

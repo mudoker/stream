@@ -120,6 +120,42 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.CommandInput.SetValue("")
 		m.CommandInput.Focus()
 		return m, nil
+	case "w":
+		if len(m.Workspaces) > 1 {
+			idx := -1
+			for i, ws := range m.Workspaces {
+				if ws.UUID == m.ActiveWorkspaceUUID {
+					idx = i
+					break
+				}
+			}
+			if idx != -1 {
+				nextIdx := (idx + 1) % len(m.Workspaces)
+				m.ActiveWorkspaceUUID = m.Workspaces[nextIdx].UUID
+				m.refreshTasks()
+				m.selectDefaultTaskForSelectedDay()
+				m.StatusMsg = fmt.Sprintf("Switched to workspace '%s'.", m.Workspaces[nextIdx].Name)
+			}
+		}
+		return m, nil
+	case "W":
+		if len(m.Workspaces) > 1 {
+			idx := -1
+			for i, ws := range m.Workspaces {
+				if ws.UUID == m.ActiveWorkspaceUUID {
+					idx = i
+					break
+				}
+			}
+			if idx != -1 {
+				prevIdx := (idx - 1 + len(m.Workspaces)) % len(m.Workspaces)
+				m.ActiveWorkspaceUUID = m.Workspaces[prevIdx].UUID
+				m.refreshTasks()
+				m.selectDefaultTaskForSelectedDay()
+				m.StatusMsg = fmt.Sprintf("Switched to workspace '%s'.", m.Workspaces[prevIdx].Name)
+			}
+		}
+		return m, nil
 	case "i":
 		m.CurrentMode = ModeForm
 		m.Form = NewTaskForm()

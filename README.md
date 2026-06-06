@@ -88,6 +88,8 @@ All data files reside in ~/.config/stream/:
 * J / K - Scroll timeline hours up / down
 * H / L - Switch days backward / forward
 * t - Jump back to today
+* w - Cycle to next workspace →
+* W - Cycle to previous workspace ←
 * Tab - Toggle focus between Sidebar, Day Timeline, and Todo Shelf
 * i - Open Task Creation Wizard
 * z - Start selected task focus session or resume a background session

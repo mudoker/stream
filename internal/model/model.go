@@ -98,3 +98,10 @@ func (t *Task) SortingWeight() int {
 	}
 	return pVal + t.StoryPoints
 }
+
+type UserSettings struct {
+	Username           string `json:"username"`
+	PasswordHash       string `json:"password_hash"`
+	LockTimeoutMinutes int    `json:"lock_timeout_minutes"`
+}
+

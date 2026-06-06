@@ -1,6 +1,8 @@
 package db
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,9 +30,11 @@ type JSONDB struct {
 	dataPath       string
 	ledgerPath     string
 	workspacesPath string
+	settingsPath   string
 	tasks          map[string]model.Task
 	workspaces     map[string]model.Workspace
 	ledger         []LedgerEntry
+	userSettings   model.UserSettings
 }
 
 func NewJSONDB() (*JSONDB, error) {
@@ -48,6 +52,7 @@ func NewJSONDB() (*JSONDB, error) {
 		dataPath:       filepath.Join(configDir, "data.json"),
 		ledgerPath:     filepath.Join(configDir, "ledger.json"),
 		workspacesPath: filepath.Join(configDir, "workspaces.json"),
+		settingsPath:   filepath.Join(configDir, "settings.json"),
 		tasks:          make(map[string]model.Task),
 		workspaces:     make(map[string]model.Workspace),
 		ledger:         []LedgerEntry{},
@@ -61,6 +66,9 @@ func NewJSONDB() (*JSONDB, error) {
 		return nil, err
 	}
 	if err := db.saveTasks(); err != nil {
+		return nil, err
+	}
+	if err := db.saveSettings(); err != nil {
 		return nil, err
 	}
 
@@ -135,6 +143,28 @@ func (db *JSONDB) load() error {
 		}
 	}
 
+	// Load User Settings
+	db.userSettings = model.UserSettings{
+		Username:           "Doan Huu Quoc",
+		PasswordHash:       "",
+		LockTimeoutMinutes: 5,
+	}
+	if _, err := os.Stat(db.settingsPath); err == nil {
+		data, err := os.ReadFile(db.settingsPath)
+		if err == nil {
+			var s model.UserSettings
+			if err := json.Unmarshal(data, &s); err == nil {
+				if s.Username == "" {
+					s.Username = "Doan Huu Quoc"
+				}
+				if s.LockTimeoutMinutes <= 0 {
+					s.LockTimeoutMinutes = 5
+				}
+				db.userSettings = s
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -177,6 +207,30 @@ func (db *JSONDB) saveLedger() error {
 		return fmt.Errorf("could not write ledger file: %w", err)
 	}
 	return nil
+}
+
+func (db *JSONDB) saveSettings() error {
+	data, err := json.MarshalIndent(db.userSettings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("could not marshal settings: %w", err)
+	}
+	if err := os.WriteFile(db.settingsPath, data, 0644); err != nil {
+		return fmt.Errorf("could not write settings file: %w", err)
+	}
+	return nil
+}
+
+func (db *JSONDB) GetUserSettings() model.UserSettings {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	return db.userSettings
+}
+
+func (db *JSONDB) UpdateUserSettings(s model.UserSettings) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.userSettings = s
+	return db.saveSettings()
 }
 
 func (db *JSONDB) GetTasks() []model.Task {
@@ -368,4 +422,10 @@ func (db *JSONDB) DeleteWorkspace(wsUUID string) error {
 		}
 	}
 	return db.saveTasks()
+}
+
+func HashPassword(password string) string {
+	h := sha256.New()
+	h.Write([]byte(password))
+	return hex.EncodeToString(h.Sum(nil))
 }

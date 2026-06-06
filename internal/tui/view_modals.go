@@ -227,16 +227,29 @@ func (m Model) renderFormModal() string {
 
 	priorityValStr := PriorityOptions[f.PriorityIdx]
 	spValStr := fmt.Sprintf("%d", SPOptions[f.SPIdx])
-	anchoredValStr := "No"
-	if f.IsAnchored {
-		anchoredValStr = "Yes"
-	}
 
 	fields = append(fields, renderField("1", "Title", f.TitleInput.View(), 0))
 	fields = append(fields, renderField("2", "Description", f.DescInput.View(), 1))
 	fields = append(fields, renderDropdown("3", "Priority", priorityValStr, 2))
 	fields = append(fields, renderDropdown("4", "Story Points", spValStr, 3))
-	fields = append(fields, renderDropdown("5", "Anchored", anchoredValStr, 4))
+	// Radio button row for Anchored toggle
+	{
+		numStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("5")
+		lblStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg)
+		if f.ActiveField == 4 {
+			lblStyle = lblStyle.Foreground(m.Theme.Accent).Bold(true)
+		}
+		var anchOpt, floatOpt string
+		if f.IsAnchored {
+			anchOpt = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("◉ Anchored")
+			floatOpt = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("◎ Floating")
+		} else {
+			anchOpt = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("◎ Anchored")
+			floatOpt = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("◉ Floating")
+		}
+		sep := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  /  ")
+		fields = append(fields, fmt.Sprintf("  %s  %-16s %s%s%s", numStyle, lblStyle.Render("Schedule"), anchOpt, sep, floatOpt))
+	}
 	if f.IsAnchored {
 		fields = append(fields, renderField("6", "Start Time", f.StartTimeInput.View(), 5))
 		fields = append(fields, renderField("7", "Duration (min)", f.DurationInput.View(), 6))

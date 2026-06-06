@@ -21,9 +21,13 @@ func (m Model) renderCapacityPanel(w, h int) string {
 	weeklyCompletedPoints := make(map[time.Weekday]int)
 	weeklyCount := make(map[time.Weekday]int)
 	
-	startOfWeek := today.AddDate(0, 0, -int(today.Weekday()))
+	offset := int(today.Weekday()) - 1
+	if offset < 0 {
+		offset = 6
+	}
+	weekStart := today.AddDate(0, 0, -offset)
 	for i := 0; i < 7; i++ {
-		day := startOfWeek.AddDate(0, 0, i)
+		day := weekStart.AddDate(0, 0, i)
 		for _, t := range m.Tasks {
 			if t.TimeWindow.Start.Year() == day.Year() &&
 				t.TimeWindow.Start.Month() == day.Month() &&

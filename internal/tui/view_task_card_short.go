@@ -9,12 +9,12 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// renderShortCard renders a compact card for h < 4 rows using a left strip bar.
+// renderShortCard renders a compact card for h < 3 rows using left and right borders.
 func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color, isActive bool, isSelected bool, hasCollision bool, isZenFocus bool, timeStr string) string {
 	stripColor := pColor
 	isCompleted := task.LifecycleState == model.StateCompleted
 	if isCompleted {
-		stripColor = lipgloss.Color("#45475a") // dim strip for completed
+		stripColor = lipgloss.Color("#45475a") // dim border for completed
 	} else if isZenFocus {
 		stripColor = m.Theme.SuccessColor
 	} else if isSelected {
@@ -25,11 +25,10 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		stripColor = m.Theme.Accent
 	}
 
-	strip := lipgloss.NewStyle().
-		Foreground(stripColor).
-		Render("▎")
+	leftBorder := lipgloss.NewStyle().Foreground(stripColor).Render("│")
+	rightBorder := lipgloss.NewStyle().Foreground(stripColor).Render("│")
 
-	contentW := w - 1
+	contentW := w - 2
 	if contentW < 1 {
 		contentW = 1
 	}
@@ -47,15 +46,7 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		}
 	}
 
-	var text string
-	switch h {
-	case 1:
-		text = fmt.Sprintf(" %s", titleStr)
-	case 2:
-		text = fmt.Sprintf(" %s", titleStr)
-	case 3:
-		text = fmt.Sprintf(" %s", titleStr)
-	}
+	text := " " + titleStr
 
 	var textStyle lipgloss.Style
 	if isCompleted {
@@ -72,13 +63,7 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		textStyle = lipgloss.NewStyle().Foreground(m.Theme.Fg)
 	}
 
-	row := strip + textStyle.
-		Width(contentW).
-		Render(text)
-	rowW := lipgloss.Width(row)
-	if rowW < w {
-		row += strings.Repeat(" ", w-rowW)
-	}
+	row := leftBorder + textStyle.Width(contentW).Render(text) + rightBorder
 
 	if h <= 1 {
 		return row
@@ -91,19 +76,15 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		if hasCollision {
 			pName = "⚠️ " + pName
 		}
-		meta := fmt.Sprintf(" %s  %s", pName, timeStr)
+		meta := " " + pName + "  " + timeStr
 		metaRunes := []rune(meta)
 		if len(metaRunes) > contentW {
 			meta = string(metaRunes[:contentW])
 		}
-		metaLine := strip + lipgloss.NewStyle().
+		metaLine := leftBorder + lipgloss.NewStyle().
 			Foreground(m.Theme.Muted).
 			Width(contentW).
-			Render(meta)
-		metaW := lipgloss.Width(metaLine)
-		if metaW < w {
-			metaLine += strings.Repeat(" ", w-metaW)
-		}
+			Render(meta) + rightBorder
 		rows = append(rows, metaLine)
 	}
 	if h >= 3 {
@@ -112,14 +93,10 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		if len(meta2Runes) > contentW {
 			meta2 = string(meta2Runes[:contentW])
 		}
-		meta2Line := strip + lipgloss.NewStyle().
+		meta2Line := leftBorder + lipgloss.NewStyle().
 			Foreground(m.Theme.Muted).
 			Width(contentW).
-			Render(meta2)
-		meta2W := lipgloss.Width(meta2Line)
-		if meta2W < w {
-			meta2Line += strings.Repeat(" ", w-meta2W)
-		}
+			Render(meta2) + rightBorder
 		rows = append(rows, meta2Line)
 	}
 	return strings.Join(rows, "\n")

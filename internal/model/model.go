@@ -53,8 +53,18 @@ type GCalMetadata struct {
 	EventID    string `json:"event_id,omitempty"` // Google Calendar Event ID
 }
 
+type Workspace struct {
+	UUID      string    `json:"uuid"`
+	Name      string    `json:"name"`
+	Icon      string    `json:"icon"`
+	Badge     string    `json:"badge"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type Task struct {
 	UUID             string           `json:"uuid"`
+	WorkspaceUUID    string           `json:"workspace_uuid,omitempty"`
 	Title            string           `json:"title"`
 	Description      string           `json:"description"`
 	Priority         Priority         `json:"priority"`

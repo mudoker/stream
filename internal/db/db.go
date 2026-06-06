@@ -23,12 +23,14 @@ type LedgerEntry struct {
 }
 
 type JSONDB struct {
-	mu         sync.RWMutex
-	configDir  string
-	dataPath   string
-	ledgerPath string
-	tasks      map[string]model.Task
-	ledger     []LedgerEntry
+	mu             sync.RWMutex
+	configDir      string
+	dataPath       string
+	ledgerPath     string
+	workspacesPath string
+	tasks          map[string]model.Task
+	workspaces     map[string]model.Workspace
+	ledger         []LedgerEntry
 }
 
 func NewJSONDB() (*JSONDB, error) {
@@ -42,14 +44,23 @@ func NewJSONDB() (*JSONDB, error) {
 	}
 
 	db := &JSONDB{
-		configDir:  configDir,
-		dataPath:   filepath.Join(configDir, "data.json"),
-		ledgerPath: filepath.Join(configDir, "ledger.json"),
-		tasks:      make(map[string]model.Task),
-		ledger:     []LedgerEntry{},
+		configDir:      configDir,
+		dataPath:       filepath.Join(configDir, "data.json"),
+		ledgerPath:     filepath.Join(configDir, "ledger.json"),
+		workspacesPath: filepath.Join(configDir, "workspaces.json"),
+		tasks:          make(map[string]model.Task),
+		workspaces:     make(map[string]model.Workspace),
+		ledger:         []LedgerEntry{},
 	}
 
 	if err := db.load(); err != nil {
+		return nil, err
+	}
+
+	if err := db.saveWorkspaces(); err != nil {
+		return nil, err
+	}
+	if err := db.saveTasks(); err != nil {
 		return nil, err
 	}
 
@@ -59,6 +70,41 @@ func NewJSONDB() (*JSONDB, error) {
 func (db *JSONDB) load() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
+
+	// Load Workspaces
+	if _, err := os.Stat(db.workspacesPath); err == nil {
+		data, err := os.ReadFile(db.workspacesPath)
+		if err != nil {
+			return fmt.Errorf("could not read workspaces file: %w", err)
+		}
+		var list []model.Workspace
+		if err := json.Unmarshal(data, &list); err != nil {
+			return fmt.Errorf("could not unmarshal workspaces: %w", err)
+		}
+		for _, ws := range list {
+			db.workspaces[ws.UUID] = ws
+		}
+	}
+
+	// Initialize default workspace if none exist
+	if len(db.workspaces) == 0 {
+		defaultWS := model.Workspace{
+			UUID:      uuid.New().String(),
+			Name:      "Aether Workspace",
+			Icon:      "🚀",
+			Badge:     "[Dev]",
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		db.workspaces[defaultWS.UUID] = defaultWS
+	}
+
+	// Get first/default workspace UUID
+	var defaultWSUUID string
+	for u := range db.workspaces {
+		defaultWSUUID = u
+		break
+	}
 
 	// Load Tasks
 	if _, err := os.Stat(db.dataPath); err == nil {
@@ -71,6 +117,9 @@ func (db *JSONDB) load() error {
 			return fmt.Errorf("could not unmarshal tasks: %w", err)
 		}
 		for _, t := range list {
+			if t.WorkspaceUUID == "" {
+				t.WorkspaceUUID = defaultWSUUID
+			}
 			db.tasks[t.UUID] = t
 		}
 	}
@@ -100,6 +149,21 @@ func (db *JSONDB) saveTasks() error {
 	}
 	if err := os.WriteFile(db.dataPath, data, 0644); err != nil {
 		return fmt.Errorf("could not write data file: %w", err)
+	}
+	return nil
+}
+
+func (db *JSONDB) saveWorkspaces() error {
+	var list []model.Workspace
+	for _, ws := range db.workspaces {
+		list = append(list, ws)
+	}
+	data, err := json.MarshalIndent(list, "", "  ")
+	if err != nil {
+		return fmt.Errorf("could not marshal workspaces: %w", err)
+	}
+	if err := os.WriteFile(db.workspacesPath, data, 0644); err != nil {
+		return fmt.Errorf("could not write workspaces file: %w", err)
 	}
 	return nil
 }
@@ -231,4 +295,77 @@ func (db *JSONDB) ClearLedger() error {
 
 func (db *JSONDB) GetConfigDir() string {
 	return db.configDir
+}
+
+func (db *JSONDB) GetWorkspaces() []model.Workspace {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	var list []model.Workspace
+	for _, ws := range db.workspaces {
+		list = append(list, ws)
+	}
+	return list
+}
+
+func (db *JSONDB) GetWorkspace(uuid string) (model.Workspace, bool) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	ws, exists := db.workspaces[uuid]
+	return ws, exists
+}
+
+func (db *JSONDB) AddWorkspace(ws model.Workspace) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if ws.UUID == "" {
+		ws.UUID = uuid.New().String()
+	}
+	now := time.Now()
+	ws.CreatedAt = now
+	ws.UpdatedAt = now
+
+	db.workspaces[ws.UUID] = ws
+	return db.saveWorkspaces()
+}
+
+func (db *JSONDB) UpdateWorkspace(ws model.Workspace) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if _, exists := db.workspaces[ws.UUID]; !exists {
+		return errors.New("workspace not found")
+	}
+	ws.UpdatedAt = time.Now()
+	db.workspaces[ws.UUID] = ws
+	return db.saveWorkspaces()
+}
+
+func (db *JSONDB) DeleteWorkspace(wsUUID string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if len(db.workspaces) <= 1 {
+		return errors.New("cannot delete the last workspace")
+	}
+
+	if _, exists := db.workspaces[wsUUID]; !exists {
+		return errors.New("workspace not found")
+	}
+
+	// Remove workspace
+	delete(db.workspaces, wsUUID)
+	if err := db.saveWorkspaces(); err != nil {
+		return err
+	}
+
+	// Clean up tasks in deleted workspace
+	for u, t := range db.tasks {
+		if t.WorkspaceUUID == wsUUID {
+			delete(db.tasks, u)
+		}
+	}
+	return db.saveTasks()
 }

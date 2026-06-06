@@ -278,7 +278,13 @@ func (zt *ZenTimer) NextSession() bool {
 
 func (zt *ZenTimer) AddTime(d time.Duration) {
 	zt.TimeRemaining += d
+	if zt.TimeRemaining < 0 {
+		zt.TimeRemaining = 0
+	}
 	zt.TotalDuration += d
+	if zt.TotalDuration < 0 {
+		zt.TotalDuration = 0
+	}
 }
 
 func (zt *ZenTimer) UpdateTaskDuration(newTask model.Task) {

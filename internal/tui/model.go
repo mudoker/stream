@@ -269,6 +269,7 @@ type Model struct {
 	// Task move lock state
 	TaskMovePrefix           string
 	TaskMoveOriginalTimeWindow model.TimeWindow
+	ZenPrefix                  string
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {

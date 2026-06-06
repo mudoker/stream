@@ -9,115 +9,55 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m Model) renderAnalyticsView() string {
+func (m Model) renderAnalyticsView(height int) string {
 	today := time.Now()
 	stats := m.calculateAnalyticsStats()
-
 	workspaceWidth := m.Layout.WorkspaceW - 4
-
-	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", workspaceWidth))
 
 	// ── Page Header ──────────────────────────────────────────────
 	header := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("▲ Analytics")
 	subhead := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(today.Format("January 2006"))
+	headerLine := header + "  " + subhead
 
-	// ── KPI Cards Row ────────────────────────────────────────────
-	kpiRow := m.renderAnalyticsKPICards(workspaceWidth, stats)
-
-	leftColW := 36
-	rightColW := workspaceWidth - leftColW - 6
-	if rightColW < 30 {
-		rightColW = 30
+	// ── Top Metric Banner Box ────────────────────────────────────
+	bannerItems := []string{
+		fmt.Sprintf("%s [ %s ]", lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("STREAK"), lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(fmt.Sprintf("%d Days", stats.streak))),
+		fmt.Sprintf("%s [ %s ]", lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("SESSIONS"), lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(fmt.Sprintf("%d Blocks", stats.effectiveSessions))),
+		fmt.Sprintf("%s [ %s ]", lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("FOCUS TIME"), lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(fmt.Sprintf("%.1f hrs", stats.totalHrs))),
+		fmt.Sprintf("%s [ %s ]", lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("PURITY"), lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(fmt.Sprintf("%.0f%%", stats.purityPct))),
+		fmt.Sprintf("%s [ %s ]", lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("COMPLETION"), lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(fmt.Sprintf("%.0f%%", stats.rate))),
 	}
-	leftCol := m.renderAnalyticsLeftCol(stats, leftColW, today)
-	rightCol := m.renderAnalyticsRightCol(stats, rightColW, workspaceWidth, today)
+	bullet := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("   •   ")
+	bannerStr := strings.Join(bannerItems, bullet)
 
-	columns := lipgloss.JoinHorizontal(lipgloss.Top,
-		lipgloss.NewStyle().Width(leftColW).Render(leftCol),
-		"    ",
-		lipgloss.NewStyle().Width(rightColW).Render(rightCol),
-	)
+	bannerContainer := lipgloss.NewStyle().
+		Width(workspaceWidth).
+		Padding(1, 2).
+		Align(lipgloss.Center).
+		Render(bannerStr)
 
-	var out strings.Builder
-	out.WriteString(header + "  " + subhead + "\n")
-	out.WriteString(sep + "\n\n")
-	out.WriteString(kpiRow + "\n\n")
-	out.WriteString(sep + "\n\n")
-	out.WriteString(columns)
-
-	return out.String()
-}
-
-// renderAnalyticsKPICards renders the top KPI metric strip.
-func (m Model) renderAnalyticsKPICards(w int, stats AnalyticsStats) string {
-	type kpiEntry struct {
-		label  string
-		value  string
-		sub    string
-		color  lipgloss.Color
-	}
-	kpis := []kpiEntry{
-		{
-			label: "STREAK",
-			value: fmt.Sprintf("%d days", stats.streak),
-			sub:   "consecutive",
-			color: m.Theme.P1Color,
-		},
-		{
-			label: "SESSIONS",
-			value: fmt.Sprintf("%d blocks", stats.effectiveSessions),
-			sub:   "pomodoros",
-			color: m.Theme.Accent,
-		},
-		{
-			label: "FOCUS TIME",
-			value: fmt.Sprintf("%.1f hrs", stats.totalHrs),
-			sub:   "work + personal",
-			color: m.Theme.SuccessColor,
-		},
-		{
-			label: "PURITY",
-			value: fmt.Sprintf("%.0f%%", stats.purityPct),
-			sub:   "no interruptions",
-			color: m.Theme.FocusPurple,
-		},
-		{
-			label: "COMPLETION",
-			value: fmt.Sprintf("%.0f%%", stats.rate),
-			sub:   fmt.Sprintf("%d/%d tasks", stats.completedCount, stats.totalCount),
-			color: m.Theme.SuccessColor,
-		},
+	// ── Balanced Four-Quadrant Data Grid ─────────────────────────
+	quadWidth := (workspaceWidth - 4) / 2
+	quadHeight := (height - 12) / 2
+	if quadHeight < 10 {
+		quadHeight = 10
 	}
 
-	cardW := (w - 4) / len(kpis)
-	if cardW < 14 {
-		cardW = 14
+	makeQuad := func(title string, content string) string {
+		return lipgloss.NewStyle().
+			Width(quadWidth - 2).
+			Height(quadHeight).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(m.Theme.Muted).
+			Padding(1, 2).
+			Render(
+				lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(title) + "\n\n" +
+				content,
+			)
 	}
 
-	var cards []string
-	for _, k := range kpis {
-		lbl := lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render(k.label)
-		val := lipgloss.NewStyle().Foreground(k.color).Bold(true).Render(k.value)
-		sub := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(k.sub)
-		card := lipgloss.NewStyle().
-			Background(m.Theme.PanelBg).
-			Padding(0, 2).
-			Width(cardW - 1).
-			Render(lbl + "\n" + val + "\n" + sub)
-		cards = append(cards, card)
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, cards...)
-}
-
-// renderAnalyticsLeftCol renders daily timeline + focus health.
-func (m Model) renderAnalyticsLeftCol(stats AnalyticsStats, w int, today time.Time) string {
-	mutedB := lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true)
-
-	// Daily productivity timeline (last 7 days)
-	var lines []string
-	lines = append(lines, mutedB.Render("DAILY FOCUS  (7 DAYS)"))
-	lines = append(lines, "")
-
+	// Quadrant 1: Daily Focus & Allocation (Top Left)
+	var q1Lines []string
 	maxDaySecs := 1
 	daySecsList := make([]int, 7)
 	daysList := make([]time.Time, 7)
@@ -131,31 +71,32 @@ func (m Model) renderAnalyticsLeftCol(stats AnalyticsStats, w int, today time.Ti
 		}
 	}
 
-	barMaxW := w - 18
-	if barMaxW < 6 {
-		barMaxW = 6
-	}
+	targetHrs := 8.0
+	barTotalW := 20
 	for i := 0; i < 7; i++ {
 		day := daysList[i]
 		daySecs := daySecsList[i]
 		dayHrs := float64(daySecs) / 3600.0
-		pct := float64(daySecs) / float64(maxDaySecs)
-		barLen := int(math.Round(pct * float64(barMaxW)))
-		barStr := strings.Repeat("█", barLen)
-		if barStr == "" && dayHrs > 0 {
-			barStr = "▏"
+
+		solidW := int(math.Round(dayHrs / targetHrs * float64(barTotalW)))
+		if solidW > barTotalW {
+			solidW = barTotalW
 		}
-		var barColor lipgloss.Color
-		switch {
-		case dayHrs == 0:
-			barColor = m.Theme.Muted
-		case dayHrs <= 2.0:
-			barColor = m.Theme.P2Color
-		case dayHrs <= 5.0:
-			barColor = m.Theme.Accent
-		default:
-			barColor = m.Theme.SuccessColor
+		if solidW == 0 && daySecs > 0 {
+			solidW = 1
 		}
+		mutedW := barTotalW - solidW
+		if mutedW < 0 {
+			mutedW = 0
+		}
+
+		solidBar := strings.Repeat("█", solidW)
+		mutedBar := strings.Repeat("░", mutedW)
+
+		solidStyled := lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(solidBar)
+		mutedStyled := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(mutedBar)
+		barStr := solidStyled + mutedStyled
+
 		isToday := day.Format("2006-01-02") == today.Format("2006-01-02")
 		dayLabel := day.Format("Mon _2")
 		if isToday {
@@ -163,101 +104,79 @@ func (m Model) renderAnalyticsLeftCol(stats AnalyticsStats, w int, today time.Ti
 		} else {
 			dayLabel = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(dayLabel)
 		}
-		colored := lipgloss.NewStyle().Foreground(barColor).Render(barStr)
-		hrsStr := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("%.1fh", dayHrs))
-		lines = append(lines, fmt.Sprintf("  %s │ %s %s", dayLabel, colored, hrsStr))
+
+		hrsStr := fmt.Sprintf("%4.1fh", dayHrs)
+		q1Lines = append(q1Lines, fmt.Sprintf("  %-8s  %s  %s", dayLabel, barStr, hrsStr))
 	}
+	q1Content := strings.Join(q1Lines, "\n")
 
-	lines = append(lines, "")
-	lines = append(lines, mutedB.Render("FOCUS HEALTH"))
-	lines = append(lines, "")
-
-	statsData := []struct {
-		label string
-		value string
-	}{
-		{"Purity", fmt.Sprintf("%.1f%%", stats.purityPct)},
-		{"Focus Logged", fmt.Sprintf("%v", time.Duration(stats.totalFocusSecs)*time.Second)},
-		{"Interruptions", fmt.Sprintf("%d", stats.totalInterruptions)},
-		{"Tasks done", fmt.Sprintf("%d / %d", stats.completedCount, stats.totalCount)},
-	}
-	for _, s := range statsData {
-		lbl := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("  %-16s", s.label))
-		val := lipgloss.NewStyle().Foreground(m.Theme.Fg).Render(s.value)
-		lines = append(lines, lbl+val)
-	}
-
-	return strings.Join(lines, "\n")
-}
-
-// renderAnalyticsRightCol renders time ratios, top tags, and 30-day trend.
-func (m Model) renderAnalyticsRightCol(stats AnalyticsStats, w int, workW int, today time.Time) string {
-	mutedB := lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true)
-	var lines []string
-
-	// Time allocation ratio
-	lines = append(lines, mutedB.Render("TIME ALLOCATION"))
-	lines = append(lines, "")
-
-	ratioBarW := w - 2
-	if ratioBarW > 28 {
-		ratioBarW = 28
-	}
-	var ratioBar string
-	if stats.totalHrs == 0 {
-		ratioBar = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("·", ratioBarW))
-	} else {
-		wLen := int(math.Round(stats.workPct * float64(ratioBarW)))
-		pLen := ratioBarW - wLen
-		ratioBar = lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(strings.Repeat("█", wLen)) +
-			lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render(strings.Repeat("█", pLen))
-	}
-
-	lines = append(lines, "  "+ratioBar)
-	lines = append(lines, fmt.Sprintf("  %s Work  %.0f%% (%.1fh)",
-		lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("█"),
-		stats.workPct*100, stats.workHrs))
-	lines = append(lines, fmt.Sprintf("  %s Personal  %.0f%% (%.1fh)",
-		lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render("█"),
-		stats.personalPct*100, stats.personalHrs))
-
-	lines = append(lines, "")
-	lines = append(lines, mutedB.Render("TOP TAGS"))
-	lines = append(lines, "")
-
+	// Quadrant 2: Top Tags Breakdown (Top Right)
+	var q2Lines []string
 	if len(stats.tags) == 0 {
-		lines = append(lines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  No tagged sessions."))
+		q2Lines = append(q2Lines, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  No tagged sessions."))
 	} else {
 		maxSecs := stats.tags[0].Secs
 		if maxSecs == 0 {
 			maxSecs = 1
 		}
 		for idx, tv := range stats.tags {
-			if idx >= 5 {
+			if idx >= 7 {
 				break
 			}
 			hrs := float64(tv.Secs) / 3600.0
 			pct := float64(tv.Secs) / float64(maxSecs)
-			bLen := int(math.Round(pct * 12))
-			bar := strings.Repeat("█", bLen)
-			if bar == "" && tv.Secs > 0 {
-				bar = "▏"
+
+			solidW := int(math.Round(pct * float64(barTotalW)))
+			if solidW > barTotalW {
+				solidW = barTotalW
 			}
-			colored := lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Render(bar)
-			tagName := tv.Tag
-			if len(tagName) > 10 {
-				tagName = tagName[:9] + "…"
+			if solidW == 0 && tv.Secs > 0 {
+				solidW = 1
 			}
-			lines = append(lines, fmt.Sprintf("  %-10s %s %.1fh", tagName, colored, hrs))
+			mutedW := barTotalW - solidW
+			if mutedW < 0 {
+				mutedW = 0
+			}
+
+			solidBar := strings.Repeat("█", solidW)
+			mutedBar := strings.Repeat("░", mutedW)
+
+			solidStyled := lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Render(solidBar)
+			mutedStyled := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(mutedBar)
+			barStr := solidStyled + mutedStyled
+
+			tagLbl := tv.Tag
+			tagRunes := []rune(tagLbl)
+			if len(tagRunes) > 12 {
+				tagLbl = string(tagRunes[:11]) + "…"
+			}
+			q2Lines = append(q2Lines, fmt.Sprintf("  %-12s  %s  %4.1fh", tagLbl, barStr, hrs))
 		}
 	}
+	q2Content := strings.Join(q2Lines, "\n")
 
-	lines = append(lines, "")
-	lines = append(lines, mutedB.Render("30-DAY TREND"))
-	lines = append(lines, "")
+	// Quadrant 3: Focus Health Summary (Bottom Left)
+	tableW := quadWidth - 10
+	if tableW < 20 {
+		tableW = 20
+	}
+	renderTableRow := func(title, val string) string {
+		padSize := tableW - len([]rune(title)) - len([]rune(val))
+		if padSize < 1 {
+			padSize = 1
+		}
+		return title + strings.Repeat(" ", padSize) + val
+	}
 
-	var trendSB strings.Builder
-	trendSB.WriteString("  ")
+	var q3Lines []string
+	q3Lines = append(q3Lines, renderTableRow("Purity Ratio:", fmt.Sprintf("%.1f%%", stats.purityPct)))
+	q3Lines = append(q3Lines, renderTableRow("Focus Logged:", fmt.Sprintf("%v", time.Duration(stats.totalFocusSecs)*time.Second)))
+	q3Lines = append(q3Lines, renderTableRow("Interruption Count:", fmt.Sprintf("%d", stats.totalInterruptions)))
+	q3Lines = append(q3Lines, renderTableRow("Tasks Cleared:", fmt.Sprintf("%d / %d", stats.completedCount, stats.totalCount)))
+	q3Content := strings.Join(q3Lines, "\n\n")
+
+	// Quadrant 4: 30-Day Contribution Grid (Bottom Right)
+	var q4Blocks []string
 	for i := 29; i >= 0; i-- {
 		date := today.AddDate(0, 0, -i)
 		secs := stats.dailyFocusSecs[date.Format("2006-01-02")]
@@ -267,7 +186,7 @@ func (m Model) renderAnalyticsRightCol(stats AnalyticsStats, w int, workW int, t
 		switch {
 		case hrs == 0:
 			cellColor = m.Theme.Muted
-			char = "·"
+			char = "░"
 		case hrs <= 1.5:
 			cellColor = m.Theme.P2Color
 		case hrs <= 4.0:
@@ -275,18 +194,35 @@ func (m Model) renderAnalyticsRightCol(stats AnalyticsStats, w int, workW int, t
 		default:
 			cellColor = m.Theme.SuccessColor
 		}
-		trendSB.WriteString(lipgloss.NewStyle().Foreground(cellColor).Render(char) + " ")
+		q4Blocks = append(q4Blocks, lipgloss.NewStyle().Foreground(cellColor).Render(char))
 	}
-	lines = append(lines, trendSB.String())
+	blocksStr := strings.Join(q4Blocks, " ")
 
-	var legend strings.Builder
-	legend.WriteString("  less ")
-	legend.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("·") + " ")
-	legend.WriteString(lipgloss.NewStyle().Foreground(m.Theme.P2Color).Render("■") + " ")
-	legend.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("■") + " ")
-	legend.WriteString(lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render("■") + " ")
-	legend.WriteString("more")
-	lines = append(lines, legend.String())
+	legend := fmt.Sprintf("Less  %s  %s  %s  %s  More",
+		lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("░"),
+		lipgloss.NewStyle().Foreground(m.Theme.P2Color).Render("■"),
+		lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("■"),
+		lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render("■"),
+	)
 
-	return strings.Join(lines, "\n")
+	centeredBlocks := lipgloss.NewStyle().Width(quadWidth - 6).Align(lipgloss.Center).Render(blocksStr)
+	centeredLegend := lipgloss.NewStyle().Width(quadWidth - 6).Align(lipgloss.Center).Render(legend)
+	q4Content := centeredBlocks + "\n\n\n" + centeredLegend
+
+	// Assemble Grid
+	q1 := makeQuad("📅 DAILY FOCUS & ALLOCATION", q1Content)
+	q2 := makeQuad("🏷️ TOP CATEGORY TAGS", q2Content)
+	q3 := makeQuad("📈 FOCUS HEALTH METRICS", q3Content)
+	q4 := makeQuad("🧱 30-DAY ACTIVATION TREND", q4Content)
+
+	topRow := lipgloss.JoinHorizontal(lipgloss.Top, q1, q2)
+	bottomRow := lipgloss.JoinHorizontal(lipgloss.Top, q3, q4)
+	grid := lipgloss.JoinVertical(lipgloss.Left, topRow, bottomRow)
+
+	var out strings.Builder
+	out.WriteString(headerLine + "\n\n")
+	out.WriteString(bannerContainer + "\n\n")
+	out.WriteString(grid)
+
+	return out.String()
 }

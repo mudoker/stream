@@ -11,7 +11,7 @@ import (
 
 // renderTodoShelf renders the backlog todo shelf column.
 // All item widths are explicitly bounded by m.Layout.TodoW to prevent line wrap.
-func (m Model) renderTodoShelf() string {
+func (m Model) renderTodoShelf(appContentHeight int) string {
 	l := m.Layout
 	innerW := l.TodoW - 2 // account for padding
 	if innerW < 10 {
@@ -32,34 +32,48 @@ func (m Model) renderTodoShelf() string {
 
 	shelfTasks := m.getTodoShelfTasks()
 
-	priorities := []model.Priority{model.P0, model.P1, model.P2, model.P3}
-	pTitles := []string{"Urgent", "High", "Medium", "Low"}
-	pColors := []lipgloss.Color{m.Theme.P0Color, m.Theme.P1Color, m.Theme.P2Color, m.Theme.P3Color}
+	groups := []struct {
+		name  string
+		color lipgloss.Color
+		tasks []model.Task
+	}{
+		{"URGENT", m.Theme.P0Color, nil},
+		{"TODAY", m.Theme.P1Color, nil},
+		{"BACKLOG", m.Theme.P2Color, nil},
+	}
+
+	for _, t := range shelfTasks {
+		switch t.Priority {
+		case model.P0:
+			groups[0].tasks = append(groups[0].tasks, t)
+		case model.P1:
+			groups[1].tasks = append(groups[1].tasks, t)
+		default:
+			groups[2].tasks = append(groups[2].tasks, t)
+		}
+	}
 
 	hasAny := false
-	for idx, prio := range priorities {
-		var list []model.Task
-		for _, t := range shelfTasks {
-			if t.Priority == prio {
-				list = append(list, t)
-			}
-		}
-
-		if len(list) == 0 {
+	for _, g := range groups {
+		if len(g.tasks) == 0 {
 			continue
 		}
 		hasAny = true
 
-		pHeader := lipgloss.NewStyle().Foreground(pColors[idx]).Bold(true).
-			Render(fmt.Sprintf("▲ %s", pTitles[idx]))
+		pHeader := lipgloss.NewStyle().Foreground(g.color).Bold(true).Render("▲ " + g.name)
 		rows = append(rows, pHeader)
 
-		for _, t := range list {
+		for _, t := range g.tasks {
 			isSelected := m.TodoShelfFocus && t.UUID == m.SelectedTaskUUID
 
+			chk := "[ ]"
+			if t.LifecycleState == model.StateCompleted {
+				chk = "[✓]"
+			}
+
 			title := sentenceCase(t.Title)
-			// truncate to fit innerW minus bullet and padding
-			maxTitleW := innerW - 4
+			// Truncate to fit innerW minus checkbox and padding
+			maxTitleW := innerW - 5
 			if len([]rune(title)) > maxTitleW {
 				if maxTitleW > 2 {
 					title = string([]rune(title)[:maxTitleW-1]) + "…"
@@ -68,29 +82,16 @@ func (m Model) renderTodoShelf() string {
 				}
 			}
 
-			bullet := lipgloss.NewStyle().Foreground(pColors[idx]).Render("●")
-
+			line := fmt.Sprintf(" %s %s", chk, title)
+			var itemStyle lipgloss.Style
 			if isSelected {
-				// Selected: full-width highlight — Width() ensures no jagged edge
-				line := fmt.Sprintf(" %s %s", bullet, title)
-				rows = append(rows,
-					lipgloss.NewStyle().
-						Background(m.Theme.SelectedBg).
-						Foreground(m.Theme.FocusPurple).
-						Bold(true).
-						Width(innerW).
-						Render(line),
-				)
+				itemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff8700")).Bold(true)
 			} else {
-				line := fmt.Sprintf(" %s %s", bullet, title)
-				rows = append(rows,
-					lipgloss.NewStyle().
-						Foreground(m.Theme.Fg).
-						Width(innerW).
-						Render(line),
-				)
+				itemStyle = lipgloss.NewStyle().Foreground(g.color)
 			}
+			rows = append(rows, itemStyle.Width(innerW).Render(line))
 		}
+		// Add a blank row only after the section to separate them
 		rows = append(rows, "")
 	}
 
@@ -113,7 +114,7 @@ func (m Model) renderTodoShelf() string {
 		offset = 0
 	}
 
-	maxVisible := l.Height - 2
+	maxVisible := appContentHeight - 2
 	var visible []string
 	if offset > 0 {
 		visible = append(visible,
@@ -130,5 +131,3 @@ func (m Model) renderTodoShelf() string {
 		Padding(1, 1).
 		Render(strings.Join(visible, "\n"))
 }
-
-

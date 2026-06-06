@@ -135,8 +135,9 @@ func (m Model) overlayMiniZen(content string, workspaceWidth int) string {
 	bar := RenderProgressBar(18, pct)
 
 	title := zt.Task.Title
-	if len(title) > 20 {
-		title = title[:17] + "..."
+	titleRunes := []rune(title)
+	if len(titleRunes) > 20 {
+		title = string(titleRunes[:17]) + "..."
 	}
 
 	widgetWidth := 26

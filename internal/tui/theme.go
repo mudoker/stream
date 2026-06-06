@@ -34,21 +34,21 @@ type Theme struct {
 }
 
 func NewTheme() Theme {
-	canvasBg := lipgloss.Color("#121318")
-	panelBg := lipgloss.Color("#1c1d24")
-	selectedBg := lipgloss.Color("#2b2d38")
-	modalBg := lipgloss.Color("#252730")
-	fg := lipgloss.Color("#e2e8f0")
-	muted := lipgloss.Color("#626875")
-	accent := lipgloss.Color("#5e6ad2")
-	focusPurple := lipgloss.Color("#8b5cf6")
+	canvasBg := lipgloss.Color("#1e1e2e")
+	panelBg := lipgloss.Color("#181825")
+	selectedBg := lipgloss.Color("#313244")
+	modalBg := lipgloss.Color("#1e1e2e")
+	fg := lipgloss.Color("#cdd6f4")
+	muted := lipgloss.Color("#6c7086")
+	accent := lipgloss.Color("#89b4fa")
+	focusPurple := lipgloss.Color("#b4befe")
 
-	p0 := lipgloss.Color("#f43f5e")
-	p1 := lipgloss.Color("#f59e0b")
-	p2 := lipgloss.Color("#3b82f6")
-	p3 := lipgloss.Color("#6b7280")
+	p0 := lipgloss.Color("#f38ba8")
+	p1 := lipgloss.Color("#fab387")
+	p2 := lipgloss.Color("#89b4fa")
+	p3 := lipgloss.Color("#45475a")
 
-	success := lipgloss.Color("#10b981")
+	success := lipgloss.Color("#a6e3a1")
 
 	return Theme{
 		CanvasBg:     canvasBg,
@@ -66,34 +66,28 @@ func NewTheme() Theme {
 		SuccessColor: success,
 
 		BaseStyle: lipgloss.NewStyle().
-			Background(canvasBg).
 			Foreground(fg),
 
 		PanelStyle: lipgloss.NewStyle().
-			Background(panelBg).
 			Foreground(fg).
 			Padding(1, 2),
 
 		SelectedPanel: lipgloss.NewStyle().
-			Background(selectedBg).
 			Foreground(fg).
 			Padding(1, 2),
 
 		ModalStyle: lipgloss.NewStyle().
-			Background(modalBg).
 			Foreground(fg).
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(accent).
 			Padding(1, 2),
 
 		HeaderStyle: lipgloss.NewStyle().
-			Background(panelBg).
 			Foreground(fg).
 			Padding(0, 1).
 			Bold(true),
 
 		FooterStyle: lipgloss.NewStyle().
-			Background(panelBg).
 			Foreground(muted).
 			Padding(0, 1),
 

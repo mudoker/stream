@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"stream/internal/db"
 	"stream/internal/model"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -21,7 +20,6 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	visible := m.Form.VisibleFields()
 
-	// Find index of current ActiveField in visible
 	curIdx := -1
 	for idx, val := range visible {
 		if val == m.Form.ActiveField {
@@ -47,30 +45,30 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "left":
 		switch m.Form.ActiveField {
-		case 2: // Priority
+		case 2:
 			m.Form.PriorityIdx = (m.Form.PriorityIdx - 1 + 4) % 4
 			return m, nil
-		case 3: // Story Points
+		case 3:
 			m.Form.SPIdx = (m.Form.SPIdx - 1 + 6) % 6
 			return m, nil
-		case 4: // Task Type
+		case 4:
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx - 1 + len(TaskTypeOptions)) % len(TaskTypeOptions)
 			return m, nil
 		}
 	case "right", " ":
 		switch m.Form.ActiveField {
-		case 2: // Priority
+		case 2:
 			m.Form.PriorityIdx = (m.Form.PriorityIdx + 1) % 4
 			return m, nil
-		case 3: // Story Points
+		case 3:
 			m.Form.SPIdx = (m.Form.SPIdx + 1) % 6
 			return m, nil
-		case 4: // Task Type
+		case 4:
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % len(TaskTypeOptions)
 			return m, nil
 		}
 	case "enter":
-		if m.Form.ActiveField == 8 { // Submit
+		if m.Form.ActiveField == 8 {
 			m.submitForm()
 			m.CurrentMode = ModeNormal
 			return m, nil
@@ -257,266 +255,4 @@ func (m *Model) submitForm() {
 	}
 }
 
-func (m *Model) handleWorkspaceFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
 
-	switch key {
-	case "up", "shift+tab":
-		m.WorkspaceForm.ActiveField = (m.WorkspaceForm.ActiveField - 1 + 4) % 4
-		m.focusWorkspaceFormFields()
-		return m, nil
-	case "down", "tab":
-		m.WorkspaceForm.ActiveField = (m.WorkspaceForm.ActiveField + 1) % 4
-		m.focusWorkspaceFormFields()
-		return m, nil
-	case "enter":
-		if m.WorkspaceForm.ActiveField == 3 { // Submit
-			m.submitWorkspaceForm()
-			m.CurrentMode = ModeNormal
-			return m, nil
-		}
-		m.WorkspaceForm.ActiveField = (m.WorkspaceForm.ActiveField + 1) % 4
-		m.focusWorkspaceFormFields()
-		return m, nil
-	case "esc":
-		m.CurrentMode = ModeNormal
-		m.IsEditingWorkspace = false
-		m.EditingWorkspaceUUID = ""
-		return m, nil
-	}
-
-	var cmd tea.Cmd
-	switch m.WorkspaceForm.ActiveField {
-	case 0:
-		m.WorkspaceForm.NameInput, cmd = m.WorkspaceForm.NameInput.Update(msg)
-	case 1:
-		m.WorkspaceForm.IconInput, cmd = m.WorkspaceForm.IconInput.Update(msg)
-	case 2:
-		m.WorkspaceForm.BadgeInput, cmd = m.WorkspaceForm.BadgeInput.Update(msg)
-	}
-
-	return m, cmd
-}
-
-func (m *Model) focusWorkspaceFormFields() {
-	m.WorkspaceForm.NameInput.Blur()
-	m.WorkspaceForm.IconInput.Blur()
-	m.WorkspaceForm.BadgeInput.Blur()
-
-	switch m.WorkspaceForm.ActiveField {
-	case 0:
-		m.WorkspaceForm.NameInput.Focus()
-	case 1:
-		m.WorkspaceForm.IconInput.Focus()
-	case 2:
-		m.WorkspaceForm.BadgeInput.Focus()
-	}
-}
-
-func (m *Model) submitWorkspaceForm() {
-	name := m.WorkspaceForm.NameInput.Value()
-	if strings.TrimSpace(name) == "" {
-		m.StatusMsg = "Workspace name cannot be empty."
-		return
-	}
-
-	icon := m.WorkspaceForm.IconInput.Value()
-	if strings.TrimSpace(icon) == "" {
-		icon = "💼"
-	}
-
-	badge := m.WorkspaceForm.BadgeInput.Value()
-
-	var ws model.Workspace
-	isEdit := m.IsEditingWorkspace
-	if isEdit {
-		for _, w := range m.Workspaces {
-			if w.UUID == m.EditingWorkspaceUUID {
-				ws = w
-				break
-			}
-		}
-	} else {
-		ws = model.Workspace{
-			UUID:      uuid.New().String(),
-			CreatedAt: time.Now(),
-		}
-	}
-
-	ws.Name = name
-	ws.Icon = icon
-	ws.Badge = badge
-	ws.UpdatedAt = time.Now()
-
-	if isEdit {
-		err := m.DB.UpdateWorkspace(ws)
-		if err != nil {
-			m.StatusMsg = fmt.Sprintf("Error updating workspace: %v", err)
-		} else {
-			m.StatusMsg = fmt.Sprintf("Workspace '%s' updated successfully.", name)
-		}
-	} else {
-		err := m.DB.AddWorkspace(ws)
-		if err != nil {
-			m.StatusMsg = fmt.Sprintf("Error creating workspace: %v", err)
-		} else {
-			m.ActiveWorkspaceUUID = ws.UUID // Switch to it!
-			m.StatusMsg = fmt.Sprintf("Workspace '%s' created successfully.", name)
-		}
-	}
-
-	m.IsEditingWorkspace = false
-	m.EditingWorkspaceUUID = ""
-	m.refreshWorkspaces()
-	m.refreshTasks()
-	m.selectDefaultTaskForSelectedDay()
-}
-
-func (m *Model) startEditMode(task model.Task) {
-	m.IsEditing = true
-	m.EditingTaskUUID = task.UUID
-
-	// Pre-fill form fields
-	m.Form.TitleInput.SetValue(task.Title)
-	m.Form.DescInput.SetValue(task.Description)
-	switch task.Priority {
-	case model.P0:
-		m.Form.PriorityIdx = 0
-	case model.P1:
-		m.Form.PriorityIdx = 1
-	case model.P2:
-		m.Form.PriorityIdx = 2
-	case model.P3:
-		m.Form.PriorityIdx = 3
-	}
-
-	m.Form.SPIdx = 2
-	for idx, val := range SPOptions {
-		if val == task.StoryPoints {
-			m.Form.SPIdx = idx
-			break
-		}
-	}
-
-	if task.SchedulingType == model.Anchored {
-		m.Form.TaskTypeIdx = 0
-		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
-		durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
-		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
-	} else if task.SchedulingType == model.Reminder {
-		m.Form.TaskTypeIdx = 2
-		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
-		m.Form.DurationInput.SetValue("60")
-	} else {
-		m.Form.TaskTypeIdx = 1
-		m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
-		m.Form.DurationInput.SetValue("60")
-	}
-
-	m.Form.TagsInput.SetValue(strings.Join(task.Tags, ", "))
-
-	m.Form.ActiveField = 0
-	m.focusFormFields()
-	m.CurrentMode = ModeForm
-}
-
-func (m *Model) handleProfileFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
-
-	switch key {
-	case "up", "shift+tab":
-		m.ProfileForm.ActiveField = (m.ProfileForm.ActiveField - 1 + 4) % 4
-		m.focusProfileFormFields()
-		return m, nil
-	case "down", "tab":
-		m.ProfileForm.ActiveField = (m.ProfileForm.ActiveField + 1) % 4
-		m.focusProfileFormFields()
-		return m, nil
-	case "enter":
-		if m.ProfileForm.ActiveField == 3 { // Submit
-			m.submitProfileForm()
-			m.CurrentMode = ModeNormal
-			return m, nil
-		}
-		m.ProfileForm.ActiveField = (m.ProfileForm.ActiveField + 1) % 4
-		m.focusProfileFormFields()
-		return m, nil
-	case "esc":
-		m.CurrentMode = ModeNormal
-		return m, nil
-	}
-
-	var cmd tea.Cmd
-	switch m.ProfileForm.ActiveField {
-	case 0:
-		m.ProfileForm.UsernameInput, cmd = m.ProfileForm.UsernameInput.Update(msg)
-	case 1:
-		m.ProfileForm.PasswordInput, cmd = m.ProfileForm.PasswordInput.Update(msg)
-	case 2:
-		m.ProfileForm.LockTimeoutInput, cmd = m.ProfileForm.LockTimeoutInput.Update(msg)
-	}
-
-	return m, cmd
-}
-
-func (m *Model) focusProfileFormFields() {
-	m.ProfileForm.UsernameInput.Blur()
-	m.ProfileForm.PasswordInput.Blur()
-	m.ProfileForm.LockTimeoutInput.Blur()
-
-	switch m.ProfileForm.ActiveField {
-	case 0:
-		m.ProfileForm.UsernameInput.Focus()
-	case 1:
-		m.ProfileForm.PasswordInput.Focus()
-	case 2:
-		m.ProfileForm.LockTimeoutInput.Focus()
-	}
-}
-
-func (m *Model) submitProfileForm() {
-	user := strings.TrimSpace(m.ProfileForm.UsernameInput.Value())
-	if user == "" {
-		m.StatusMsg = "Username cannot be empty."
-		return
-	}
-
-	passVal := m.ProfileForm.PasswordInput.Value()
-	timeoutStr := m.ProfileForm.LockTimeoutInput.Value()
-
-	timeoutVal := 5
-	if val, err := strconv.Atoi(timeoutStr); err == nil && val > 0 {
-		timeoutVal = val
-	}
-
-	settings := m.DB.GetUserSettings()
-	settings.Username = user
-	settings.LockTimeoutMinutes = timeoutVal
-
-	// Update password if provided
-	if passVal != "" {
-		if strings.EqualFold(passVal, "none") {
-			settings.PasswordHash = ""
-			m.IsLocked = false
-			m.StatusMsg = "Display username and settings updated. Password lock disabled."
-		} else {
-			// Hash it
-			settings.PasswordHash = db.HashPassword(passVal)
-			m.StatusMsg = "Display username, settings, and password updated successfully."
-		}
-	} else {
-		m.StatusMsg = "Display username and lock settings updated successfully."
-	}
-
-	if err := m.DB.UpdateUserSettings(settings); err != nil {
-		m.StatusMsg = fmt.Sprintf("Error saving settings: %v", err)
-	} else {
-		// Reset lock timer to match new timeout
-		m.SessionTimeRemainingSeconds = timeoutVal * 60
-	}
-
-	// Sync local copy in model too
-	m.ProfileForm.Username = user
-	m.ProfileForm.LockTimeoutMins = timeoutVal
-	m.ProfileForm.PasswordInput.SetValue("")
-}

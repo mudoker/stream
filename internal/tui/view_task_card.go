@@ -43,9 +43,7 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 	// Card border
 	borderColor := pColor
 	isCompleted := task.LifecycleState == model.StateCompleted
-	if isCompleted {
-		borderColor = lipgloss.Color("#45475a") // Dim border for completed
-	} else if isZenFocus {
+	if isZenFocus {
 		borderColor = m.Theme.SuccessColor
 	} else if isSelected {
 		borderColor = lipgloss.Color("#ff8700")
@@ -53,6 +51,8 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 		borderColor = lipgloss.Color("#ff0000")
 	} else if isActive {
 		borderColor = m.Theme.Accent
+	} else if isCompleted {
+		borderColor = lipgloss.Color("#45475a") // Dim border for completed
 	}
 
 	// Priority badge
@@ -146,14 +146,14 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 	}
 
 	titleStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true)
-	if isCompleted {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("#a6e3a1")).Faint(true)
-	} else if isZenFocus {
+	if isZenFocus {
 		titleStyle = titleStyle.Foreground(m.Theme.SuccessColor)
 	} else if isSelected {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff8700"))
 	} else if hasCollision {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff0000"))
+	} else if isCompleted {
+		titleStyle = titleStyle.Foreground(lipgloss.Color("#a6e3a1")).Faint(true)
 	}
 	titleLine := titleStyle.Render(titleStr)
 	metaLine := metaStr

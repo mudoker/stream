@@ -13,9 +13,7 @@ import (
 func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color, isActive bool, isSelected bool, hasCollision bool, isZenFocus bool, timeStr string) string {
 	stripColor := pColor
 	isCompleted := task.LifecycleState == model.StateCompleted
-	if isCompleted {
-		stripColor = lipgloss.Color("#45475a") // dim border for completed
-	} else if isZenFocus {
+	if isZenFocus {
 		stripColor = m.Theme.SuccessColor
 	} else if isSelected {
 		stripColor = lipgloss.Color("#ff8700")
@@ -23,6 +21,8 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		stripColor = lipgloss.Color("#ff0000")
 	} else if isActive {
 		stripColor = m.Theme.Accent
+	} else if isCompleted {
+		stripColor = lipgloss.Color("#45475a") // dim border for completed
 	}
 
 	leftBorder := lipgloss.NewStyle().Foreground(stripColor).Render("│")
@@ -49,9 +49,7 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 	text := " " + titleStr
 
 	var textStyle lipgloss.Style
-	if isCompleted {
-		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Faint(true)
-	} else if isZenFocus {
+	if isZenFocus {
 		textStyle = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true)
 	} else if isSelected {
 		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff8700")).Bold(true)
@@ -59,6 +57,8 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true)
 	} else if isActive {
 		textStyle = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true)
+	} else if isCompleted {
+		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Faint(true)
 	} else {
 		textStyle = lipgloss.NewStyle().Foreground(m.Theme.Fg)
 	}

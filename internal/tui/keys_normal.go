@@ -243,6 +243,8 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "t":
 		m.SelectedDay = time.Now()
+		m.selectDefaultTaskForSelectedDay()
+		m.TimelineHour = time.Now().Hour()
 		m.ScrollOffset = 0
 		m.StatusMsg = "Jumped to today."
 		return m, nil

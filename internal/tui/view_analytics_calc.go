@@ -205,6 +205,9 @@ func (m Model) calculateAnalyticsStats() AnalyticsStats {
 		sortedTags = append(sortedTags, TagVal{Tag: k, Secs: v})
 	}
 	sort.Slice(sortedTags, func(i, j int) bool {
+		if sortedTags[i].Secs == sortedTags[j].Secs {
+			return sortedTags[i].Tag < sortedTags[j].Tag
+		}
 		return sortedTags[i].Secs > sortedTags[j].Secs
 	})
 

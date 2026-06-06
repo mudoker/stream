@@ -10,6 +10,38 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+func padLines(s string, count int) string {
+	lines := strings.Split(s, "\n")
+	for len(lines) < count {
+		lines = append(lines, "")
+	}
+	if len(lines) > count {
+		lines = lines[:count]
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderSettingsCard(title string, content string, width int) string {
+	headerStyle := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, true, false, true).
+		BorderForeground(m.Theme.SelectedBg).
+		Background(m.Theme.SelectedBg).
+		Foreground(m.Theme.Accent).
+		Bold(true).
+		Width(width).
+		Padding(0, 1)
+
+	header := headerStyle.Render(" " + strings.ToUpper(title))
+
+	bodyStyle := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, true, true, true).
+		BorderForeground(m.Theme.SelectedBg).
+		Padding(1, 2).
+		Width(width)
+
+	return lipgloss.JoinVertical(lipgloss.Left, header, bodyStyle.Render(content))
+}
+
 func (m Model) renderSettingsView(height int) string {
 	workspaceWidth := m.Layout.WorkspaceW - 4
 	appContentHeight := height - 4 // spacing for header and footer
@@ -44,104 +76,115 @@ func (m Model) renderSettingsView(height int) string {
 
 	// 2. Prepare Panels
 	panelW := (workspaceWidth - 2) / 2
-	if panelW < 20 {
-		panelW = 20
+	if panelW < 24 {
+		panelW = 24
 	}
 
-	// ── PANEL 1: Google Calendar Sync ──
-	syncStatus := "Disconnected"
+	// Labels with aligned vertical separators
+	lblStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Width(13)
+	valStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg)
+	cmdStyle := lipgloss.NewStyle().Background(m.Theme.SelectedBg).Foreground(m.Theme.Accent).Bold(true)
+
+	// ── CARD 1: Google Calendar Sync ──
+	syncStatus := "● Disconnected"
 	statusColor := m.Theme.P0Color
 	if m.Sync.IsOnline() {
-		syncStatus = "Connected (Online)"
+		syncStatus = "● Connected"
 		statusColor = m.Theme.SuccessColor
 	}
+	statusStyle := lipgloss.NewStyle().Foreground(statusColor).Bold(true)
 	
 	var sbSync strings.Builder
-	sbSync.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("GOOGLE CALENDAR SYNC") + "\n\n")
-	sbSync.WriteString(fmt.Sprintf("  Status:     %s\n", lipgloss.NewStyle().Foreground(statusColor).Bold(true).Render(syncStatus)))
-	sbSync.WriteString(fmt.Sprintf("  Client ID:  %s\n", "stream-gcal-client"))
-	sbSync.WriteString(fmt.Sprintf("  API Server: http://localhost:8080\n\n"))
-	sbSync.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  Commands:\n"))
-	sbSync.WriteString("   • :auth  - Authenticate with GCal\n")
-	sbSync.WriteString("   • :sync  - Force background sync\n")
+	sbSync.WriteString(fmt.Sprintf("%s  %s\n", lblStyle.Render("Status        │"), statusStyle.Render(syncStatus)))
+	sbSync.WriteString(fmt.Sprintf("%s  %s\n", lblStyle.Render("Client ID     │"), valStyle.Render("stream-gcal-client")))
+	sbSync.WriteString(fmt.Sprintf("%s  %s\n\n", lblStyle.Render("API Server    │"), valStyle.Render("http://localhost:8080")))
 	
-	panel1 := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.SelectedBg).
-		Padding(1, 2).
-		Width(panelW).
-		Height(10).
-		Render(sbSync.String())
+	sbSync.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("COMMANDS\n"))
+	sbSync.WriteString(fmt.Sprintf("  %-12s  %s\n", cmdStyle.Render(" :auth "), valStyle.Render("Authenticate GCal API")))
+	sbSync.WriteString(fmt.Sprintf("  %-12s  %s", cmdStyle.Render(" :sync "), valStyle.Render("Force background sync")))
 
-	// ── PANEL 2: Active Workspace ──
+	// ── CARD 2: Active Workspace ──
 	var sbWS strings.Builder
-	sbWS.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("ACTIVE WORKSPACE") + "\n\n")
-	sbWS.WriteString(fmt.Sprintf("  Name:   %s %s\n", activeWS.Icon, activeWS.Name))
-	sbWS.WriteString(fmt.Sprintf("  Badge:  %s\n", activeWS.Badge))
-	sbWS.WriteString(fmt.Sprintf("  UUID:   %s\n\n", activeWS.UUID))
-	sbWS.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  Commands:\n"))
-	sbWS.WriteString("   • :ws-create - Add workspace\n")
-	sbWS.WriteString("   • :ws-edit   - Edit workspace\n")
-	sbWS.WriteString("   • :ws-delete - Delete workspace\n")
-
-	panel2 := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.SelectedBg).
-		Padding(1, 2).
-		Width(panelW).
-		Height(10).
-		Render(sbWS.String())
-
-	// ── PANEL 3: Theme & UI Styling ──
-	var sbTheme strings.Builder
-	sbTheme.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("THEME & COLOR SCHEME") + "\n\n")
-	sbTheme.WriteString("  Active Theme: Catppuccin Mocha\n")
-	sbTheme.WriteString(fmt.Sprintf("  Palette Preview:\n"))
-	sbTheme.WriteString(fmt.Sprintf("   • Success:  %s\n", lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render("████")))
-	sbTheme.WriteString(fmt.Sprintf("   • Accent:   %s\n", lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("████")))
-	sbTheme.WriteString(fmt.Sprintf("   • P0/P1:    %s  %s\n", 
-		lipgloss.NewStyle().Foreground(m.Theme.P0Color).Render("████"),
-		lipgloss.NewStyle().Foreground(m.Theme.P1Color).Render("████")))
-
-	panel3 := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.SelectedBg).
-		Padding(1, 2).
-		Width(panelW).
-		Height(10).
-		Render(sbTheme.String())
-
-	// ── PANEL 4: Database & Paths ──
-	configDir := m.DB.GetConfigDir()
-	var sbDB strings.Builder
-	sbDB.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("DATABASE & LEDGER PATHS") + "\n\n")
+	sbWS.WriteString(fmt.Sprintf("%s  %s %s\n", lblStyle.Render("Workspace     │"), valStyle.Render(activeWS.Icon), valStyle.Bold(true).Render(activeWS.Name)))
+	sbWS.WriteString(fmt.Sprintf("%s  %s\n", lblStyle.Render("Badge         │"), valStyle.Render(activeWS.Badge)))
 	
-	// Truncate paths if they are too long for panel width
+	uuidStr := activeWS.UUID
+	if len(uuidStr) > panelW-18 {
+		uuidStr = uuidStr[:panelW-21] + "..."
+	}
+	sbWS.WriteString(fmt.Sprintf("%s  %s\n\n", lblStyle.Render("UUID          │"), valStyle.Render(uuidStr)))
+
+	sbWS.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("COMMANDS\n"))
+	sbWS.WriteString(fmt.Sprintf("  %-12s  %s\n", cmdStyle.Render(" :ws-create "), valStyle.Render("Create new workspace")))
+	sbWS.WriteString(fmt.Sprintf("  %-12s  %s\n", cmdStyle.Render(" :ws-edit   "), valStyle.Render("Edit active workspace")))
+	sbWS.WriteString(fmt.Sprintf("  %-12s  %s", cmdStyle.Render(" :ws-delete "), valStyle.Render("Delete active workspace")))
+
+	// ── CARD 3: Theme & Color Scheme ──
+	var sbTheme strings.Builder
+	sbTheme.WriteString(fmt.Sprintf("%s  %s\n", lblStyle.Render("Active Theme  │"), valStyle.Render("Catppuccin Mocha")))
+	sbTheme.WriteString(fmt.Sprintf("%s  %s  %s\n", lblStyle.Render("Accent Color  │"), lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("████"), valStyle.Render("#89b4fa")))
+	sbTheme.WriteString(fmt.Sprintf("%s  %s  %s\n", lblStyle.Render("Success Color │"), lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render("████"), valStyle.Render("#a6e3a1")))
+	sbTheme.WriteString(fmt.Sprintf("%s  %s  %s\n", lblStyle.Render("Zen Purple    │"), lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Render("████"), valStyle.Render("#b4befe")))
+	sbTheme.WriteString(fmt.Sprintf("%s  %s  %s\n", lblStyle.Render("P0 Urgent     │"), lipgloss.NewStyle().Foreground(m.Theme.P0Color).Render("████"), valStyle.Render("#f38ba8")))
+	sbTheme.WriteString(fmt.Sprintf("%s  %s  %s", lblStyle.Render("P1 High       │"), lipgloss.NewStyle().Foreground(m.Theme.P1Color).Render("████"), valStyle.Render("#fab387")))
+
+	// ── CARD 4: Database & Paths ──
+	configDir := m.DB.GetConfigDir()
+	pathStyle := lipgloss.NewStyle().
+		Background(m.Theme.SelectedBg).
+		Foreground(m.Theme.Accent).
+		Padding(0, 1)
+
 	truncPath := func(path string, maxLen int) string {
 		if len(path) > maxLen {
 			return "..." + path[len(path)-maxLen+3:]
 		}
 		return path
 	}
-	pathMaxW := panelW - 16
-	sbDB.WriteString(fmt.Sprintf("  Config Dir: %s\n", truncPath(configDir, pathMaxW)))
-	sbDB.WriteString(fmt.Sprintf("  Data File:  %s\n", truncPath(filepath.Join(configDir, "data.json"), pathMaxW)))
-	sbDB.WriteString(fmt.Sprintf("  Workspaces: %s\n", truncPath(filepath.Join(configDir, "workspaces.json"), pathMaxW)))
-	sbDB.WriteString(fmt.Sprintf("  Ledger:     %s\n", truncPath(filepath.Join(configDir, "ledger.json"), pathMaxW)))
 
-	panel4 := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(m.Theme.SelectedBg).
-		Padding(1, 2).
-		Width(panelW).
-		Height(10).
-		Render(sbDB.String())
+	pathMaxLen := panelW - 22
+	if pathMaxLen < 15 {
+		pathMaxLen = 15
+	}
 
-	// Assemble rows
-	row1 := lipgloss.JoinHorizontal(lipgloss.Top, panel1, "  ", panel2)
-	row2 := lipgloss.JoinHorizontal(lipgloss.Top, panel3, "  ", panel4)
+	cfgPath := truncPath(configDir, pathMaxLen)
+	dataPath := truncPath(filepath.Join(configDir, "data.json"), pathMaxLen)
+	wsPath := truncPath(filepath.Join(configDir, "workspaces.json"), pathMaxLen)
+	ledgPath := truncPath(filepath.Join(configDir, "ledger.json"), pathMaxLen)
 
-	// Combine everything
+	renderPathLine := func(label string, path string) string {
+		lbl := lblStyle.Render(label + "  │")
+		pathRend := pathStyle.Render(path)
+		pathW := lipgloss.Width(pathRend)
+		
+		// inner width is panelW - 4 (left/right padding of body)
+		innerW := panelW - 4
+		copyIcon := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("[📋]")
+		copyW := lipgloss.Width(copyIcon)
+		
+		leftW := lipgloss.Width(lbl) + 2 + pathW
+		spaceCount := innerW - leftW - copyW
+		if spaceCount < 1 {
+			spaceCount = 1
+		}
+		return fmt.Sprintf("%s  %s%s%s", lbl, pathRend, strings.Repeat(" ", spaceCount), copyIcon)
+	}
+
+	var sbDB strings.Builder
+	sbDB.WriteString(renderPathLine("Config Dir", cfgPath) + "\n")
+	sbDB.WriteString(renderPathLine("Data File", dataPath) + "\n")
+	sbDB.WriteString(renderPathLine("Workspaces", wsPath) + "\n")
+	sbDB.WriteString(renderPathLine("Ledger File", ledgPath))
+
+	// 3. Assemble Grid with padded lines for perfect height matching
+	card1 := m.renderSettingsCard("Google Calendar Sync", padLines(sbSync.String(), 7), panelW)
+	card2 := m.renderSettingsCard("Active Workspace", padLines(sbWS.String(), 7), panelW)
+	card3 := m.renderSettingsCard("Theme & Color Scheme", padLines(sbTheme.String(), 7), panelW)
+	card4 := m.renderSettingsCard("Database & Ledger Paths", padLines(sbDB.String(), 7), panelW)
+
+	row1 := lipgloss.JoinHorizontal(lipgloss.Top, card1, "  ", card2)
+	row2 := lipgloss.JoinHorizontal(lipgloss.Top, card3, "  ", card4)
+
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		headerLine,
 		"",

@@ -23,15 +23,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TickMsg:
 		// Tick Zen Timer if active
 		if m.ZenTimer != nil {
+			oldIdx := m.ZenTimer.CurrentSessionIdx
 			finished := m.ZenTimer.Tick()
+
+			if m.ZenTimer.CurrentSessionIdx != oldIdx || finished {
+				if m.DB != nil {
+					m.DB.UpdateTask(m.ZenTimer.Task)
+					m.refreshTasks()
+				}
+			}
+
 			if finished {
 				// Record completion metrics
 				t := m.ZenTimer.Task
 				t.LifecycleState = model.StateCompleted
-				t.ExecutionMetrics.ElapsedFocusSeconds += int(m.ZenTimer.TotalDuration.Seconds())
-				t.ExecutionMetrics.TotalCompletedPomodoros += 1
-				m.DB.UpdateTask(t)
-				m.refreshTasks()
+				if m.DB != nil {
+					m.DB.UpdateTask(t)
+					m.refreshTasks()
+				}
+				m.ZenTimer = nil
 
 				if m.CurrentMode == ModeZen {
 					m.CurrentMode = ModeNormal

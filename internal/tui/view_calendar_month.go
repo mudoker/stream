@@ -18,21 +18,19 @@ func (m Model) renderMonthView(height int) string {
 		laneHeight = 10
 	}
 
-	// Squeeze day blocks to 3 characters wide, use single-spaced rows, and stack as many as workspace height/width allows.
 	maxLeftW := workspaceWidth - 35
 	if maxLeftW < 33 {
-		maxLeftW = 33 // At least 1 month
+		maxLeftW = 33
 	}
 
-	innerLeftW := maxLeftW - 6 // content + padding (4) + borders (2)
+	innerLeftW := maxLeftW - 6
 	colsFit := innerLeftW / 29
 	if colsFit < 1 {
 		colsFit = 1
 	}
 
-	// Calculate exact layout widths to eliminate gaps!
 	monthGridW := colsFit*29 + (colsFit-1)*2
-	leftColWidth := monthGridW + 6 // contentW + 4 padding + 2 borders
+	leftColWidth := monthGridW + 6
 	rightColWidth := workspaceWidth - leftColWidth
 	if rightColWidth < 30 {
 		rightColWidth = 30
@@ -62,7 +60,6 @@ func (m Model) renderMonthView(height int) string {
 		}
 		gridStart := firstOfCur.AddDate(0, 0, -offset)
 
-		// Title for this month block
 		title := fmt.Sprintf("   %s %d", strings.ToUpper(month.String()), year)
 
 		var gridRows []string
@@ -84,7 +81,6 @@ func (m Model) renderMonthView(height int) string {
 					}
 				}
 
-				// Format cell contents to be exactly 3 character cells wide
 				var valStr string
 				if isSelected {
 					if dayNum < 10 {
@@ -149,7 +145,7 @@ func (m Model) renderMonthView(height int) string {
 				break
 			}
 			if c > 0 {
-				rowBlocks = append(rowBlocks, "  ") // 2 spaces gutter
+				rowBlocks = append(rowBlocks, "  ")
 			}
 			rowBlocks = append(rowBlocks, monthBlocks[mIdx])
 		}
@@ -158,7 +154,6 @@ func (m Model) renderMonthView(height int) string {
 		}
 	}
 
-	// Agenda Inspector (Right Column) tasks list
 	var inspectorLines []string
 	var selectedDayTasks []model.Task
 	for _, t := range m.Tasks {
@@ -240,170 +235,4 @@ func (m Model) renderMonthView(height int) string {
 		)
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
-}
-
-
-
-func (m Model) renderWeekView(height int) string {
-	today := time.Now()
-	offset := int(m.SelectedDay.Weekday()) - 1
-	if offset < 0 {
-		offset = 6
-	}
-	weekStart := m.SelectedDay.AddDate(0, 0, -offset)
-	weekEnd := weekStart.AddDate(0, 0, 6)
-
-	// Week title calculation
-	_, weekNum := m.SelectedDay.ISOWeek()
-	startStr := strings.ToUpper(weekStart.Format("June 2")) // Wait, let's use standard format
-	startStr = strings.ToUpper(weekStart.Format("January 2"))
-	endStr := strings.ToUpper(weekEnd.Format("January 2, 2006"))
-
-	weekTitle := fmt.Sprintf("◀  WEEK %d (%s - %s)  ▶", weekNum, startStr, endStr)
-	titleColor := m.Theme.Fg
-	if m.SidebarFocus {
-		titleColor = m.Theme.Muted
-	}
-	titleStyle := lipgloss.NewStyle().
-		Foreground(titleColor).
-		Bold(!m.SidebarFocus).
-		Align(lipgloss.Center).
-		Width(m.Layout.WorkspaceW - 4)
-	renderedTitle := titleStyle.Render(weekTitle)
-
-	weekdayNames := []string{"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"}
-	var colRendered []string
-
-	// Split the central canvas width equally into 7 columns (accounting for vertical separators)
-	contentW := m.Layout.WorkspaceW - 4
-	colWidth := (contentW - 6) / 7
-	if colWidth < 12 {
-		colWidth = 12
-	}
-
-	laneHeight := height - 4
-	if laneHeight < 10 {
-		laneHeight = 10
-	}
-
-	for i := 0; i < 7; i++ {
-		day := weekStart.AddDate(0, 0, i)
-		isToday := sameDay(day, today)
-		isSelected := sameDay(day, m.SelectedDay)
-
-		var dayTasks []model.Task
-		for _, t := range m.Tasks {
-			if t.SchedulingType == model.Anchored && sameDay(t.TimeWindow.Start, day) {
-				dayTasks = append(dayTasks, t)
-			}
-		}
-
-
-
-		colStyle := lipgloss.NewStyle().
-			Width(colWidth).
-			Height(laneHeight)
-
-		var dayContent []string
-
-		// Clean header row
-		headerText := fmt.Sprintf("%s %02d", weekdayNames[i], day.Day())
-		if isToday {
-			headerText += " [ACT]"
-		}
-
-		var headerStyle lipgloss.Style
-		if isToday {
-			headerStyle = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true)
-		} else if isSelected {
-			headerStyle = lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Bold(true)
-		} else {
-			headerStyle = lipgloss.NewStyle().Foreground(m.Theme.Muted)
-		}
-		dayContent = append(dayContent, headerStyle.Render(headerText))
-
-		// Horizontal rule divider below header
-		dayContent = append(dayContent, lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", colWidth)))
-
-		// Render stacked cards
-		resolved := ResolveOverlaps(dayTasks)
-		if len(resolved) == 0 {
-			dayContent = append(dayContent, "", lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  (No work)"))
-		} else {
-			for _, rc := range resolved {
-				timeText := fmt.Sprintf("%s-%s", rc.Task.TimeWindow.Start.Format("15:04"), rc.Task.TimeWindow.End.Format("15:04"))
-				blockColor := m.getTaskCardColor(rc.Task)
-				if rc.Task.UUID == m.SelectedTaskUUID {
-					blockColor = lipgloss.Color("#ff8700")
-				}
-
-				cardW := colWidth - 4
-				if cardW < 6 {
-					cardW = 6
-				}
-
-				timeLine := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(timeText)
-				titleText := sentenceCase(rc.Task.Title)
-				maxTitleW := cardW - 2
-				titleRunes := []rune(titleText)
-				if len(titleRunes) > maxTitleW {
-					if maxTitleW > 1 {
-						titleText = string(titleRunes[:maxTitleW-1]) + "…"
-					} else {
-						titleText = string(titleRunes[:maxTitleW])
-					}
-				}
-				titleLine := lipgloss.NewStyle().Foreground(m.Theme.Fg).Render(titleText)
-
-				cardContent := timeLine + "\n" + titleLine
-
-				cardStr := lipgloss.NewStyle().
-					Border(lipgloss.RoundedBorder()).
-					BorderForeground(blockColor).
-					Padding(1, 1).
-					Width(cardW).
-					Render(cardContent)
-
-				dayContent = append(dayContent, "", cardStr)
-			}
-		}
-
-		colRendered = append(colRendered, colStyle.Render(strings.Join(dayContent, "\n")))
-	}
-
-	// Join with vertical separator lines
-	var sepLines []string
-	for h := 0; h < laneHeight; h++ {
-		sepLines = append(sepLines, "│")
-	}
-	sepStr := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#45475a")).
-		Render(strings.Join(sepLines, "\n"))
-
-	var colsToJoin []string
-	for idx, col := range colRendered {
-		if idx > 0 {
-			colsToJoin = append(colsToJoin, sepStr)
-		}
-		colsToJoin = append(colsToJoin, col)
-	}
-
-	joinedLanes := lipgloss.JoinHorizontal(lipgloss.Top, colsToJoin...)
-
-	var out strings.Builder
-	out.WriteString(renderedTitle + "\n\n")
-	out.WriteString(joinedLanes)
-
-	return out.String()
-}
-
-func (m Model) getTaskCardColor(t model.Task) lipgloss.Color {
-	switch t.Priority {
-	case model.P0:
-		return m.Theme.P0Color
-	case model.P1:
-		return m.Theme.P1Color
-	default:
-		return m.Theme.P2Color
-	}
 }

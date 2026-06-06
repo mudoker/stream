@@ -84,45 +84,39 @@ func (m *Model) autoScrollToSelectedTask() {
 		return
 	}
 
-	startRow := timeToRow(selectedTask.TimeWindow.Start)
-	durationMinutes := int(selectedTask.TimeWindow.End.Sub(selectedTask.TimeWindow.Start).Minutes())
-	h := (durationMinutes * rowsPerHour + 59) / 60
-	if startRow+h > totalRows {
-		h = totalRows - startRow
-	}
-	if h < 1 {
-		h = 1
-	}
+	tStart := selectedTask.TimeWindow.Start.Local().Hour()
+	tEnd := (selectedTask.TimeWindow.End.Local().Hour()*60 + selectedTask.TimeWindow.End.Local().Minute() + 59) / 60
 
 	appContentHeight := m.Height
 	visibleH := appContentHeight - 4
 	if visibleH < 8 {
 		visibleH = 8
 	}
+	visibleHours := visibleH / rowsPerHour
+	if visibleHours < 1 {
+		visibleHours = 1
+	}
 
-	centerRow := m.TimelineHour * rowsPerHour
-	startR := centerRow - visibleH/2
+	startHour := m.TimelineHour - visibleHours/2
+	endHour := startHour + visibleHours
 
-	if h >= visibleH {
-		startR = startRow
+	if tEnd-tStart >= visibleHours {
+		m.TimelineHour = tEnd - visibleHours/2
 	} else {
-		if startRow < startR {
-			startR = startRow
+		if tStart < startHour {
+			m.TimelineHour = tStart + visibleHours/2
 		}
-		if startRow+h > startR+visibleH {
-			startR = startRow + h - visibleH
+		if tEnd > endHour {
+			m.TimelineHour = tEnd - visibleHours/2
 		}
 	}
 
-	newCenterRow := startR + visibleH/2
-	if newCenterRow < 0 {
-		newCenterRow = 0
+	if m.TimelineHour < 0 {
+		m.TimelineHour = 0
 	}
-	if newCenterRow >= totalRows {
-		newCenterRow = totalRows - 1
+	if m.TimelineHour > 23 {
+		m.TimelineHour = 23
 	}
-
-	m.TimelineHour = newCenterRow / rowsPerHour
 }
 
 func (m *Model) navigateVertical(dir int) {

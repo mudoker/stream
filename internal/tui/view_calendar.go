@@ -63,10 +63,7 @@ func (m Model) renderMonthView(height int) string {
 		gridStart := firstOfCur.AddDate(0, 0, -offset)
 
 		// Title for this month block
-		title := fmt.Sprintf("◀  %s %d  ▶", strings.ToUpper(month.String()), year)
-		if mIdx > 0 {
-			title = fmt.Sprintf("   %s %d", strings.ToUpper(month.String()), year)
-		}
+		title := fmt.Sprintf("   %s %d", strings.ToUpper(month.String()), year)
 
 		var gridRows []string
 		cellDay := gridStart

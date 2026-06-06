@@ -17,14 +17,30 @@ var SPOptions = []int{1, 2, 3, 5, 8, 13}
 
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
+	visible := m.Form.VisibleFields()
+
+	// Find index of current ActiveField in visible
+	curIdx := -1
+	for idx, val := range visible {
+		if val == m.Form.ActiveField {
+			curIdx = idx
+			break
+		}
+	}
+	if curIdx == -1 {
+		curIdx = 0
+		m.Form.ActiveField = visible[0]
+	}
 
 	switch key {
 	case "tab", "down":
-		m.Form.ActiveField = (m.Form.ActiveField + 1) % 9
+		curIdx = (curIdx + 1) % len(visible)
+		m.Form.ActiveField = visible[curIdx]
 		m.focusFormFields()
 		return m, nil
 	case "shift+tab", "up":
-		m.Form.ActiveField = (m.Form.ActiveField - 1 + 9) % 9
+		curIdx = (curIdx - 1 + len(visible)) % len(visible)
+		m.Form.ActiveField = visible[curIdx]
 		m.focusFormFields()
 		return m, nil
 	case "left":
@@ -57,7 +73,8 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.CurrentMode = ModeNormal
 			return m, nil
 		}
-		m.Form.ActiveField = (m.Form.ActiveField + 1) % 9
+		curIdx = (curIdx + 1) % len(visible)
+		m.Form.ActiveField = visible[curIdx]
 		m.focusFormFields()
 		return m, nil
 	case "esc":
@@ -97,9 +114,13 @@ func (m *Model) focusFormFields() {
 	case 1:
 		m.Form.DescInput.Focus()
 	case 5:
-		m.Form.StartTimeInput.Focus()
+		if m.Form.IsAnchored {
+			m.Form.StartTimeInput.Focus()
+		}
 	case 6:
-		m.Form.DurationInput.Focus()
+		if m.Form.IsAnchored {
+			m.Form.DurationInput.Focus()
+		}
 	case 7:
 		m.Form.TagsInput.Focus()
 	}
@@ -182,6 +203,8 @@ func (m *Model) submitForm() {
 		newTask.CreatedAt = existingTask.CreatedAt
 		newTask.UpdatedAt = time.Now()
 		newTask.ExecutionMetrics = existingTask.ExecutionMetrics
+		newTask.GCalMetadata = existingTask.GCalMetadata
+		newTask.Notes = existingTask.Notes
 	}
 
 	if anchored {
@@ -206,6 +229,9 @@ func (m *Model) submitForm() {
 
 	if isEdit {
 		m.DB.UpdateTask(newTask)
+		if m.ZenTimer != nil && m.ZenTimer.Task.UUID == newTask.UUID {
+			m.ZenTimer.UpdateTaskDuration(newTask)
+		}
 		m.IsEditing = false
 		m.EditingTaskUUID = ""
 		m.refreshTasks()
@@ -332,4 +358,48 @@ func (m *Model) submitWorkspaceForm() {
 	m.refreshWorkspaces()
 	m.refreshTasks()
 	m.selectDefaultTaskForSelectedDay()
+}
+
+func (m *Model) startEditMode(task model.Task) {
+	m.IsEditing = true
+	m.EditingTaskUUID = task.UUID
+
+	// Pre-fill form fields
+	m.Form.TitleInput.SetValue(task.Title)
+	m.Form.DescInput.SetValue(task.Description)
+	switch task.Priority {
+	case model.P0:
+		m.Form.PriorityIdx = 0
+	case model.P1:
+		m.Form.PriorityIdx = 1
+	case model.P2:
+		m.Form.PriorityIdx = 2
+	case model.P3:
+		m.Form.PriorityIdx = 3
+	}
+
+	m.Form.SPIdx = 2
+	for idx, val := range SPOptions {
+		if val == task.StoryPoints {
+			m.Form.SPIdx = idx
+			break
+		}
+	}
+
+	if task.SchedulingType == model.Anchored {
+		m.Form.IsAnchored = true
+		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
+		durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
+	} else {
+		m.Form.IsAnchored = false
+		m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
+		m.Form.DurationInput.SetValue("60")
+	}
+
+	m.Form.TagsInput.SetValue(strings.Join(task.Tags, ", "))
+
+	m.Form.ActiveField = 0
+	m.focusFormFields()
+	m.CurrentMode = ModeForm
 }

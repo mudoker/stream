@@ -3,6 +3,8 @@ package tui
 import (
 	"testing"
 	"time"
+
+	"stream/internal/model"
 )
 
 func TestPartitionTask(t *testing.T) {
@@ -56,3 +58,111 @@ func TestPartitionTask(t *testing.T) {
 		})
 	}
 }
+
+func TestZenTimerUpdateTaskDuration(t *testing.T) {
+	// Create a Floating task with SP=2 (90 minutes duration)
+	task := model.Task{
+		UUID:        "test-task",
+		Title:       "Test Task",
+		StoryPoints: 2,
+	}
+
+	zt := NewZenTimer(task)
+	// SP=2 is 90 minutes. Partitioned into:
+	// rem=90m. >= 60m => Focus: 50m, Break: 10m. rem=30m.
+	// rem=30m. Not >= 60m, < 60m, >= 30m => Focus: 25m, Break: 5m. rem=0.
+	// Sessions:
+	// 0: Focus, 50m
+	// 1: Break, 10m
+	// 2: Focus, 25m
+	// 3: Break, 5m
+
+	if len(zt.Sessions) != 4 {
+		t.Fatalf("expected 4 sessions, got %d", len(zt.Sessions))
+	}
+
+	// 1. Simulate starting work. Spent 20 minutes in the first session.
+	zt.TimeRemaining = 30 * time.Minute // 50m - 20m spent = 30m remaining
+	zt.TotalDuration = 50 * time.Minute
+
+	// Now increase task duration by editing the task (SP=3, which is 135 minutes)
+	newTask := task
+	newTask.StoryPoints = 3
+
+	zt.UpdateTaskDuration(newTask)
+
+	// Expected new total duration: 135 minutes.
+	// We spent 20 minutes. So 115 minutes remaining to schedule.
+	// Current session has 30m remaining.
+	// subRemaining = 115 - 30 = 85 minutes.
+	// Existing subsequent sessions:
+	// index 1: Break, 10m (10 <= 85 => keep, subRemaining = 75)
+	// index 2: Focus, 25m (25 <= 75 => keep, subRemaining = 50)
+	// index 3: Break, 5m  (5 <= 50  => keep, subRemaining = 45)
+	// We have 45 minutes leftover.
+	// PartitionTask(45m) -> Focus: 40m, Break: 5m.
+	// Total sessions:
+	// 0: Focus, 50m (current, 30m remaining)
+	// 1: Break, 10m
+	// 2: Focus, 25m
+	// 3: Break, 5m
+	// 4: Focus, 40m
+	// 5: Break, 5m
+	if len(zt.Sessions) != 6 {
+		t.Fatalf("expected 6 sessions, got %d", len(zt.Sessions))
+	}
+	if zt.TimeRemaining != 30*time.Minute {
+		t.Errorf("expected TimeRemaining to be preserved at 30m, got %v", zt.TimeRemaining)
+	}
+
+	// 2. Simulate decreasing duration.
+	// Current state:
+	// We spent 20m of the first session.
+	// Total done so far = 20m.
+	// Decrease task duration to 45m (e.g., SP=1, 45m duration).
+	newTask2 := task
+	newTask2.StoryPoints = 1 // 45m
+
+	zt.UpdateTaskDuration(newTask2)
+
+	// newDur = 45m.
+	// elapsedTotal = 20m.
+	// remainingToSchedule = 45 - 20 = 25m.
+	// remainingToSchedule (25m) <= TimeRemaining (30m):
+	// Shorten current session to 20m + 25m = 45m.
+	// TimeRemaining = 25m.
+	// Discard subsequent sessions.
+	if len(zt.Sessions) != 1 {
+		t.Fatalf("expected 1 session after shortening, got %d", len(zt.Sessions))
+	}
+	if zt.Sessions[0].Duration != 45*time.Minute {
+		t.Errorf("expected session 0 duration to be 45m, got %v", zt.Sessions[0].Duration)
+	}
+	if zt.TimeRemaining != 25*time.Minute {
+		t.Errorf("expected TimeRemaining to be 25m, got %v", zt.TimeRemaining)
+	}
+
+	// 3. Simulate decreasing duration below elapsed time.
+	// Current state:
+	// We spent 20m of the first session.
+	// Total done so far = 20m.
+	// Decrease task duration to 15m.
+	// Since 15m <= 20m (elapsedTotal), we truncate the session to what was done (20m) and stop.
+	newTask3 := task
+	newTask3.SchedulingType = model.Anchored
+	newTask3.TimeWindow = model.TimeWindow{
+		Start: time.Now(),
+		End:   time.Now().Add(15 * time.Minute),
+	}
+	zt.UpdateTaskDuration(newTask3)
+	if zt.Sessions[0].Duration != 20*time.Minute {
+		t.Errorf("expected session 0 duration to be truncated to 20m, got %v", zt.Sessions[0].Duration)
+	}
+	if zt.TimeRemaining != 0 {
+		t.Errorf("expected TimeRemaining to be 0, got %v", zt.TimeRemaining)
+	}
+	if zt.Running {
+		t.Errorf("expected ZenTimer to stop running")
+	}
+}
+

@@ -281,6 +281,67 @@ func (zt *ZenTimer) AddTime(d time.Duration) {
 	zt.TotalDuration += d
 }
 
+func (zt *ZenTimer) UpdateTaskDuration(newTask model.Task) {
+	zt.Task = newTask
+	var newDur time.Duration
+	if newTask.SchedulingType == model.Anchored {
+		newDur = newTask.TimeWindow.End.Sub(newTask.TimeWindow.Start)
+	} else {
+		newDur = time.Duration(newTask.StoryPoints) * 45 * time.Minute
+	}
+
+	elapsedTotal := time.Duration(0)
+	for i := 0; i < zt.CurrentSessionIdx; i++ {
+		elapsedTotal += zt.Sessions[i].Duration
+	}
+	elapsedCurrent := zt.TotalDuration - zt.TimeRemaining
+	elapsedTotal += elapsedCurrent
+
+	if newDur <= elapsedTotal {
+		// Truncate current session to what was already done
+		zt.Sessions[zt.CurrentSessionIdx].Duration = elapsedCurrent
+		zt.TotalDuration = elapsedCurrent
+		zt.TimeRemaining = 0
+		zt.Sessions = zt.Sessions[:zt.CurrentSessionIdx+1]
+		zt.Running = false
+		return
+	}
+
+	remainingToSchedule := newDur - elapsedTotal
+	if remainingToSchedule <= zt.TimeRemaining {
+		zt.TimeRemaining = remainingToSchedule
+		zt.TotalDuration = elapsedCurrent + remainingToSchedule
+		zt.Sessions[zt.CurrentSessionIdx].Duration = zt.TotalDuration
+		zt.Sessions = zt.Sessions[:zt.CurrentSessionIdx+1]
+	} else {
+		// Keep current session's remaining time as is
+		subRemaining := remainingToSchedule - zt.TimeRemaining
+		keepCount := zt.CurrentSessionIdx + 1
+
+		for j := zt.CurrentSessionIdx + 1; j < len(zt.Sessions); j++ {
+			if subRemaining <= 0 {
+				break
+			}
+			if zt.Sessions[j].Duration <= subRemaining {
+				subRemaining -= zt.Sessions[j].Duration
+				keepCount++
+			} else {
+				zt.Sessions[j].Duration = subRemaining
+				subRemaining = 0
+				keepCount++
+				break
+			}
+		}
+		zt.Sessions = zt.Sessions[:keepCount]
+
+		if subRemaining > 0 {
+			extraSessions := PartitionTask(subRemaining)
+			zt.Sessions = append(zt.Sessions, extraSessions...)
+		}
+	}
+}
+
+
 var blockDigits3 = map[rune][]string{
 	'0': {
 		"█▀▀▀█",

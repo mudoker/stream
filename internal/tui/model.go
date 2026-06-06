@@ -149,6 +149,13 @@ func NewTaskForm() TaskForm {
 	}
 }
 
+func (f TaskForm) VisibleFields() []int {
+	if f.IsAnchored {
+		return []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
+	}
+	return []int{0, 1, 2, 3, 4, 7, 8}
+}
+
 type WorkspaceForm struct {
 	Name        string
 	Icon        string
@@ -240,6 +247,13 @@ type Model struct {
 	IsEditing            bool
 	EditingTaskUUID      string
 
+	// Quick Anchor State
+	AnchorPromptOpen     bool
+	AnchorPromptTask     model.Task
+	AnchorTimeInput      textinput.Model
+	AnchorDurationInput  textinput.Model
+	AnchorActiveField    int // 0: Start Time, 1: Duration
+
 	// Scrolling & Help View States
 	HelpOpen             bool
 	HelpScrollOffset     int // scroll position inside the help modal
@@ -326,12 +340,25 @@ func (m *Model) cycleFocus() {
 		if m.SidebarFocus {
 			m.SidebarFocus = false
 			m.TodoShelfFocus = false
+			dayTasks := m.getDayTasks()
+			if len(dayTasks) > 0 {
+				m.SelectedTaskUUID = dayTasks[0].UUID
+				m.TimelineHour = dayTasks[0].TimeWindow.Start.Hour()
+			} else {
+				m.SelectedTaskUUID = ""
+			}
 		} else if m.TodoShelfFocus {
 			m.SidebarFocus = true
 			m.TodoShelfFocus = false
 		} else {
 			m.SidebarFocus = false
 			m.TodoShelfFocus = true
+			shelf := m.getTodoShelfTasks()
+			if len(shelf) > 0 {
+				m.SelectedTaskUUID = shelf[0].UUID
+			} else {
+				m.SelectedTaskUUID = ""
+			}
 		}
 	} else {
 		m.SidebarFocus = !m.SidebarFocus

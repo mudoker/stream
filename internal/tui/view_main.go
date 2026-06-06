@@ -119,11 +119,13 @@ func (m Model) View() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.CurrentMode == ModeForm || m.CurrentMode == ModeWorkspaceForm || m.CurrentMode == ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen {
+	if m.CurrentMode == ModeForm || m.CurrentMode == ModeWorkspaceForm || m.CurrentMode == ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen {
 		var modalStr string
 		switch {
 		case m.ConfirmOpen:
 			modalStr = m.renderConfirmModal()
+		case m.AnchorPromptOpen:
+			modalStr = m.renderAnchorPromptModal()
 		case m.CurrentMode == ModeForm:
 			modalStr = m.renderFormModal()
 		case m.CurrentMode == ModeWorkspaceForm:

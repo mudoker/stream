@@ -150,9 +150,13 @@ func (m Model) renderFormModal() string {
 	fields = append(fields, renderDropdown("3", "Priority", priorityValStr, 2))
 	fields = append(fields, renderDropdown("4", "Story Points", spValStr, 3))
 	fields = append(fields, renderDropdown("5", "Anchored", anchoredValStr, 4))
-	fields = append(fields, renderField("6", "Start Time", f.StartTimeInput.View(), 5))
-	fields = append(fields, renderField("7", "Duration (min)", f.DurationInput.View(), 6))
-	fields = append(fields, renderField("8", "Tags (csv)", f.TagsInput.View(), 7))
+	if f.IsAnchored {
+		fields = append(fields, renderField("6", "Start Time", f.StartTimeInput.View(), 5))
+		fields = append(fields, renderField("7", "Duration (min)", f.DurationInput.View(), 6))
+		fields = append(fields, renderField("8", "Tags (csv)", f.TagsInput.View(), 7))
+	} else {
+		fields = append(fields, renderField("6", "Tags (csv)", f.TagsInput.View(), 7))
+	}
 	fields = append(fields, "")
 	fields = append(fields, m.modalSep(innerW))
 	fields = append(fields, "")
@@ -456,6 +460,7 @@ func (m Model) renderHelpModal() string {
 	addSection(&body, "TASK ACTIONS")
 	body = append(body, formatKeyVal("i", "Open task creation form"))
 	body = append(body, formatKeyVal("e", "Edit selected task"))
+	body = append(body, formatKeyVal("a", "Quick anchor / de-anchor task"))
 	body = append(body, formatKeyVal("x", "Complete selected task"))
 	body = append(body, formatKeyVal("d", "Delete selected task"))
 	body = append(body, formatKeyVal("z", "Start / resume Zen session"))
@@ -611,3 +616,33 @@ func (m Model) renderWorkspacePickerModal() string {
 
 	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(lines, "\n"), innerW))
 }
+
+func (m Model) renderAnchorPromptModal() string {
+	const innerW = 46
+	var lines []string
+	lines = append(lines, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("Anchor Task to Timeline"))
+	lines = append(lines, m.modalSep(innerW))
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  Task:  %s", lipgloss.NewStyle().Bold(true).Render(sentenceCase(m.AnchorPromptTask.Title))))
+	lines = append(lines, fmt.Sprintf("  Est:   %d SP (%d mins)", m.AnchorPromptTask.StoryPoints, m.AnchorPromptTask.StoryPoints*45))
+	lines = append(lines, "")
+
+	renderField := func(label string, view string, isActive bool) string {
+		lblStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg)
+		if isActive {
+			lblStyle = lblStyle.Foreground(m.Theme.Accent).Bold(true)
+		}
+		return fmt.Sprintf("  %-16s %s", lblStyle.Render(label), view)
+	}
+
+	lines = append(lines, renderField("Start Time", m.AnchorTimeInput.View(), m.AnchorActiveField == 0))
+	lines = append(lines, renderField("Duration (min)", m.AnchorDurationInput.View(), m.AnchorActiveField == 1))
+
+	lines = append(lines, "")
+	lines = append(lines, m.modalSep(innerW))
+	hint := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("Tab switch  Enter confirm  Esc cancel")
+	lines = append(lines, "  "+hint)
+
+	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(lines, "\n"), innerW))
+}
+

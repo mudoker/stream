@@ -7,6 +7,7 @@ import (
 
 	"stream/internal/model"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -162,6 +163,50 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.CurrentMode = ModeForm
 		m.Form = NewTaskForm()
 		m.Form.TitleInput.Focus()
+		return m, nil
+	case "a":
+		task, exists := m.getActiveTask()
+		if exists {
+			if task.SchedulingType == model.Anchored {
+				// De-anchor
+				task.SchedulingType = model.Floating
+				task.LifecycleState = model.StateReady
+				if m.DB != nil {
+					m.DB.UpdateTask(task)
+					m.refreshTasks()
+				} else {
+					m.updateTaskInMemory(task)
+				}
+				if m.Sync != nil {
+					m.Sync.TriggerSync()
+				}
+				m.StatusMsg = fmt.Sprintf("Task '%s' de-anchored to backlog.", task.Title)
+			} else {
+				// Anchor: open start time prompt
+				m.AnchorPromptTask = task
+				m.AnchorTimeInput = textinput.New()
+				now := time.Now()
+				m.AnchorTimeInput.SetValue(now.Format("15:04"))
+				m.AnchorTimeInput.Focus()
+
+				m.AnchorDurationInput = textinput.New()
+				defaultDur := task.StoryPoints * 45
+				if defaultDur <= 0 {
+					defaultDur = 60
+				}
+				m.AnchorDurationInput.SetValue(strconv.Itoa(defaultDur))
+
+				m.AnchorActiveField = 0
+				m.AnchorPromptOpen = true
+				m.StatusMsg = "Enter start time and duration to anchor task."
+			}
+		}
+		return m, nil
+	case "e":
+		task, exists := m.getActiveTask()
+		if exists {
+			m.startEditMode(task)
+		}
 		return m, nil
 	case "enter":
 		task, exists := m.getActiveTask()
@@ -387,28 +432,41 @@ func (m *Model) handleDayNav(key string) {
 }
 
 func (m *Model) getActiveTask() (model.Task, bool) {
-	if m.SelectedTaskUUID != "" {
-		for _, t := range m.Tasks {
-			if t.UUID == m.SelectedTaskUUID {
-				return t, true
-			}
-		}
-	}
 	if m.CurrentView == DayView {
 		if m.TodoShelfFocus {
 			shelf := m.getTodoShelfTasks()
 			if len(shelf) > 0 {
+				for _, t := range shelf {
+					if t.UUID == m.SelectedTaskUUID {
+						return t, true
+					}
+				}
+				m.SelectedTaskUUID = shelf[0].UUID
 				return shelf[0], true
 			}
 		} else {
 			dayTasks := m.getDayTasks()
 			if len(dayTasks) > 0 {
+				for _, t := range dayTasks {
+					if t.UUID == m.SelectedTaskUUID {
+						return t, true
+					}
+				}
+				m.SelectedTaskUUID = dayTasks[0].UUID
 				return dayTasks[0], true
 			}
 		}
 	} else {
+		if m.SelectedTaskUUID != "" {
+			for _, t := range m.Tasks {
+				if t.UUID == m.SelectedTaskUUID {
+					return t, true
+				}
+			}
+		}
 		dayTasks := m.getDayTasks()
 		if len(dayTasks) > 0 {
+			m.SelectedTaskUUID = dayTasks[0].UUID
 			return dayTasks[0], true
 		}
 	}
@@ -500,6 +558,12 @@ func (m *Model) getDayTasks() []model.Task {
 
 func (m *Model) selectDefaultTaskForSelectedDay() {
 	if m.TodoShelfFocus {
+		shelf := m.getTodoShelfTasks()
+		if len(shelf) > 0 {
+			m.SelectedTaskUUID = shelf[0].UUID
+		} else {
+			m.SelectedTaskUUID = ""
+		}
 		return
 	}
 	dayTasks := m.getDayTasks()
@@ -783,3 +847,15 @@ func (m *Model) updateTaskInMemory(updated model.Task) {
 		}
 	}
 }
+
+func (m *Model) focusAnchorPromptFields() {
+	m.AnchorTimeInput.Blur()
+	m.AnchorDurationInput.Blur()
+
+	if m.AnchorActiveField == 0 {
+		m.AnchorTimeInput.Focus()
+	} else {
+		m.AnchorDurationInput.Focus()
+	}
+}
+

@@ -2,7 +2,7 @@ package tui
 
 import (
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	"stream/internal/model"
@@ -126,6 +126,67 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if m.AnchorPromptOpen {
+			switch msg.String() {
+			case "tab", "down":
+				m.AnchorActiveField = (m.AnchorActiveField + 1) % 2
+				m.focusAnchorPromptFields()
+				return m, nil
+			case "shift+tab", "up":
+				m.AnchorActiveField = (m.AnchorActiveField - 1 + 2) % 2
+				m.focusAnchorPromptFields()
+				return m, nil
+			case "enter":
+				timeStr := m.AnchorTimeInput.Value()
+				hour, min := ParseFlexibleTime(timeStr, 9, 0)
+
+				now := time.Now()
+				startTime := time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), hour, min, 0, 0, now.Location())
+
+				durStr := m.AnchorDurationInput.Value()
+				durationMins := 60
+				if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+					durationMins = d
+				}
+				dur := time.Duration(durationMins) * time.Minute
+
+				t := m.AnchorPromptTask
+				t.SchedulingType = model.Anchored
+				t.TimeWindow = model.TimeWindow{
+					Start: startTime,
+					End:   startTime.Add(dur),
+				}
+				t.LifecycleState = model.StateScheduled
+
+				if m.DB != nil {
+					m.DB.UpdateTask(t)
+					m.refreshTasks()
+				} else {
+					m.updateTaskInMemory(t)
+				}
+				if m.Sync != nil {
+					m.Sync.TriggerSync()
+				}
+
+				m.StatusMsg = fmt.Sprintf("Task '%s' anchored to %s.", t.Title, startTime.Format("15:04"))
+				m.AnchorPromptOpen = false
+				return m, nil
+
+			case "esc":
+				m.AnchorPromptOpen = false
+				m.StatusMsg = "Anchoring canceled."
+				return m, nil
+			}
+
+			var cmd tea.Cmd
+			if m.AnchorActiveField == 0 {
+				m.AnchorTimeInput, cmd = m.AnchorTimeInput.Update(msg)
+			} else {
+				m.AnchorDurationInput, cmd = m.AnchorDurationInput.Update(msg)
+			}
+			return m, cmd
+		}
+
 		if m.PromptOpen {
 			switch msg.String() {
 			case "enter":
@@ -202,48 +263,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ConfirmOpen = true
 				return m, nil
 			case "e":
-				m.IsEditing = true
-				m.EditingTaskUUID = m.DetailTask.UUID
+				m.startEditMode(m.DetailTask)
 				m.DetailOpen = false
-
-				// Pre-fill form fields
-				m.Form.TitleInput.SetValue(m.DetailTask.Title)
-				m.Form.DescInput.SetValue(m.DetailTask.Description)
-				switch m.DetailTask.Priority {
-				case model.P0:
-					m.Form.PriorityIdx = 0
-				case model.P1:
-					m.Form.PriorityIdx = 1
-				case model.P2:
-					m.Form.PriorityIdx = 2
-				case model.P3:
-					m.Form.PriorityIdx = 3
-				}
-
-				m.Form.SPIdx = 2
-				for idx, val := range SPOptions {
-					if val == m.DetailTask.StoryPoints {
-						m.Form.SPIdx = idx
-						break
-					}
-				}
-
-				if m.DetailTask.SchedulingType == model.Anchored {
-					m.Form.IsAnchored = true
-					m.Form.StartTimeInput.SetValue(m.DetailTask.TimeWindow.Start.Format("15:04"))
-					durMins := int(m.DetailTask.TimeWindow.End.Sub(m.DetailTask.TimeWindow.Start).Minutes())
-					m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
-				} else {
-					m.Form.IsAnchored = false
-					m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
-					m.Form.DurationInput.SetValue("60")
-				}
-
-				m.Form.TagsInput.SetValue(strings.Join(m.DetailTask.Tags, ", "))
-
-				m.Form.ActiveField = 0
-				m.focusFormFields()
-				m.CurrentMode = ModeForm
 				return m, nil
 			}
 			return m, nil

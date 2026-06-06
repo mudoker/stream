@@ -173,7 +173,15 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 
 	case "ws-switch":
 		if len(parts) < 2 {
-			m.StatusMsg = "Usage: ws-switch <workspace name>"
+			m.WorkspacePickerIdx = 0
+			for i, ws := range m.Workspaces {
+				if ws.UUID == m.ActiveWorkspaceUUID {
+					m.WorkspacePickerIdx = i
+					break
+				}
+			}
+			m.CurrentMode = ModeWorkspacePicker
+			m.StatusMsg = "Select a workspace to switch to."
 			return m, nil
 		}
 		targetName := strings.Join(parts[1:], " ")

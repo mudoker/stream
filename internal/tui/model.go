@@ -24,12 +24,13 @@ const (
 type UIState string
 
 const (
-	ModeNormal        UIState = "NORMAL"
-	ModeInsert        UIState = "INSERT" // For inline text entry
-	ModeZen           UIState = "ZEN"    // Zen Mode Pomodoro Focus
-	ModeCommand       UIState = "COMMAND"
-	ModeForm          UIState = "WIZARD" // Task Creation Form Wizard
-	ModeWorkspaceForm UIState = "WORKSPACE_WIZARD"
+	ModeNormal          UIState = "NORMAL"
+	ModeInsert          UIState = "INSERT" // For inline text entry
+	ModeZen             UIState = "ZEN"    // Zen Mode Pomodoro Focus
+	ModeCommand         UIState = "COMMAND"
+	ModeForm            UIState = "WIZARD" // Task Creation Form Wizard
+	ModeWorkspaceForm   UIState = "WORKSPACE_WIZARD"
+	ModeWorkspacePicker UIState = "WS_PICKER"
 )
 
 type TickMsg struct {
@@ -239,6 +240,7 @@ type Model struct {
 	ScrollOffset         int
 	ShelfScrollOffset    int
 	CommandSelectedIndex int
+	WorkspacePickerIdx   int
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {

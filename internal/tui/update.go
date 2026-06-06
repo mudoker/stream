@@ -275,6 +275,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ModeWorkspaceForm:
 			return m.handleWorkspaceFormKeys(msg)
 
+		case ModeWorkspacePicker:
+			return m.handleWorkspacePickerKeys(msg)
+
 		case ModeNormal:
 			return m.handleNormalKeys(msg)
 		}

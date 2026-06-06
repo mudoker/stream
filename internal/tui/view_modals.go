@@ -557,3 +557,56 @@ func (m Model) prepareModalContent(content string, innerW int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+func (m Model) renderWorkspacePickerModal() string {
+	const innerW = 46
+	var lines []string
+
+	title := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("Switch Workspace")
+	lines = append(lines, title)
+	lines = append(lines, m.modalSep(innerW))
+	lines = append(lines, "")
+
+	for i, ws := range m.Workspaces {
+		isSelected := i == m.WorkspacePickerIdx
+		isActive := ws.UUID == m.ActiveWorkspaceUUID
+
+		// Pointer/indicator for the selected row in picker
+		pointer := "  "
+		if isSelected {
+			pointer = lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("› ")
+		}
+
+		// Icon + Name + Badge (if any)
+		var badgeStr string
+		if ws.Badge != "" {
+			badgeStr = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf(" [%s]", ws.Badge))
+		}
+
+		wsText := fmt.Sprintf("%s %s%s", ws.Icon, ws.Name, badgeStr)
+
+		// Active workspace indicator
+		activeMarker := ""
+		if isActive {
+			activeMarker = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Render(" ✓")
+		}
+
+		var row string
+		if isSelected {
+			row = pointer + lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(wsText) + activeMarker
+		} else {
+			row = pointer + lipgloss.NewStyle().Foreground(m.Theme.Fg).Render(wsText) + activeMarker
+		}
+
+		lines = append(lines, "  "+row)
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, m.modalSep(innerW))
+	lines = append(lines, "")
+
+	hint := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("↑↓ navigate  ↵ switch  esc cancel")
+	lines = append(lines, "  "+hint)
+
+	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(lines, "\n"), innerW))
+}

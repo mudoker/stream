@@ -115,7 +115,7 @@ func (m Model) View() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.CurrentMode == ModeForm || m.CurrentMode == ModeWorkspaceForm || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen {
+	if m.CurrentMode == ModeForm || m.CurrentMode == ModeWorkspaceForm || m.CurrentMode == ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen {
 		var modalStr string
 		switch {
 		case m.ConfirmOpen:
@@ -124,6 +124,8 @@ func (m Model) View() string {
 			modalStr = m.renderFormModal()
 		case m.CurrentMode == ModeWorkspaceForm:
 			modalStr = m.renderWorkspaceFormModal()
+		case m.CurrentMode == ModeWorkspacePicker:
+			modalStr = m.renderWorkspacePickerModal()
 		case m.PromptOpen:
 			modalStr = m.renderPromptModal()
 		case m.ReviewOpen:
@@ -437,6 +439,8 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 	case ModeForm:
 		modeColor = m.Theme.Accent
 	case ModeWorkspaceForm:
+		modeColor = m.Theme.Accent
+	case ModeWorkspacePicker:
 		modeColor = m.Theme.Accent
 	}
 	modeBadge := lipgloss.NewStyle().Foreground(modeColor).Bold(true).

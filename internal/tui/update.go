@@ -21,7 +21,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case TickMsg:
 		// Tick Zen Timer if active
-		if m.CurrentMode == ModeZen && m.ZenTimer != nil {
+		if m.ZenTimer != nil {
 			finished := m.ZenTimer.Tick()
 			if finished {
 				// Record completion metrics
@@ -32,7 +32,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.DB.UpdateTask(t)
 				m.refreshTasks()
 
-				m.CurrentMode = ModeNormal
+				if m.CurrentMode == ModeZen {
+					m.CurrentMode = ModeNormal
+				}
 				m.StatusMsg = fmt.Sprintf("Completed Focus Session for %s!", t.Title)
 			}
 		}
@@ -67,6 +69,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.ConfirmOpen {
+			switch msg.String() {
+			case "y", "Y":
+				m.DB.DeleteTask(m.ConfirmTask.UUID)
+				m.refreshTasks()
+				m.Sync.TriggerSync()
+				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
+					m.DetailOpen = false
+				}
+				m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", m.ConfirmTask.Title)
+				m.ConfirmOpen = false
+				return m, nil
+			case "n", "N", "esc", "enter":
+				m.ConfirmOpen = false
+				m.StatusMsg = "Deletion canceled."
+				return m, nil
+			}
+			return m, nil
+		}
+
+
+
+
 		if m.HelpOpen {
 			switch msg.String() {
 			case "esc", "enter", "q", " ", "?":
@@ -148,10 +173,50 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.StatusMsg = fmt.Sprintf("Task '%s' completed!", m.DetailTask.Title)
 				return m, nil
 			case "d":
-				m.DB.DeleteTask(m.DetailTask.UUID)
-				m.refreshTasks()
+				m.ConfirmTask = m.DetailTask
+				m.ConfirmOpen = true
+				return m, nil
+			case "e":
+				m.IsEditing = true
+				m.EditingTaskUUID = m.DetailTask.UUID
 				m.DetailOpen = false
-				m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", m.DetailTask.Title)
+
+				// Pre-fill form fields
+				m.Form.TitleInput.SetValue(m.DetailTask.Title)
+				m.Form.DescInput.SetValue(m.DetailTask.Description)
+				switch m.DetailTask.Priority {
+				case model.P0:
+					m.Form.PriorityIdx = 0
+				case model.P1:
+					m.Form.PriorityIdx = 1
+				case model.P2:
+					m.Form.PriorityIdx = 2
+				case model.P3:
+					m.Form.PriorityIdx = 3
+				}
+
+				m.Form.SPIdx = 2
+				for idx, val := range SPOptions {
+					if val == m.DetailTask.StoryPoints {
+						m.Form.SPIdx = idx
+						break
+					}
+				}
+
+				if m.DetailTask.SchedulingType == model.Anchored {
+					m.Form.IsAnchored = true
+					m.Form.StartTimeInput.SetValue(m.DetailTask.TimeWindow.Start.Format("15:04"))
+					durMins := int(m.DetailTask.TimeWindow.End.Sub(m.DetailTask.TimeWindow.Start).Minutes())
+					m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
+				} else {
+					m.Form.IsAnchored = false
+					m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
+					m.Form.DurationInput.SetValue("60")
+				}
+
+				m.Form.ActiveField = 0
+				m.focusFormFields()
+				m.CurrentMode = ModeForm
 				return m, nil
 			}
 			return m, nil
@@ -164,16 +229,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if m.CurrentMode == ModeZen {
-				// Abort session
-				if m.ZenTimer != nil {
-					t := m.ZenTimer.Task
-					t.LifecycleState = model.StatePaused
-					t.ExecutionMetrics.ElapsedFocusSeconds += int((m.ZenTimer.TotalDuration - m.ZenTimer.TimeRemaining).Seconds())
-					m.DB.UpdateTask(t)
-					m.refreshTasks()
-				}
 				m.CurrentMode = ModeNormal
-				m.StatusMsg = "Focus Session aborted."
+				m.StatusMsg = "Focus Session running in background. Press 'z' to return."
 				return m, nil
 			}
 			m.CurrentMode = ModeNormal

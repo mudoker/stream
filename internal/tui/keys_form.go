@@ -14,7 +14,7 @@ import (
 
 var PriorityOptions = []string{"0 (Critical)", "1 (High)", "2 (Medium)", "3 (Low)"}
 var TaskTypeOptions = []string{"Anchored", "Floating", "Reminder"}
-var SPOptions = []int{1, 2, 3, 5, 8, 13}
+var SPOptions = []int{0, 1, 2, 3, 5, 8, 13}
 
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
@@ -49,7 +49,7 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.PriorityIdx = (m.Form.PriorityIdx - 1 + 4) % 4
 			return m, nil
 		case 3:
-			m.Form.SPIdx = (m.Form.SPIdx - 1 + 6) % 6
+			m.Form.SPIdx = (m.Form.SPIdx - 1 + len(SPOptions)) % len(SPOptions)
 			return m, nil
 		case 4:
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx - 1 + len(TaskTypeOptions)) % len(TaskTypeOptions)
@@ -61,7 +61,7 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.PriorityIdx = (m.Form.PriorityIdx + 1) % 4
 			return m, nil
 		case 3:
-			m.Form.SPIdx = (m.Form.SPIdx + 1) % 6
+			m.Form.SPIdx = (m.Form.SPIdx + 1) % len(SPOptions)
 			return m, nil
 		case 4:
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % len(TaskTypeOptions)
@@ -220,6 +220,7 @@ func (m *Model) submitForm() {
 		}
 	} else if taskType == 2 {
 		newTask.SchedulingType = model.Reminder
+		newTask.StoryPoints = 0
 		newTask.TimeWindow = model.TimeWindow{
 			Start: startTime,
 		}

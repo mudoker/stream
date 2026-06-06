@@ -67,28 +67,43 @@ func (m *Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.StatusMsg = fmt.Sprintf("Subtracted %s from countdown.", formatDuration(dur))
 	case "r":
 		// Restart current session block
+		m.ZenTimer.RecordElapsedFocus()
+		if m.DB != nil {
+			m.DB.UpdateTask(m.ZenTimer.Task)
+			m.refreshTasks()
+		}
 		sess := m.ZenTimer.Sessions[m.ZenTimer.CurrentSessionIdx]
 		m.ZenTimer.TimeRemaining = sess.Duration
 		m.ZenTimer.TotalDuration = sess.Duration
 		m.StatusMsg = "Timer RESTARTED"
 	case "q":
 		// Stop/Abort focus session completely
+		m.ZenTimer.RecordElapsedFocus()
 		t := m.ZenTimer.Task
 		t.LifecycleState = model.StateReady
-		m.DB.UpdateTask(t)
-		m.refreshTasks()
+		if m.DB != nil {
+			m.DB.UpdateTask(t)
+			m.refreshTasks()
+		}
 		m.ZenTimer = nil
 		m.CurrentMode = ModeNormal
 		m.StatusMsg = "Timer STOPPED"
 	case "b":
 		// Force Break
+		m.ZenTimer.RecordElapsedFocus()
 		finished := m.ZenTimer.NextSession()
+		if m.DB != nil {
+			m.DB.UpdateTask(m.ZenTimer.Task)
+			m.refreshTasks()
+		}
 		if finished {
 			t := m.ZenTimer.Task
 			t.LifecycleState = model.StateCompleted
-			t.ExecutionMetrics.ElapsedFocusSeconds += int(m.ZenTimer.TotalDuration.Seconds())
-			m.DB.UpdateTask(t)
-			m.refreshTasks()
+			if m.DB != nil {
+				m.DB.UpdateTask(t)
+				m.refreshTasks()
+			}
+			m.ZenTimer = nil
 			m.CurrentMode = ModeNormal
 			m.StatusMsg = "Focus sessions completed!"
 		} else {

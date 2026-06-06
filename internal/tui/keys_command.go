@@ -332,6 +332,7 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 
 	case "stop":
 		if m.ZenTimer != nil {
+			m.ZenTimer.RecordElapsedFocus()
 			t := m.ZenTimer.Task
 			t.LifecycleState = model.StateReady
 			m.DB.UpdateTask(t)

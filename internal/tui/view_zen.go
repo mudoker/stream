@@ -95,7 +95,7 @@ func (m Model) renderZenMode() string {
 	col1W := 44
 	// Row 1
 	r1Part1 := triggerStyle.Render("[ space ]") + descStyle.Render("  Pause / Resume Focus Session")
-	r1Part2 := triggerStyle.Render("[  +  ]") + descStyle.Render("  Add 5 Minutes to Clock")
+	r1Part2 := triggerStyle.Render("[ +/- ]") + descStyle.Render("  Adjust Clock (+/- 30s)")
 	r1Pad := col1W - lipgloss.Width(r1Part1)
 	if r1Pad < 1 {
 		r1Pad = 1

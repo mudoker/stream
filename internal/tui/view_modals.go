@@ -468,7 +468,7 @@ func (m Model) renderHelpModal() string {
 
 	addSection(&body, "ZEN FOCUS MODE")
 	body = append(body, formatKeyVal("Space", "Pause / resume timer"))
-	body = append(body, formatKeyVal("+", "Inject +5 min to session"))
+	body = append(body, formatKeyVal("[x]+ / [x]-", "Adjust timer by +/- 30s (x multiplier)"))
 	body = append(body, formatKeyVal("b", "Skip current block"))
 	body = append(body, formatKeyVal("r", "Restart block timer"))
 	body = append(body, formatKeyVal("Esc", "Exit to background (timer runs)"))

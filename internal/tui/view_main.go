@@ -35,7 +35,7 @@ func (m Model) View() string {
 		cmdPaletteH = lipgloss.Height(cmdPaletteStr)
 	}
 
-	appContentHeight := m.Height - cmdPaletteH
+	appContentHeight := m.Height - cmdPaletteH - 1
 	if appContentHeight < 10 {
 		appContentHeight = 10
 	}
@@ -319,7 +319,6 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 		{"Week Lanes", "󰸶", WeekView},
 		{"Day Timeline", "󰸴", DayView},
 		{"Analytics", "󰄫", AnalyticsView},
-		{"Settings", "⚙️", SettingsView},
 	}
 
 	for _, item := range items {

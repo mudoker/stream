@@ -55,11 +55,7 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		return m, nil
-	case "6":
-		m.CurrentView = SettingsView
-		m.ScrollOffset = 0
-		m.ShelfScrollOffset = 0
-		return m, nil
+
 	case "tab":
 		m.cycleFocus()
 		return m, nil
@@ -294,12 +290,24 @@ func (m *Model) handleDashboardOrAnalyticsNav(key string) {
 			m.DashboardFocusRow = (m.DashboardFocusRow + 1) % 3
 		}
 
-		availH := m.Height - 10
+		availH := m.Height - 11
 		if availH < 10 {
 			availH = 10
 		}
 
-		rowHeights := partitionHeights(availH, 3)
+		var rowHeights []int
+		if availH > 45 {
+			contentH := availH - 6
+			if contentH < 3 {
+				contentH = 3
+			}
+			rowHeights = partitionHeights(contentH, 3)
+			for i := range rowHeights {
+				rowHeights[i] += 2
+			}
+		} else {
+			rowHeights = []int{15, 15, 15}
+		}
 
 		var yStart, yEnd int
 		for i := 0; i < m.DashboardFocusRow; i++ {
@@ -331,14 +339,22 @@ func (m *Model) handleDashboardOrAnalyticsNav(key string) {
 		yStart := m.AnalyticsFocusRow * 13
 		yEnd := (m.AnalyticsFocusRow + 1) * 13
 
-		gridHeight := m.Height - 10
+		gridHeight := m.Height - 11
 		if gridHeight < 10 {
 			gridHeight = 10
 		}
 
+		defaultTotalH := 78
 		rowHeights := make([]int, totalLayers)
-		if gridHeight > totalLayers*13 {
-			rowHeights = partitionHeights(gridHeight, totalLayers)
+		if gridHeight > defaultTotalH {
+			contentH := gridHeight - 12
+			if contentH < 6 {
+				contentH = 6
+			}
+			rowHeights = partitionHeights(contentH, totalLayers)
+			for i := range rowHeights {
+				rowHeights[i] += 2
+			}
 		} else {
 			for i := range rowHeights {
 				rowHeights[i] = 13

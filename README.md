@@ -72,6 +72,7 @@ stream runs a delta-sync daemon that operates offline and syncs local updates ba
 
 All data files reside in ~/.config/stream/:
 * data.json - Local task and calendar database.
+* workspaces.json - Workspace metadata and configuration.
 * ledger.json - Offline transaction ledger logs.
 * credentials.json - Google OAuth2 tokens.
 * client_secrets.json - Google Calendar client credentials.
@@ -82,26 +83,38 @@ All data files reside in ~/.config/stream/:
 
 ### NORMAL Mode
 * 1-5 - Switch views (Dashboard, Month Grid, Week Columns, Day Timeline, Analytics)
-* h / j / k / l - Navigate cells, hours, or backlog tasks
-* Tab - Toggle focus between Day Timeline and Todo Shelf
+* j / k - Navigate selected task vertically
+* h / l - Navigate overlapping tasks horizontally
+* J / K - Scroll timeline hours up / down
+* H / L - Switch days backward / forward
+* t - Jump back to today
+* Tab - Toggle focus between Sidebar, Day Timeline, and Todo Shelf
 * i - Open Task Creation Wizard
-* z - Launch selected task in Zen Mode Focus Session
+* z - Start selected task focus session or resume a background session
 * Enter - Slide out detailed task inspector panel
+* e - Edit the selected task (from Detail Inspector)
 * x - Complete selected task
-* d - Delete selected task
+* d - Delete selected task (triggers confirmation dialog)
 * : - Open Command Palette
 
-### WIZARD Mode
+### WIZARD Mode (Task Form)
 * Tab / Down - Move to next field
 * Shift+Tab / Up - Move to previous field
-* Enter - Advance or submit
+* Left / Right / Space - Cycle selection on dropdown fields (Priority, Story Points, Anchored)
+* Enter - Advance fields or submit
 * Esc - Dismiss wizard
+
+### WORKSPACE_WIZARD Mode (Workspace Form)
+* Tab / Down - Move to next field
+* Shift+Tab / Up - Move to previous field
+* Enter - Advance fields or submit
+* Esc - Dismiss workspace wizard
 
 ### ZEN Mode
 * Space - Pause / Resume countdown timer
 * + - Inject +5 minutes to active focus session
 * b - Skip current focus/break block
-* Esc - Terminate focus session early
+* Esc - Exit focus mode screen (timer continues running in background)
 
 ---
 
@@ -109,7 +122,12 @@ All data files reside in ~/.config/stream/:
 
 * :create <title> - Create fixed scheduled task for today at 9:00 AM.
 * :todo <title> - Create unscheduled floating task on Todo Shelf.
+* :ws-create - Create a new workspace.
+* :ws-edit - Edit the active workspace's name, icon, and badge.
+* :ws-delete [name] - Delete active workspace (or workspace with specified name) and all its tasks.
+* :ws-switch <name> - Switch active workspace view.
 * :review - Open Daily Shutdown Review to defer unfinished tasks.
 * :sync - Force run the Google Calendar sync daemon.
 * :auth - Launch authorization callback server.
+* :stop - Stop / Abort active Zen focus session.
 * :quit / :q - Exit stream.

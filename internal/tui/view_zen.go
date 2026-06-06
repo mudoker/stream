@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"stream/internal/model"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -31,6 +33,24 @@ func (m Model) renderZenMode() string {
 	weightStr := fmt.Sprintf("%d SP", t.StoryPoints)
 	dateStr := time.Now().Format("Monday, January 2")
 	metaText := fmt.Sprintf("  Priority: %s  •  Weight: %s  •  Date: %s", priorityStr, weightStr, dateStr)
+
+	// Current Time + Upcoming Task (Subtle context)
+	currentTimeStr := time.Now().Format("15:04:05")
+	upcomingStr := "None"
+	if upTask, upExists := m.getUpcomingTask(); upExists {
+		titleText := sentenceCase(upTask.Title)
+		if upTask.SchedulingType == model.Anchored {
+			upcomingStr = fmt.Sprintf("%s (%s)", titleText, upTask.TimeWindow.Start.Format("15:04"))
+		} else {
+			upcomingStr = fmt.Sprintf("%s (Backlog)", titleText)
+		}
+	}
+	clockLabel := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("Time: ")
+	clockVal := lipgloss.NewStyle().Foreground(m.Theme.Fg).Render(currentTimeStr)
+	nextLabel := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  •  Upcoming: ")
+	nextVal := lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(upcomingStr)
+	upcomingText := "  " + clockLabel + clockVal + nextLabel + nextVal
+
 	bottomDivider := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", m.Width))
 
 	// 2. Large Clock (5-row solid block characters clock)
@@ -126,16 +146,16 @@ func (m Model) renderZenMode() string {
 
 	// 7. Dynamic Height Padding
 	// Components height:
-	// Ribbon: 3 rows (topDivider, metaText, bottomDivider)
+	// Ribbon: 4 rows (topDivider, metaText, upcomingText, bottomDivider)
 	// Clock: 5 rows (using the 5-row solid font)
 	// Session Badge Box: 3 rows (border top/bottom + text)
 	// Progress Bar: 1 row
 	// Data Deck: 1 row
 	// Footer: 3 rows (space, b, q)
 	// Fixed spacing: 2 blank rows below clock block to badge
-	// Total component height = 3 + 5 + 3 + 1 + 1 + 3 = 16 rows.
-	// Plus 2 fixed spacing rows = 18 rows.
-	remHeight := m.Height - 18
+	// Total component height = 4 + 5 + 3 + 1 + 1 + 3 = 17 rows.
+	// Plus 2 fixed spacing rows = 19 rows.
+	remHeight := m.Height - 19
 	if remHeight < 0 {
 		remHeight = 0
 	}
@@ -158,6 +178,7 @@ func (m Model) renderZenMode() string {
 	// Ribbon Header
 	sb = append(sb, topDivider)
 	sb = append(sb, metaText)
+	sb = append(sb, upcomingText)
 	sb = append(sb, bottomDivider)
 
 	// Spacer 1
@@ -207,3 +228,44 @@ func centerMultiLine(s string, width int) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+func (m *Model) getUpcomingTask() (model.Task, bool) {
+	now := time.Now()
+	var candidates []model.Task
+	for _, t := range m.Tasks {
+		if t.SchedulingType == model.Anchored && t.LifecycleState != model.StateCompleted {
+			if t.TimeWindow.Start.After(now) {
+				candidates = append(candidates, t)
+			}
+		}
+	}
+
+	if len(candidates) > 0 {
+		sortTasksByStartAsc(candidates)
+		return candidates[0], true
+	}
+
+	shelf := m.getTodoShelfTasks()
+	if len(shelf) > 0 {
+		activeTask, activeExists := m.getActiveTask()
+		for _, t := range shelf {
+			if activeExists && t.UUID == activeTask.UUID {
+				continue
+			}
+			return t, true
+		}
+	}
+
+	return model.Task{}, false
+}
+
+func sortTasksByStartAsc(tasks []model.Task) {
+	for i := 0; i < len(tasks); i++ {
+		for j := i + 1; j < len(tasks); j++ {
+			if tasks[j].TimeWindow.Start.Before(tasks[i].TimeWindow.Start) {
+				tasks[i], tasks[j] = tasks[j], tasks[i]
+			}
+		}
+	}
+}
+

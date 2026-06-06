@@ -170,10 +170,7 @@ func (m Model) renderPanel(title string, lines []string, w, h int, borderCol lip
 		if rawW < innerW {
 			contentLines[i] = line + strings.Repeat(" ", innerW-rawW)
 		} else if rawW > innerW {
-			runes := []rune(line)
-			if len(runes) > innerW {
-				contentLines[i] = string(runes[:innerW])
-			}
+			contentLines[i] = sliceAnsi(line, 0, innerW)
 		}
 	}
 

@@ -71,12 +71,58 @@ func (m *Model) autoScrollToSelectedTask() {
 	if m.SelectedTaskUUID == "" {
 		return
 	}
+	var selectedTask model.Task
+	found := false
 	for _, t := range m.Tasks {
 		if t.UUID == m.SelectedTaskUUID && t.SchedulingType == model.Anchored {
-			m.TimelineHour = t.TimeWindow.Start.Hour()
+			selectedTask = t
+			found = true
 			break
 		}
 	}
+	if !found {
+		return
+	}
+
+	startRow := timeToRow(selectedTask.TimeWindow.Start)
+	durationMinutes := int(selectedTask.TimeWindow.End.Sub(selectedTask.TimeWindow.Start).Minutes())
+	h := (durationMinutes * rowsPerHour + 59) / 60
+	if startRow+h > totalRows {
+		h = totalRows - startRow
+	}
+	if h < 1 {
+		h = 1
+	}
+
+	appContentHeight := m.Height
+	visibleH := appContentHeight - 4
+	if visibleH < 8 {
+		visibleH = 8
+	}
+
+	centerRow := m.TimelineHour * rowsPerHour
+	startR := centerRow - visibleH/2
+
+	if h >= visibleH {
+		startR = startRow
+	} else {
+		if startRow < startR {
+			startR = startRow
+		}
+		if startRow+h > startR+visibleH {
+			startR = startRow + h - visibleH
+		}
+	}
+
+	newCenterRow := startR + visibleH/2
+	if newCenterRow < 0 {
+		newCenterRow = 0
+	}
+	if newCenterRow >= totalRows {
+		newCenterRow = totalRows - 1
+	}
+
+	m.TimelineHour = newCenterRow / rowsPerHour
 }
 
 func (m *Model) navigateVertical(dir int) {

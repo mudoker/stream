@@ -84,63 +84,69 @@ func (m Model) renderDashboard(height int) string {
 	leftColW := (workspaceWidth * 5) / 10
 	rightColW := workspaceWidth - leftColW
 
-	// Choose Layout based on dimensions
-	var leftPanels []string
-	var rightPanels []string
-
-	isSmall := height < 28 || workspaceWidth < 80
-	isMedium := !isSmall && height < 36
-	isLarge := !isSmall && !isMedium && height < 46
-
-	if isSmall {
-		leftPanels = append(leftPanels, m.renderAgendaPanel(leftColW, availH))
-		rightPanels = append(rightPanels, m.renderCapacityPanel(rightColW, availH))
-	} else if isMedium {
-		leftHeights := partitionHeights(availH, 2)
-		leftPanels = append(leftPanels,
-			m.renderAgendaPanel(leftColW, leftHeights[0]),
-			m.renderUpcomingPanel(leftColW, leftHeights[1]),
-		)
-		rightHeights := partitionHeights(availH, 2)
-		rightPanels = append(rightPanels,
-			m.renderCapacityPanel(rightColW, rightHeights[0]),
-			m.renderTelemetryPanel(rightColW, rightHeights[1]),
-		)
-	} else if isLarge {
-		leftHeights := partitionHeights(availH, 2)
-		leftPanels = append(leftPanels,
-			m.renderAgendaPanel(leftColW, leftHeights[0]),
-			m.renderUpcomingPanel(leftColW, leftHeights[1]),
-		)
-		rightHeights := partitionHeights(availH, 3)
-		rightPanels = append(rightPanels,
-			m.renderCapacityPanel(rightColW, rightHeights[0]),
-			m.renderBacklogHealthPanel(rightColW, rightHeights[1]),
-			m.renderTelemetryPanel(rightColW, rightHeights[2]),
-		)
+	// Choose Layout heights
+	var leftHeights []int
+	var rightHeights []int
+	
+	defaultH := 45 // default detailed height
+	if availH > defaultH {
+		// Stretch dynamically to fill height
+		leftHeights = partitionHeights(availH, 3)
+		rightHeights = partitionHeights(availH, 3)
 	} else {
-		leftHeights := partitionHeights(availH, 3)
-		leftPanels = append(leftPanels,
-			m.renderAgendaPanel(leftColW, leftHeights[0]),
-			m.renderUpcomingPanel(leftColW, leftHeights[1]),
-			m.renderRecentActivityPanel(leftColW, leftHeights[2]),
-		)
-		rightHeights := partitionHeights(availH, 3)
-		rightPanels = append(rightPanels,
-			m.renderCapacityPanel(rightColW, rightHeights[0]),
-			m.renderBacklogHealthPanel(rightColW, rightHeights[1]),
-			m.renderTelemetryPanel(rightColW, rightHeights[2]),
-		)
+		// Use fixed detailed heights
+		leftHeights = []int{15, 15, 15}
+		rightHeights = []int{11, 17, 17}
 	}
+
+	var leftPanels []string
+	leftPanels = append(leftPanels,
+		m.renderAgendaPanel(leftColW, leftHeights[0]),
+		m.renderUpcomingPanel(leftColW, leftHeights[1]),
+		m.renderRecentActivityPanel(leftColW, leftHeights[2]),
+	)
+
+	var rightPanels []string
+	rightPanels = append(rightPanels,
+		m.renderCapacityPanel(rightColW, rightHeights[0]),
+		m.renderBacklogHealthPanel(rightColW, rightHeights[1]),
+		m.renderTelemetryPanel(rightColW, rightHeights[2]),
+	)
 
 	leftJoined := lipgloss.JoinVertical(lipgloss.Left, leftPanels...)
 	rightJoined := lipgloss.JoinVertical(lipgloss.Left, rightPanels...)
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, leftJoined, rightJoined)
 
+	// Slice/crop the columns to exactly availH
+	gridLines := strings.Split(columns, "\n")
+	maxScroll := len(gridLines) - availH
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	if m.ScrollOffset > maxScroll {
+		m.ScrollOffset = maxScroll
+	}
+	if m.ScrollOffset < 0 {
+		m.ScrollOffset = 0
+	}
+
+	endIdx := m.ScrollOffset + availH
+	if endIdx > len(gridLines) {
+		endIdx = len(gridLines)
+	}
+	visibleGridLines := gridLines[m.ScrollOffset : endIdx]
+	
+	// Pad if needed to prevent terminal jitter
+	for len(visibleGridLines) < availH {
+		visibleGridLines = append(visibleGridLines, strings.Repeat(" ", workspaceWidth))
+	}
+	
+	visibleGrid := strings.Join(visibleGridLines, "\n")
+
 	var out strings.Builder
 	out.WriteString(headerLine + "\n\n")
 	out.WriteString(bannerContainer + "\n\n")
-	out.WriteString(columns)
+	out.WriteString(visibleGrid)
 
 	return out.String()
 }

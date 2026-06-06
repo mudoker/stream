@@ -50,21 +50,21 @@ func (m Model) renderAnalyticsView(height int) string {
 		gridHeight = 10
 	}
 
-	// Determine number of layers (rows of quadrants) dynamically based on height
-	numRows := 1
-	if height >= 28 && height < 38 {
-		numRows = 2
-	} else if height >= 38 && height < 48 {
-		numRows = 3
-	} else if height >= 48 && height < 58 {
-		numRows = 4
-	} else if height >= 58 && height < 68 {
-		numRows = 5
-	} else if height >= 68 {
-		numRows = 6
-	}
+	// Always render all 6 layers (12 quadrants). If gridHeight is taller than total,
+	// stretch them. Otherwise, use fixed detailed heights and scroll.
+	totalLayers := 6
+	defaultRowH := 13
+	defaultTotalH := totalLayers * defaultRowH
 
-	rowHeights := partitionHeights(gridHeight, numRows)
+	var rowHeights []int
+	if gridHeight > defaultTotalH {
+		rowHeights = partitionHeights(gridHeight, totalLayers)
+	} else {
+		rowHeights = make([]int, totalLayers)
+		for i := 0; i < totalLayers; i++ {
+			rowHeights[i] = defaultRowH
+		}
+	}
 
 	quadWidth := workspaceWidth / 2
 	leftQW := quadWidth
@@ -72,7 +72,7 @@ func (m Model) renderAnalyticsView(height int) string {
 
 	var gridRows []string
 
-	for r := 0; r < numRows; r++ {
+	for r := 0; r < totalLayers; r++ {
 		h := rowHeights[r]
 		var leftPanel string
 		var rightPanel string
@@ -104,10 +104,35 @@ func (m Model) renderAnalyticsView(height int) string {
 
 	grid := lipgloss.JoinVertical(lipgloss.Left, gridRows...)
 
+	// Slice/crop the grid vertically
+	gridLines := strings.Split(grid, "\n")
+	maxScroll := len(gridLines) - gridHeight
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	if m.ScrollOffset > maxScroll {
+		m.ScrollOffset = maxScroll
+	}
+	if m.ScrollOffset < 0 {
+		m.ScrollOffset = 0
+	}
+
+	endIdx := m.ScrollOffset + gridHeight
+	if endIdx > len(gridLines) {
+		endIdx = len(gridLines)
+	}
+	visibleGridLines := gridLines[m.ScrollOffset : endIdx]
+
+	for len(visibleGridLines) < gridHeight {
+		visibleGridLines = append(visibleGridLines, strings.Repeat(" ", workspaceWidth))
+	}
+
+	visibleGrid := strings.Join(visibleGridLines, "\n")
+
 	var out strings.Builder
 	out.WriteString(headerLine + "\n\n")
 	out.WriteString(bannerContainer + "\n\n")
-	out.WriteString(grid)
+	out.WriteString(visibleGrid)
 
 	return out.String()
 }

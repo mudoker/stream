@@ -215,9 +215,22 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.handleWeekNav(key)
 	case DayView:
 		m.handleDayNav(key)
+	case DashboardView, AnalyticsView:
+		m.handleDashboardOrAnalyticsNav(key)
 	}
 
 	return m, nil
+}
+
+func (m *Model) handleDashboardOrAnalyticsNav(key string) {
+	switch key {
+	case "j", "down":
+		m.ScrollOffset++
+	case "k", "up":
+		if m.ScrollOffset > 0 {
+			m.ScrollOffset--
+		}
+	}
 }
 
 func (m *Model) handleMonthNav(key string) {

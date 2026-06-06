@@ -219,66 +219,97 @@ func (m Model) renderWorkspaceFormModal() string {
 func (m Model) renderCommandPalette() string {
 	var sb strings.Builder
 
-	// Top/bottom inner padding on the query input area
+	divColor := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37"))
+	mutedStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
+	innerW := m.Width - 8
+
+	// ── Input area ────────────────────────────────────────────────────────
 	inputStyle := lipgloss.NewStyle().Padding(1, 2)
 	sb.WriteString(inputStyle.Render(m.CommandInput.View()) + "\n")
-	sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", m.Width-8)) + "\n\n")
+	sb.WriteString(divColor.Render(strings.Repeat("─", innerW)) + "\n\n")
 
-	// Section Tag (40% Opacity, Unbolded)
-	sb.WriteString("  " + lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("COMMANDS") + "\n\n")
-
+	// ── Filter both static + dynamic entries ──────────────────────────────
 	val := strings.ToLower(m.CommandInput.Value())
-	var filtered []CommandEntry
-	for _, c := range DefaultCommands {
-		if strings.Contains(c.Name, val) {
-			filtered = append(filtered, c)
+	allCommands := m.getCommandList()
+
+	// Split workspace-switch entries out into their own group
+	var genericEntries []CommandEntry
+	var wsEntries []CommandEntry
+	for _, c := range allCommands {
+		if strings.HasPrefix(c.Name, "ws-switch ") {
+			wsEntries = append(wsEntries, c)
+		} else {
+			genericEntries = append(genericEntries, c)
 		}
 	}
+
+	filterGroup := func(src []CommandEntry) []CommandEntry {
+		var out []CommandEntry
+		for _, c := range src {
+			if strings.Contains(strings.ToLower(c.Name), val) ||
+				strings.Contains(strings.ToLower(c.Desc), val) {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+	filteredGeneric := filterGroup(genericEntries)
+	filteredWS := filterGroup(wsEntries)
+	totalEntries := len(filteredGeneric) + len(filteredWS)
 
 	// Clamp selected index
 	selIdx := m.CommandSelectedIndex
 	if selIdx < 0 {
 		selIdx = 0
 	}
-	if len(filtered) > 0 && selIdx >= len(filtered) {
-		selIdx = len(filtered) - 1
+	if totalEntries > 0 && selIdx >= totalEntries {
+		selIdx = totalEntries - 1
 	}
 
-	// Calculate container inner width
-	innerW := m.Width - 8
-
-	for idx, c := range filtered {
-		isSelected := idx == selIdx
-
-		var line string
+	nameW := 26 // wide enough for "ws-switch <long-name>"
+	renderRow := func(globalIdx int, c CommandEntry) string {
+		isSelected := globalIdx == selIdx
 		if isSelected {
 			indicator := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("┃")
-			keywordStyle := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true)
-			descStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true)
-			keyword := keywordStyle.Render(fmt.Sprintf("%-10s", c.Name))
-			desc := descStyle.Render(c.Desc)
-
-			rowText := fmt.Sprintf("%s  %s  %s", indicator, keyword, desc)
-			line = lipgloss.NewStyle().
-				Width(innerW).
-				Render(rowText)
-		} else {
-			keywordStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg)
-			descStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
-			keyword := keywordStyle.Render(fmt.Sprintf("%-10s", c.Name))
-			desc := descStyle.Render(c.Desc)
-
-			rowText := fmt.Sprintf("   %s  %s", keyword, desc)
-			line = lipgloss.NewStyle().
-				Width(innerW).
-				Render(rowText)
+			keyword := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).
+				Render(fmt.Sprintf("%-*s", nameW, c.Name))
+			desc := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(c.Desc)
+			return lipgloss.NewStyle().Width(innerW).
+				Render(fmt.Sprintf("%s  %s  %s", indicator, keyword, desc))
 		}
-		sb.WriteString(line + "\n")
+		keyword := lipgloss.NewStyle().Foreground(m.Theme.Fg).
+			Render(fmt.Sprintf("%-*s", nameW, c.Name))
+		desc := mutedStyle.Render(c.Desc)
+		return lipgloss.NewStyle().Width(innerW).
+			Render(fmt.Sprintf("   %s  %s", keyword, desc))
 	}
 
-	sb.WriteString("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", m.Width-8)) + "\n")
-	footerTip := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  💡 Use ↑↓ to navigate • ↵ to execute • esc to close")
-	sb.WriteString(footerTip + "\n")
+	// ── COMMANDS section ───────────────────────────────────────────────────
+	if len(filteredGeneric) > 0 {
+		sb.WriteString("  " + mutedStyle.Render("COMMANDS") + "\n\n")
+		for i, e := range filteredGeneric {
+			sb.WriteString(renderRow(i, e) + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	// ── SWITCH WORKSPACE section ───────────────────────────────────────────
+	if len(filteredWS) > 0 {
+		sb.WriteString("  " + mutedStyle.Render("SWITCH WORKSPACE") + "\n\n")
+		base := len(filteredGeneric)
+		for i, e := range filteredWS {
+			sb.WriteString(renderRow(base+i, e) + "\n")
+		}
+		sb.WriteString("\n")
+	}
+
+	if totalEntries == 0 {
+		sb.WriteString("  " + mutedStyle.Render("No matching commands") + "\n\n")
+	}
+
+	// ── Footer ────────────────────────────────────────────────────────────
+	sb.WriteString(divColor.Render(strings.Repeat("─", innerW)) + "\n")
+	sb.WriteString(mutedStyle.Render("  ↑↓ navigate  ↵ execute  esc close  w/W quick-switch") + "\n")
 
 	return lipgloss.NewStyle().
 		Foreground(m.Theme.Fg).
@@ -288,6 +319,7 @@ func (m Model) renderCommandPalette() string {
 		Padding(0, 2).
 		Render(sb.String())
 }
+
 
 func (m Model) renderPromptModal() string {
 	const innerW = 46

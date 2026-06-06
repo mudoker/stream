@@ -33,6 +33,8 @@ var DefaultCommands = []CommandEntry{
 	{"ws-create", "Create a new workspace"},
 	{"ws-edit", "Edit active workspace"},
 	{"ws-delete", "Delete active workspace or specify name"},
+	{"ws-switch", "Switch to a workspace by name (type: ws-switch <name>)"},
+	{"help", "Open command reference / help"},
 	{"quit", "Exit stream"},
 }
 

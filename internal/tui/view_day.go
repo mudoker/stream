@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	rowsPerHour  = 4  // 15-minute slots per hour
-	totalRows    = 96 // 24h * 4 rows
+	rowsPerHour  = 12 // 12 slots per hour (5-minute precision)
+	totalRows    = 288 // 24h * 12 rows
 	gutterWidth  = 11 // " HH:MM ───┼" timestamp gutter
 )
 
@@ -169,7 +169,7 @@ func (m Model) renderDayTimeline(appContentHeight int) string {
 	for _, rc := range cols {
 		startRow := timeToRow(rc.Task.TimeWindow.Start)
 		durationMinutes := int(rc.Task.TimeWindow.End.Sub(rc.Task.TimeWindow.Start).Minutes())
-		h := (durationMinutes + 14) / 15
+		h := (durationMinutes * rowsPerHour + 59) / 60
 		if startRow+h > totalRows {
 			h = totalRows - startRow
 		}
@@ -241,10 +241,10 @@ func (m Model) buildNowLine(width int, now time.Time) string {
 		Render(badge + rest)
 }
 
-// timeToRow converts a time.Time to its 15-minute row index (0–95) in local time.
+// timeToRow converts a time.Time to its local day row index (0 to totalRows-1).
 func timeToRow(t time.Time) int {
 	local := t.Local()
-	return (local.Hour() * rowsPerHour) + (local.Minute() / 15)
+	return (local.Hour() * rowsPerHour) + (local.Minute() * rowsPerHour / 60)
 }
 
 // sameDay returns true if a and b are on the same calendar day in local time.

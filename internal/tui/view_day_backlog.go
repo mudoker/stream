@@ -83,8 +83,11 @@ func (m Model) renderTodoShelf(appContentHeight int) string {
 			}
 
 			title := sentenceCase(t.Title)
-			// Truncate to fit innerW minus checkbox and padding
-			maxTitleW := innerW - 5
+			// Truncate title to fit innerW minus checkbox and indicator
+			// Indicator is "▶ " (length 2) or "  " (length 2).
+			// Checkbox is " [ ] " (length 5).
+			// So total prefix is 7 characters.
+			maxTitleW := innerW - 7
 			if len([]rune(title)) > maxTitleW {
 				if maxTitleW > 2 {
 					title = string([]rune(title)[:maxTitleW-1]) + "…"
@@ -93,17 +96,64 @@ func (m Model) renderTodoShelf(appContentHeight int) string {
 				}
 			}
 
-			line := fmt.Sprintf(" %s %s", chk, title)
-			var itemStyle lipgloss.Style
+			// Prefix
+			prefix := "  "
 			if isSelected {
-				itemStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff8700")).Bold(true)
-			} else {
-				itemStyle = lipgloss.NewStyle().Foreground(g.color)
+				prefix = "▶ "
 			}
-			rows = append(rows, itemStyle.Width(innerW).Render(line))
+
+			titleLine := fmt.Sprintf("%s%s %s", prefix, chk, title)
+
+			// Build detail line: SP + Tags
+			var details []string
+			details = append(details, fmt.Sprintf("%d SP", t.StoryPoints))
+			if len(t.Tags) > 0 {
+				details = append(details, strings.Join(t.Tags, ", "))
+			}
+			detailStr := strings.Join(details, " • ")
+			// Truncate detailStr to fit innerW minus 5 indentation spaces
+			maxDetailW := innerW - 5
+			if len([]rune(detailStr)) > maxDetailW {
+				if maxDetailW > 2 {
+					detailStr = string([]rune(detailStr)[:maxDetailW-1]) + "…"
+				} else {
+					detailStr = string([]rune(detailStr)[:maxDetailW])
+				}
+			}
+			detailLine := "     " + detailStr
+
+			var titleStyle, detailStyle lipgloss.Style
+			if isSelected {
+				titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff8700")).Bold(true)
+				detailStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffaa44"))
+			} else {
+				titleStyle = lipgloss.NewStyle().Foreground(g.color)
+				detailStyle = lipgloss.NewStyle().Foreground(m.Theme.Muted)
+			}
+
+			rows = append(rows, titleStyle.Render(titleLine))
+			if detailStr != "" {
+				rows = append(rows, detailStyle.Render(detailLine))
+			}
+
+			// Add description snippet if it is selected and has a description
+			if isSelected && t.Description != "" {
+				desc := t.Description
+				// Truncate desc to fit innerW - 5
+				maxDescW := innerW - 5
+				if len([]rune(desc)) > maxDescW {
+					if maxDescW > 2 {
+						desc = string([]rune(desc)[:maxDescW-1]) + "…"
+					} else {
+						desc = string([]rune(desc)[:maxDescW])
+					}
+				}
+				descLine := "     " + lipgloss.NewStyle().Italic(true).Render(desc)
+				rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(descLine))
+			}
+
+			rows = append(rows, "")
 		}
-		// Add a blank row only after the section to separate them
-		rows = append(rows, "")
 	}
 
 	if !hasAny {

@@ -496,7 +496,7 @@ func (m *Model) getActiveTask() (model.Task, bool) {
 func (m *Model) getTodoShelfTasks() []model.Task {
 	var shelf []model.Task
 	for _, t := range m.Tasks {
-		if t.SchedulingType == model.Floating && t.LifecycleState != model.StateCompleted {
+		if (t.SchedulingType == model.Floating || t.SchedulingType == model.Reminder) && t.LifecycleState != model.StateCompleted {
 			shelf = append(shelf, t)
 		}
 	}
@@ -878,4 +878,3 @@ func (m *Model) focusAnchorPromptFields() {
 		m.AnchorDurationInput.Focus()
 	}
 }
-

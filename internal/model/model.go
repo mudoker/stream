@@ -18,6 +18,7 @@ type SchedulingType string
 const (
 	Anchored  SchedulingType = "ANCHORED"  // Fixed time block
 	Floating  SchedulingType = "FLOATING"  // Todo Shelf/unscheduled
+	Reminder  SchedulingType = "REMINDER"  // Reminder with due time
 	Recurring SchedulingType = "RECURRING" // Recurring task template
 )
 
@@ -104,4 +105,3 @@ type UserSettings struct {
 	PasswordHash       string `json:"password_hash"`
 	LockTimeoutMinutes int    `json:"lock_timeout_minutes"`
 }
-

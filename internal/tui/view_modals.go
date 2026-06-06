@@ -227,33 +227,20 @@ func (m Model) renderFormModal() string {
 
 	priorityValStr := PriorityOptions[f.PriorityIdx]
 	spValStr := fmt.Sprintf("%d", SPOptions[f.SPIdx])
+	typeValStr := TaskTypeOptions[f.TaskTypeIdx]
 
 	fields = append(fields, renderField("1", "Title", f.TitleInput.View(), 0))
 	fields = append(fields, renderField("2", "Description", f.DescInput.View(), 1))
 	fields = append(fields, renderDropdown("3", "Priority", priorityValStr, 2))
 	fields = append(fields, renderDropdown("4", "Story Points", spValStr, 3))
-	// Radio button row for Anchored toggle
-	{
-		numStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("5")
-		lblStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg)
-		if f.ActiveField == 4 {
-			lblStyle = lblStyle.Foreground(m.Theme.Accent).Bold(true)
-		}
-		var anchOpt, floatOpt string
-		if f.IsAnchored {
-			anchOpt = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("◉ Anchored")
-			floatOpt = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("◎ Floating")
-		} else {
-			anchOpt = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("◎ Anchored")
-			floatOpt = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("◉ Floating")
-		}
-		sep := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  /  ")
-		fields = append(fields, fmt.Sprintf("  %s  %-16s %s%s%s", numStyle, lblStyle.Render("Schedule"), anchOpt, sep, floatOpt))
-	}
-	if f.IsAnchored {
+	fields = append(fields, renderDropdown("5", "Type", typeValStr, 4))
+	if f.TaskTypeIdx == 0 {
 		fields = append(fields, renderField("6", "Start Time", f.StartTimeInput.View(), 5))
 		fields = append(fields, renderField("7", "Duration (min)", f.DurationInput.View(), 6))
 		fields = append(fields, renderField("8", "Tags (csv)", f.TagsInput.View(), 7))
+	} else if f.TaskTypeIdx == 2 {
+		fields = append(fields, renderField("6", "Due Time", f.StartTimeInput.View(), 5))
+		fields = append(fields, renderField("7", "Tags (csv)", f.TagsInput.View(), 7))
 	} else {
 		fields = append(fields, renderField("6", "Tags (csv)", f.TagsInput.View(), 7))
 	}
@@ -420,23 +407,30 @@ func (m Model) renderCommandPalette() string {
 		Foreground(m.Theme.Fg).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(m.Theme.Accent).
-		Width(m.Width - 4).
+		Width(m.Width-4).
 		Padding(0, 2).
 		Render(sb.String())
 }
 
-
 func (m Model) renderPromptModal() string {
 	const innerW = 46
 	var lines []string
-	lines = append(lines, lipgloss.NewStyle().Foreground(m.Theme.P1Color).Bold(true).Render("Task Ready for Focus"))
+	title := "Task Ready for Focus"
+	if m.PromptTask.SchedulingType == model.Reminder {
+		title = "Reminder Due"
+	}
+	lines = append(lines, lipgloss.NewStyle().Foreground(m.Theme.P1Color).Bold(true).Render(title))
 	lines = append(lines, m.modalSep(innerW))
 	lines = append(lines, "")
 	lines = append(lines, fmt.Sprintf("  %s", lipgloss.NewStyle().Bold(true).Render(sentenceCase(m.PromptTask.Title))))
 	lines = append(lines, fmt.Sprintf("  %s  •  %d SP", m.PromptTask.Priority, m.PromptTask.StoryPoints))
-	lines = append(lines, fmt.Sprintf("  %s → %s",
-		m.PromptTask.TimeWindow.Start.Format("15:04"),
-		m.PromptTask.TimeWindow.End.Format("15:04")))
+	if m.PromptTask.SchedulingType == model.Reminder {
+		lines = append(lines, fmt.Sprintf("  Due: %s", m.PromptTask.TimeWindow.Start.Format("15:04")))
+	} else {
+		lines = append(lines, fmt.Sprintf("  %s → %s",
+			m.PromptTask.TimeWindow.Start.Format("15:04"),
+			m.PromptTask.TimeWindow.End.Format("15:04")))
+	}
 	lines = append(lines, "")
 	lines = append(lines, m.modalSep(innerW))
 	hint := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("Enter start  s snooze 5m  d dismiss")
@@ -483,8 +477,6 @@ func (m Model) renderConfirmModal() string {
 
 	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(lines, "\n"), innerW))
 }
-
-
 
 func (m Model) renderHelpModal() string {
 	modalW := 82
@@ -763,7 +755,7 @@ func (m Model) renderLockScreen() string {
 	fields = append(fields, "")
 	fields = append(fields, lipgloss.NewStyle().Foreground(m.Theme.Fg).Render("This terminal session is protected by a password."))
 	fields = append(fields, "")
-	
+
 	inputStr := m.LockPasswordInput.View()
 	fields = append(fields, "  "+inputStr)
 	fields = append(fields, "")
@@ -875,5 +867,3 @@ func (m Model) renderSessionExpiryModal() string {
 
 	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(fields, "\n"), innerW))
 }
-
-

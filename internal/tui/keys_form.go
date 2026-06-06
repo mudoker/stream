@@ -14,6 +14,7 @@ import (
 )
 
 var PriorityOptions = []string{"0 (Critical)", "1 (High)", "2 (Medium)", "3 (Low)"}
+var TaskTypeOptions = []string{"Anchored", "Floating", "Reminder"}
 var SPOptions = []int{1, 2, 3, 5, 8, 13}
 
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -52,8 +53,8 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 3: // Story Points
 			m.Form.SPIdx = (m.Form.SPIdx - 1 + 6) % 6
 			return m, nil
-		case 4: // Anchored
-			m.Form.IsAnchored = !m.Form.IsAnchored
+		case 4: // Task Type
+			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx - 1 + len(TaskTypeOptions)) % len(TaskTypeOptions)
 			return m, nil
 		}
 	case "right", " ":
@@ -64,8 +65,8 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 3: // Story Points
 			m.Form.SPIdx = (m.Form.SPIdx + 1) % 6
 			return m, nil
-		case 4: // Anchored
-			m.Form.IsAnchored = !m.Form.IsAnchored
+		case 4: // Task Type
+			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % len(TaskTypeOptions)
 			return m, nil
 		}
 	case "enter":
@@ -115,11 +116,11 @@ func (m *Model) focusFormFields() {
 	case 1:
 		m.Form.DescInput.Focus()
 	case 5:
-		if m.Form.IsAnchored {
+		if m.Form.TaskTypeIdx != 1 {
 			m.Form.StartTimeInput.Focus()
 		}
 	case 6:
-		if m.Form.IsAnchored {
+		if m.Form.TaskTypeIdx == 0 {
 			m.Form.DurationInput.Focus()
 		}
 	case 7:
@@ -147,23 +148,23 @@ func (m *Model) submitForm() {
 	}
 
 	spVal := SPOptions[m.Form.SPIdx]
-	anchored := m.Form.IsAnchored
+	taskType := m.Form.TaskTypeIdx
 
 	var startTime time.Time
 	duration := 60
 
-	if anchored {
+	if taskType != 1 {
 		timeStr := m.Form.StartTimeInput.Value()
-		durStr := m.Form.DurationInput.Value()
 
 		hour, min := ParseFlexibleTime(timeStr, 9, 0)
-
-		if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
-			duration = d
-		}
-
 		now := time.Now()
 		startTime = time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), hour, min, 0, 0, now.Location())
+		if taskType == 0 {
+			durStr := m.Form.DurationInput.Value()
+			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+				duration = d
+			}
+		}
 	}
 
 	var isEdit = m.IsEditing
@@ -208,7 +209,7 @@ func (m *Model) submitForm() {
 		newTask.Notes = existingTask.Notes
 	}
 
-	if anchored {
+	if taskType == 0 {
 		newTask.SchedulingType = model.Anchored
 		newTask.TimeWindow = model.TimeWindow{
 			Start: startTime,
@@ -218,6 +219,16 @@ func (m *Model) submitForm() {
 			newTask.LifecycleState = model.StateCompleted
 		} else {
 			newTask.LifecycleState = model.StateScheduled
+		}
+	} else if taskType == 2 {
+		newTask.SchedulingType = model.Reminder
+		newTask.TimeWindow = model.TimeWindow{
+			Start: startTime,
+		}
+		if isEdit && existingTask.LifecycleState == model.StateCompleted {
+			newTask.LifecycleState = model.StateCompleted
+		} else {
+			newTask.LifecycleState = model.StateReady
 		}
 	} else {
 		newTask.SchedulingType = model.Floating
@@ -388,12 +399,16 @@ func (m *Model) startEditMode(task model.Task) {
 	}
 
 	if task.SchedulingType == model.Anchored {
-		m.Form.IsAnchored = true
+		m.Form.TaskTypeIdx = 0
 		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
 		durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
 		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
+	} else if task.SchedulingType == model.Reminder {
+		m.Form.TaskTypeIdx = 2
+		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
+		m.Form.DurationInput.SetValue("60")
 	} else {
-		m.Form.IsAnchored = false
+		m.Form.TaskTypeIdx = 1
 		m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
 		m.Form.DurationInput.SetValue("60")
 	}

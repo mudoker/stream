@@ -21,12 +21,19 @@ func (m Model) renderTodoShelf(appContentHeight int) string {
 	isTodoFocused := m.TodoShelfFocus && !m.SidebarFocus
 	var titleStr string
 	var sepColor lipgloss.Color
+	backlogTitle := "BACKLOG"
+	for _, t := range m.getTodoShelfTasks() {
+		if t.SchedulingType == model.Reminder {
+			backlogTitle = "BACKLOG / REMINDERS"
+			break
+		}
+	}
 	if isTodoFocused {
 		titleStr = lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("● ") +
-			lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("BACKLOG")
+			lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(backlogTitle)
 		sepColor = m.Theme.Accent
 	} else {
-		titleStr = "  " + lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("BACKLOG")
+		titleStr = "  " + lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render(backlogTitle)
 		sepColor = lipgloss.Color("#2a2c37")
 	}
 
@@ -101,12 +108,19 @@ func (m Model) renderTodoShelf(appContentHeight int) string {
 			if isSelected {
 				prefix = "▶ "
 			}
+			indicator := ""
+			if t.SchedulingType == model.Reminder {
+				indicator = " ⏰"
+			}
 
-			titleLine := fmt.Sprintf("%s%s %s", prefix, chk, title)
+			titleLine := fmt.Sprintf("%s%s %s%s", prefix, chk, title, indicator)
 
-			// Build detail line: SP + Tags
+			// Build detail line: SP + reminder due + tags
 			var details []string
 			details = append(details, fmt.Sprintf("%d SP", t.StoryPoints))
+			if t.SchedulingType == model.Reminder {
+				details = append(details, fmt.Sprintf("due %s", t.TimeWindow.Start.Format("15:04")))
+			}
 			if len(t.Tags) > 0 {
 				details = append(details, strings.Join(t.Tags, ", "))
 			}

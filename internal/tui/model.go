@@ -54,11 +54,11 @@ func tickCmd() tea.Cmd {
 // Layout holds all pre-computed column dimensions for the current terminal size.
 // It is the single source of truth — view functions must NOT recompute these.
 type Layout struct {
-	SidebarW  int // Arc sidebar width
-	TimelineW int // Day timeline column width (day view)
-	TodoW     int // Todo shelf column width (day view)
+	SidebarW   int // Arc sidebar width
+	TimelineW  int // Day timeline column width (day view)
+	TodoW      int // Todo shelf column width (day view)
 	WorkspaceW int // Full workspace width (non-day views = TimelineW + TodoW)
-	Height    int // Total terminal height
+	Height     int // Total terminal height
 }
 
 // computeLayout calculates all column widths from terminal dimensions.
@@ -104,11 +104,11 @@ type TaskForm struct {
 	Description    string
 	PriorityIdx    int // 0: P0, 1: P1, 2: P2, 3: P3
 	SPIdx          int // index in []int{1, 2, 3, 5, 8, 13}
-	IsAnchored     bool
+	TaskTypeIdx    int // 0: Anchored, 1: Floating, 2: Reminder
 	StartHour      int
 	StartMin       int
 	DurationMins   int
-	ActiveField    int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Anchored (Y/N), 5: Start Time, 6: Duration, 7: Tags, 8: Submit
+	ActiveField    int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Tags, 8: Submit
 	TitleInput     textinput.Model
 	DescInput      textinput.Model
 	StartTimeInput textinput.Model
@@ -139,7 +139,7 @@ func NewTaskForm() TaskForm {
 	return TaskForm{
 		PriorityIdx:    2,
 		SPIdx:          2,
-		IsAnchored:     true,
+		TaskTypeIdx:    0,
 		StartHour:      now.Hour(),
 		StartMin:       now.Minute(),
 		DurationMins:   60,
@@ -153,10 +153,14 @@ func NewTaskForm() TaskForm {
 }
 
 func (f TaskForm) VisibleFields() []int {
-	if f.IsAnchored {
+	switch f.TaskTypeIdx {
+	case 0: // Anchored
 		return []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
+	case 2: // Reminder
+		return []int{0, 1, 2, 3, 4, 5, 7, 8}
+	default: // Floating
+		return []int{0, 1, 2, 3, 4, 7, 8}
 	}
-	return []int{0, 1, 2, 3, 4, 7, 8}
 }
 
 type WorkspaceForm struct {
@@ -279,19 +283,19 @@ type Model struct {
 	ReviewFocusSeconds   int
 
 	// Confirmation Dialog
-	ConfirmOpen          bool
-	ConfirmTask          model.Task
+	ConfirmOpen bool
+	ConfirmTask model.Task
 
 	// Task Edit Mode
-	IsEditing            bool
-	EditingTaskUUID      string
+	IsEditing       bool
+	EditingTaskUUID string
 
 	// Quick Anchor State
-	AnchorPromptOpen     bool
-	AnchorPromptTask     model.Task
-	AnchorTimeInput      textinput.Model
-	AnchorDurationInput  textinput.Model
-	AnchorActiveField    int // 0: Start Time, 1: Duration
+	AnchorPromptOpen    bool
+	AnchorPromptTask    model.Task
+	AnchorTimeInput     textinput.Model
+	AnchorDurationInput textinput.Model
+	AnchorActiveField   int // 0: Start Time, 1: Duration
 
 	// Scrolling & Help View States
 	HelpOpen             bool

@@ -104,7 +104,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// Check for auto-activation tasks
+		// Check for auto-activation tasks and reminder notifications
 		if m.CurrentMode == ModeNormal && !m.PromptOpen && !m.ReviewOpen {
 			now := time.Now()
 			for _, t := range m.Tasks {
@@ -116,6 +116,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.PromptTask = t
 					m.PromptOpen = true
 					break
+				}
+			}
+			if !m.PromptOpen {
+				for _, t := range m.Tasks {
+					if t.SchedulingType == model.Reminder && t.LifecycleState == model.StateReady {
+						due := t.TimeWindow.Start
+						if !due.Before(now.Add(-5*time.Minute)) && due.Before(now.Add(1*time.Minute)) && m.PromptTask.UUID != t.UUID {
+							m.PromptTask = t
+							m.PromptOpen = true
+							break
+						}
+					}
 				}
 			}
 		}
@@ -269,13 +281,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.PromptOpen {
 			switch msg.String() {
 			case "enter":
+				if m.PromptTask.SchedulingType == model.Reminder {
+					m.PromptOpen = false
+					m.StatusMsg = fmt.Sprintf("Reminder '%s' dismissed.", m.PromptTask.Title)
+					return m, nil
+				}
 				m.startZenMode(m.PromptTask)
 				m.PromptOpen = false
 				return m, nil
 			case "s":
 				// Snooze 5 minutes
 				m.PromptTask.TimeWindow.Start = m.PromptTask.TimeWindow.Start.Add(5 * time.Minute)
-				m.PromptTask.TimeWindow.End = m.PromptTask.TimeWindow.End.Add(5 * time.Minute)
+				if m.PromptTask.SchedulingType != model.Reminder {
+					m.PromptTask.TimeWindow.End = m.PromptTask.TimeWindow.End.Add(5 * time.Minute)
+				}
 				m.DB.UpdateTask(m.PromptTask)
 				m.refreshTasks()
 				m.PromptOpen = false

@@ -3,16 +3,18 @@ package tui
 import (
 	"testing"
 	"time"
+
+	"stream/internal/model"
 )
 
 func TestParseFlexibleTime(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     string
-		wantHour  int
-		wantMin   int
-		defaultH  int
-		defaultM  int
+		name     string
+		input    string
+		wantHour int
+		wantMin  int
+		defaultH int
+		defaultM int
 	}{
 		{"single digit hour", "14", 14, 0, 9, 0},
 		{"single digit hour with default", "9", 9, 0, 9, 0},
@@ -42,8 +44,8 @@ func TestParseFlexibleTime(t *testing.T) {
 func TestFlexibleTimeInContext(t *testing.T) {
 	// Simulate form submission with various time inputs
 	tests := []struct {
-		name        string
-		timeInput   string
+		name         string
+		timeInput    string
 		expectedHour int
 		expectedMin  int
 	}{
@@ -58,10 +60,10 @@ func TestFlexibleTimeInContext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			hour, min := ParseFlexibleTime(tt.timeInput, 9, 0)
-			
+
 			// Create a time with the parsed hour and minute
 			result := time.Date(selectedDay.Year(), selectedDay.Month(), selectedDay.Day(), hour, min, 0, 0, time.UTC)
-			
+
 			if result.Hour() != tt.expectedHour || result.Minute() != tt.expectedMin {
 				t.Errorf("Expected %02d:%02d, got %02d:%02d",
 					tt.expectedHour, tt.expectedMin, result.Hour(), result.Minute())
@@ -70,3 +72,40 @@ func TestFlexibleTimeInContext(t *testing.T) {
 	}
 }
 
+func TestGetTodoShelfTasksIncludesReminders(t *testing.T) {
+	now := time.Now()
+	m := &Model{
+		Tasks: []model.Task{
+			{
+				UUID:           "1",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "2",
+				SchedulingType: model.Reminder,
+				LifecycleState: model.StateReady,
+				TimeWindow: model.TimeWindow{
+					Start: now.Add(10 * time.Minute),
+				},
+			},
+			{
+				UUID:           "3",
+				SchedulingType: model.Anchored,
+				LifecycleState: model.StateScheduled,
+				TimeWindow: model.TimeWindow{
+					Start: now.Add(30 * time.Minute),
+					End:   now.Add(90 * time.Minute),
+				},
+			},
+		},
+	}
+
+	shelf := m.getTodoShelfTasks()
+	if len(shelf) != 2 {
+		t.Fatalf("expected 2 tasks in todo shelf, got %d", len(shelf))
+	}
+	if shelf[0].UUID != "1" && shelf[0].UUID != "2" {
+		t.Fatalf("unexpected TODO shelf task UUID %s", shelf[0].UUID)
+	}
+}

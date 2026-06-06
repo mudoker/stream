@@ -454,30 +454,99 @@ func (m *Model) navigateVertical(dir int) {
 		return
 	}
 
-	idx := -1
-	for i, t := range dayTasks {
+	// Find the current task
+	var currentTask model.Task
+	found := false
+	for _, t := range dayTasks {
 		if t.UUID == m.SelectedTaskUUID {
-			idx = i
+			currentTask = t
+			found = true
+			break
+		}
+	}
+	if !found {
+		m.SelectedTaskUUID = dayTasks[0].UUID
+		return
+	}
+
+	// Build ordered list of unique start-time groups (each group = tasks sharing the same minute)
+	// A "row" is identified by its start minute (truncated to minute precision).
+	type timeKey struct{ h, min int }
+	seen := map[timeKey]bool{}
+	var rows []timeKey
+	for _, t := range dayTasks { // dayTasks is already sorted by start time
+		k := timeKey{t.TimeWindow.Start.Hour(), t.TimeWindow.Start.Minute()}
+		if !seen[k] {
+			seen[k] = true
+			rows = append(rows, k)
+		}
+	}
+
+	// Which row is the current task in?
+	curKey := timeKey{currentTask.TimeWindow.Start.Hour(), currentTask.TimeWindow.Start.Minute()}
+	curRowIdx := -1
+	for i, r := range rows {
+		if r == curKey {
+			curRowIdx = i
+			break
+		}
+	}
+	if curRowIdx == -1 {
+		m.SelectedTaskUUID = dayTasks[0].UUID
+		return
+	}
+
+	// Move to adjacent row
+	nextRowIdx := curRowIdx + dir
+	if nextRowIdx < 0 {
+		nextRowIdx = len(rows) - 1 // wrap to last row
+	} else if nextRowIdx >= len(rows) {
+		nextRowIdx = 0 // wrap to first row
+	}
+	nextRow := rows[nextRowIdx]
+
+	// Collect all tasks in the target row
+	var targetGroup []model.Task
+	for _, t := range dayTasks {
+		k := timeKey{t.TimeWindow.Start.Hour(), t.TimeWindow.Start.Minute()}
+		if k == nextRow {
+			targetGroup = append(targetGroup, t)
+		}
+	}
+	if len(targetGroup) == 0 {
+		return
+	}
+
+	// Try to land on the same column index as the current task (h/l position preserved)
+	resolved := ResolveOverlaps(dayTasks)
+	curCol := 0
+	for _, rc := range resolved {
+		if rc.Task.UUID == currentTask.UUID {
+			curCol = rc.ColIndex
 			break
 		}
 	}
 
-	if idx == -1 {
-		if dir > 0 {
-			m.SelectedTaskUUID = dayTasks[0].UUID
-		} else {
-			m.SelectedTaskUUID = dayTasks[len(dayTasks)-1].UUID
+	// Find the task in the target group whose column is closest to curCol
+	bestTask := targetGroup[0]
+	bestDist := 9999
+	for _, t := range targetGroup {
+		for _, rc := range resolved {
+			if rc.Task.UUID == t.UUID {
+				dist := rc.ColIndex - curCol
+				if dist < 0 {
+					dist = -dist
+				}
+				if dist < bestDist {
+					bestDist = dist
+					bestTask = t
+				}
+				break
+			}
 		}
-		return
 	}
 
-	idx += dir
-	if idx < 0 {
-		idx = len(dayTasks) - 1
-	} else if idx >= len(dayTasks) {
-		idx = 0
-	}
-	m.SelectedTaskUUID = dayTasks[idx].UUID
+	m.SelectedTaskUUID = bestTask.UUID
 }
 
 func (m *Model) navigateHorizontal(dir int) {

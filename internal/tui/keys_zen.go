@@ -24,7 +24,7 @@ func (m *Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "space":
+	case " ", "space":
 		m.ZenTimer.IsPaused = !m.ZenTimer.IsPaused
 		if m.ZenTimer.IsPaused {
 			m.StatusMsg = "Timer PAUSED"
@@ -37,6 +37,21 @@ func (m *Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "+":
 		m.ZenTimer.AddTime(5 * time.Minute)
 		m.StatusMsg = "Added 5 minutes to countdown."
+	case "r":
+		// Restart current session block
+		sess := m.ZenTimer.Sessions[m.ZenTimer.CurrentSessionIdx]
+		m.ZenTimer.TimeRemaining = sess.Duration
+		m.ZenTimer.TotalDuration = sess.Duration
+		m.StatusMsg = "Timer RESTARTED"
+	case "q":
+		// Stop/Abort focus session completely
+		t := m.ZenTimer.Task
+		t.LifecycleState = model.StateReady
+		m.DB.UpdateTask(t)
+		m.refreshTasks()
+		m.ZenTimer = nil
+		m.CurrentMode = ModeNormal
+		m.StatusMsg = "Timer STOPPED"
 	case "b":
 		// Force Break
 		finished := m.ZenTimer.NextSession()

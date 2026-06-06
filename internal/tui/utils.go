@@ -2,6 +2,7 @@ package tui
 
 import (
 	"sort"
+	"time"
 
 	"stream/internal/model"
 )
@@ -10,6 +11,96 @@ type ScheduledColumn struct {
 	ColIndex int
 	TotalCol int
 	Task     model.Task
+}
+
+type TaskRect struct {
+	ScheduledColumn
+	Left    int
+	Right   int
+	Top     int
+	Bottom  int
+	CenterX int
+	CenterY int
+	Width   int
+	Height  int
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func (m Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
+	resolved := ResolveOverlaps(tasks)
+	if len(resolved) == 0 {
+		return nil
+	}
+
+	const timestampLaneW = 7
+	const leftSpacerW = 4
+	const rightSpacerW = 2
+
+	gridW := m.Layout.TimelineW - timestampLaneW
+	if gridW < 10 {
+		gridW = 10
+	}
+
+	colsAreaW := gridW - leftSpacerW - rightSpacerW
+	if colsAreaW < 1 {
+		colsAreaW = 1
+	}
+
+	numCols := 1
+	for _, rc := range resolved {
+		if rc.TotalCol > numCols {
+			numCols = rc.TotalCol
+		}
+	}
+
+	colW := colsAreaW / numCols
+	if colW < 8 {
+		colW = 8
+	}
+
+	var rects []TaskRect
+	for _, rc := range resolved {
+		startRow := timeToRow(rc.Task.TimeWindow.Start)
+		endRow := timeToRow(rc.Task.TimeWindow.End)
+		if endRow > totalRows {
+			endRow = totalRows
+		}
+		h := endRow - startRow
+		if h < 1 {
+			h = 1
+		}
+
+		x := rc.ColIndex * colW
+		y := startRow
+		rects = append(rects, TaskRect{
+			ScheduledColumn: rc,
+			Left:            x,
+			Right:           x + colW,
+			Top:             y,
+			Bottom:          y + h,
+			CenterX:         x + colW/2,
+			CenterY:         y + h/2,
+			Width:           colW,
+			Height:          h,
+		})
+	}
+
+	return rects
+}
+
+func getEffectiveEnd(t model.Task) time.Time {
+	minDuration := 1 * time.Hour
+	dur := t.TimeWindow.End.Sub(t.TimeWindow.Start)
+	if dur < minDuration {
+		return t.TimeWindow.Start.Add(minDuration)
+	}
+	return t.TimeWindow.End
 }
 
 // ResolveOverlaps processes a list of tasks for a single day and assigns columns to handle overlapping times
@@ -33,8 +124,8 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 		if !startI.Equal(startJ) {
 			return startI.Before(startJ)
 		}
-		endI := anchored[i].TimeWindow.End
-		endJ := anchored[j].TimeWindow.End
+		endI := getEffectiveEnd(anchored[i])
+		endJ := getEffectiveEnd(anchored[j])
 		if !endI.Equal(endJ) {
 			return endI.Before(endJ)
 		}
@@ -51,7 +142,8 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 		var nextActive []model.Task
 		var nextCols []int
 		for j, act := range active {
-			if act.TimeWindow.End.After(task.TimeWindow.Start) {
+			effEnd := getEffectiveEnd(act)
+			if effEnd.After(task.TimeWindow.Start) {
 				nextActive = append(nextActive, act)
 				nextCols = append(nextCols, cols[j])
 			}
@@ -98,7 +190,12 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 			tJ := results[j].Task
 
 			// Check if intervals overlap
-			overlap := tI.TimeWindow.Start.Before(tJ.TimeWindow.End) && tJ.TimeWindow.Start.Before(tI.TimeWindow.End)
+			startI := tI.TimeWindow.Start
+			endI := getEffectiveEnd(tI)
+			startJ := tJ.TimeWindow.Start
+			endJ := getEffectiveEnd(tJ)
+
+			overlap := startI.Before(endJ) && startJ.Before(endI)
 			if overlap {
 				if results[j].ColIndex > maxCol {
 					maxCol = results[j].ColIndex

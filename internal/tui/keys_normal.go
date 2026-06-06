@@ -223,12 +223,69 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) handleDashboardOrAnalyticsNav(key string) {
-	switch key {
-	case "j", "down":
-		m.ScrollOffset++
-	case "k", "up":
-		if m.ScrollOffset > 0 {
-			m.ScrollOffset--
+	if m.CurrentView == DashboardView {
+		switch key {
+		case "h", "left":
+			m.DashboardFocusCol = 0
+		case "l", "right":
+			m.DashboardFocusCol = 1
+		case "k", "up":
+			m.DashboardFocusRow--
+			if m.DashboardFocusRow < 0 {
+				m.DashboardFocusRow = 2
+			}
+		case "j", "down":
+			m.DashboardFocusRow = (m.DashboardFocusRow + 1) % 3
+		}
+
+		var yStart, yEnd int
+		switch m.DashboardFocusRow {
+		case 0:
+			yStart, yEnd = 0, 15
+		case 1:
+			yStart, yEnd = 15, 30
+		case 2:
+			yStart, yEnd = 30, 45
+		}
+
+		availH := m.Height - 6
+		if availH < 10 {
+			availH = 10
+		}
+
+		if yStart < m.ScrollOffset {
+			m.ScrollOffset = yStart
+		} else if yEnd > m.ScrollOffset+availH {
+			m.ScrollOffset = yEnd - availH
+		}
+	} else if m.CurrentView == AnalyticsView {
+		totalLayers := 6
+		switch key {
+		case "h", "left":
+			m.AnalyticsFocusCol = 0
+		case "l", "right":
+			m.AnalyticsFocusCol = 1
+		case "k", "up":
+			m.AnalyticsFocusRow--
+			if m.AnalyticsFocusRow < 0 {
+				m.AnalyticsFocusRow = totalLayers - 1
+			}
+		case "j", "down":
+			m.AnalyticsFocusRow = (m.AnalyticsFocusRow + 1) % totalLayers
+		}
+
+		yStart := m.AnalyticsFocusRow * 13
+		yEnd := (m.AnalyticsFocusRow + 1) * 13
+
+		gridHeight := m.Height - 6
+		if gridHeight < 10 {
+			gridHeight = 10
+		}
+
+		if yStart < m.ScrollOffset {
+			m.ScrollOffset = yStart
+		} else if yEnd > m.ScrollOffset+gridHeight {
+			m.ScrollOffset = yEnd - gridHeight
 		}
 	}
 }
@@ -467,12 +524,16 @@ func (m *Model) navigateVertical(dir int) {
 		return
 	}
 
-	// Find the current task
-	var currentTask model.Task
+	rects := m.BuildDayTaskRects(dayTasks)
+	if len(rects) == 0 {
+		return
+	}
+
+	var current TaskRect
 	found := false
-	for _, t := range dayTasks {
-		if t.UUID == m.SelectedTaskUUID {
-			currentTask = t
+	for _, r := range rects {
+		if r.Task.UUID == m.SelectedTaskUUID {
+			current = r
 			found = true
 			break
 		}
@@ -482,84 +543,43 @@ func (m *Model) navigateVertical(dir int) {
 		return
 	}
 
-	// Build ordered list of unique start-time groups (each group = tasks sharing the same minute)
-	// A "row" is identified by its start minute (truncated to minute precision).
-	type timeKey struct{ h, min int }
-	seen := map[timeKey]bool{}
-	var rows []timeKey
-	for _, t := range dayTasks { // dayTasks is already sorted by start time
-		k := timeKey{t.TimeWindow.Start.Hour(), t.TimeWindow.Start.Minute()}
-		if !seen[k] {
-			seen[k] = true
-			rows = append(rows, k)
+	bestScore := 1_000_000
+	bestUUID := ""
+	var bestRect TaskRect
+	for _, r := range rects {
+		if r.Task.UUID == current.Task.UUID {
+			continue
 		}
-	}
-
-	// Which row is the current task in?
-	curKey := timeKey{currentTask.TimeWindow.Start.Hour(), currentTask.TimeWindow.Start.Minute()}
-	curRowIdx := -1
-	for i, r := range rows {
-		if r == curKey {
-			curRowIdx = i
-			break
-		}
-	}
-	if curRowIdx == -1 {
-		m.SelectedTaskUUID = dayTasks[0].UUID
-		return
-	}
-
-	// Move to adjacent row
-	nextRowIdx := curRowIdx + dir
-	if nextRowIdx < 0 {
-		nextRowIdx = len(rows) - 1 // wrap to last row
-	} else if nextRowIdx >= len(rows) {
-		nextRowIdx = 0 // wrap to first row
-	}
-	nextRow := rows[nextRowIdx]
-
-	// Collect all tasks in the target row
-	var targetGroup []model.Task
-	for _, t := range dayTasks {
-		k := timeKey{t.TimeWindow.Start.Hour(), t.TimeWindow.Start.Minute()}
-		if k == nextRow {
-			targetGroup = append(targetGroup, t)
-		}
-	}
-	if len(targetGroup) == 0 {
-		return
-	}
-
-	// Try to land on the same column index as the current task (h/l position preserved)
-	resolved := ResolveOverlaps(dayTasks)
-	curCol := 0
-	for _, rc := range resolved {
-		if rc.Task.UUID == currentTask.UUID {
-			curCol = rc.ColIndex
-			break
-		}
-	}
-
-	// Find the task in the target group whose column is closest to curCol
-	bestTask := targetGroup[0]
-	bestDist := 9999
-	for _, t := range targetGroup {
-		for _, rc := range resolved {
-			if rc.Task.UUID == t.UUID {
-				dist := rc.ColIndex - curCol
-				if dist < 0 {
-					dist = -dist
-				}
-				if dist < bestDist {
-					bestDist = dist
-					bestTask = t
-				}
-				break
+		if dir > 0 {
+			if r.Top <= current.CenterY {
+				continue
+			}
+			dy := absInt(r.Top - current.CenterY)
+			dx := absInt(r.CenterX - current.CenterX)
+			score := dy + dx*2
+			if score < bestScore || (score == bestScore && (bestUUID == "" || r.Left < bestRect.Left || (r.Left == bestRect.Left && r.Top < bestRect.Top))) {
+				bestScore = score
+				bestUUID = r.Task.UUID
+				bestRect = r
+			}
+		} else {
+			if r.Bottom >= current.CenterY {
+				continue
+			}
+			dy := absInt(current.CenterY - r.Bottom)
+			dx := absInt(r.CenterX - current.CenterX)
+			score := dy + dx*2
+			if score < bestScore || (score == bestScore && (bestUUID == "" || r.Left < bestRect.Left || (r.Left == bestRect.Left && r.Top < bestRect.Top))) {
+				bestScore = score
+				bestUUID = r.Task.UUID
+				bestRect = r
 			}
 		}
 	}
 
-	m.SelectedTaskUUID = bestTask.UUID
+	if bestUUID != "" {
+		m.SelectedTaskUUID = bestUUID
+	}
 }
 
 func (m *Model) navigateHorizontal(dir int) {
@@ -568,11 +588,16 @@ func (m *Model) navigateHorizontal(dir int) {
 		return
 	}
 
-	var currentTask model.Task
+	rects := m.BuildDayTaskRects(dayTasks)
+	if len(rects) == 0 {
+		return
+	}
+
+	var current TaskRect
 	found := false
-	for _, t := range dayTasks {
-		if t.UUID == m.SelectedTaskUUID {
-			currentTask = t
+	for _, r := range rects {
+		if r.Task.UUID == m.SelectedTaskUUID {
+			current = r
 			found = true
 			break
 		}
@@ -582,69 +607,41 @@ func (m *Model) navigateHorizontal(dir int) {
 		return
 	}
 
-	resolved := ResolveOverlaps(dayTasks)
-	var currentCol int
-	for _, rc := range resolved {
-		if rc.Task.UUID == currentTask.UUID {
-			currentCol = rc.ColIndex
-			break
-		}
-	}
-
-	var candidates []ScheduledColumn
-	for _, rc := range resolved {
-		if rc.Task.UUID == currentTask.UUID {
+	bestScore := 1_000_000
+	bestUUID := ""
+	var bestRect TaskRect
+	for _, r := range rects {
+		if r.Task.UUID == current.Task.UUID {
 			continue
 		}
-		overlap := currentTask.TimeWindow.Start.Before(rc.Task.TimeWindow.End) &&
-			rc.Task.TimeWindow.Start.Before(currentTask.TimeWindow.End)
-		if overlap {
-			candidates = append(candidates, rc)
-		}
-	}
-
-	if len(candidates) == 0 {
-		return
-	}
-
-	var targetUUID string
-	if dir > 0 {
-		bestCol := 999
-		for _, c := range candidates {
-			if c.ColIndex > currentCol && c.ColIndex < bestCol {
-				bestCol = c.ColIndex
-				targetUUID = c.Task.UUID
+		if dir > 0 {
+			if r.Left <= current.CenterX {
+				continue
 			}
-		}
-		if targetUUID == "" {
-			bestCol = 999
-			for _, c := range candidates {
-				if c.ColIndex < bestCol {
-					bestCol = c.ColIndex
-					targetUUID = c.Task.UUID
-				}
+			dx := absInt(r.Left - current.CenterX)
+			dy := absInt(r.CenterY - current.CenterY)
+			score := dx + dy*2
+			if score < bestScore || (score == bestScore && (bestUUID == "" || r.Top < bestRect.Top || (r.Top == bestRect.Top && r.Left < bestRect.Left))) {
+				bestScore = score
+				bestUUID = r.Task.UUID
+				bestRect = r
 			}
-		}
-	} else {
-		bestCol := -1
-		for _, c := range candidates {
-			if c.ColIndex < currentCol && c.ColIndex > bestCol {
-				bestCol = c.ColIndex
-				targetUUID = c.Task.UUID
+		} else {
+			if r.Right >= current.CenterX {
+				continue
 			}
-		}
-		if targetUUID == "" {
-			bestCol = -1
-			for _, c := range candidates {
-				if c.ColIndex > bestCol {
-					bestCol = c.ColIndex
-					targetUUID = c.Task.UUID
-				}
+			dx := absInt(current.CenterX - r.Right)
+			dy := absInt(r.CenterY - current.CenterY)
+			score := dx + dy*2
+			if score < bestScore || (score == bestScore && (bestUUID == "" || r.Top < bestRect.Top || (r.Top == bestRect.Top && r.Left < bestRect.Left))) {
+				bestScore = score
+				bestUUID = r.Task.UUID
+				bestRect = r
 			}
 		}
 	}
 
-	if targetUUID != "" {
-		m.SelectedTaskUUID = targetUUID
+	if bestUUID != "" {
+		m.SelectedTaskUUID = bestUUID
 	}
 }

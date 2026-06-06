@@ -3,6 +3,9 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
+
+	"stream/internal/model"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -47,3 +50,39 @@ func TestOverlayString(t *testing.T) {
 		t.Errorf("Expected line 1 to be unmodified, got '%s'", lines[1])
 	}
 }
+
+func TestComputeTaskMetricsInfo(t *testing.T) {
+	m := Model{Theme: NewTheme()}
+
+	// Case 1: Floating task with 1 Story Point (planned: 45m).
+	// No focus or break logged.
+	task1 := model.Task{
+		SchedulingType: model.Floating,
+		StoryPoints:    1,
+	}
+	info1 := m.computeTaskMetricsInfo(task1)
+	if info1.PlannedDur != 45*time.Minute {
+		t.Errorf("Expected 45m planned duration, got %v", info1.PlannedDur)
+	}
+	if info1.QualityScore != 100 {
+		t.Errorf("Expected 100 quality score, got %d", info1.QualityScore)
+	}
+
+	// Case 2: 1 Interruption, 10 minutes focus, 5 minutes break
+	// 5m break / 10m focus = 50% ratio. Excess break ratio = 30%.
+	// Interruption penalty = 15. Break penalty = 30. Total penalty = 45. Quality = 55.
+	task2 := model.Task{
+		SchedulingType: model.Floating,
+		StoryPoints:    1,
+		ExecutionMetrics: model.ExecutionMetrics{
+			ElapsedFocusSeconds: 600,
+			ElapsedBreakSeconds: 300,
+			InterruptionCount:   1,
+		},
+	}
+	info2 := m.computeTaskMetricsInfo(task2)
+	if info2.QualityScore != 55 {
+		t.Errorf("Expected 55 quality score, got %d", info2.QualityScore)
+	}
+}
+

@@ -31,6 +31,7 @@ var DefaultCommands = []CommandEntry{
 	{"day", "Switch to day timeline view"},
 	{"analytics", "Switch to analytics view"},
 	{"settings", "Switch to settings view"},
+	{"profile", "Configure display username, password, and session lock"},
 	{"ws-create", "Create a new workspace"},
 	{"ws-edit", "Edit active workspace"},
 	{"ws-delete", "Delete active workspace or specify name"},
@@ -143,6 +144,13 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		m.StatusMsg = "Switched to Settings view."
+	case "profile":
+		settings := m.DB.GetUserSettings()
+		m.ProfileForm = NewProfileForm(settings.Username, settings.LockTimeoutMinutes)
+		m.ProfileForm.ActiveField = 0
+		m.focusProfileFormFields()
+		m.CurrentMode = ModeProfileForm
+		m.StatusMsg = "Edit profile & security settings."
 	case "help", "h", "?":
 		m.HelpOpen = true
 		m.HelpScrollOffset = 0

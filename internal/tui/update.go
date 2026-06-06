@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"stream/internal/db"
 	"stream/internal/model"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,6 +13,39 @@ import (
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	if m.IsLocked {
+		switch msg := msg.(type) {
+		case TickMsg:
+			cmds = append(cmds, tickCmd())
+			return m, tea.Batch(cmds...)
+		case tea.WindowSizeMsg:
+			m.Width = msg.Width
+			m.Height = msg.Height
+			m.Layout = computeLayout(msg.Width, msg.Height)
+			return m, nil
+		case tea.KeyMsg:
+			key := msg.String()
+			if key == "enter" {
+				entered := m.LockPasswordInput.Value()
+				storedHash := m.DB.GetUserSettings().PasswordHash
+				if db.HashPassword(entered) == storedHash {
+					m.IsLocked = false
+					m.SessionTimeRemainingSeconds = m.DB.GetUserSettings().LockTimeoutMinutes * 60
+					m.LockPasswordInput.SetValue("")
+					m.StatusMsg = "Session unlocked."
+				} else {
+					m.StatusMsg = "❌ Incorrect password"
+					m.LockPasswordInput.SetValue("")
+				}
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.LockPasswordInput, cmd = m.LockPasswordInput.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -50,6 +84,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// Tick Session Lock Timer if password is set
+		if m.DB != nil {
+			storedHash := m.DB.GetUserSettings().PasswordHash
+			if storedHash != "" {
+				if m.CurrentMode == ModeZen {
+					m.SessionTimeRemainingSeconds = m.DB.GetUserSettings().LockTimeoutMinutes * 60
+					m.SessionExpiryPromptOpen = false
+				} else {
+					m.SessionTimeRemainingSeconds--
+					if m.SessionTimeRemainingSeconds <= 0 {
+						m.IsLocked = true
+						m.SessionExpiryPromptOpen = false
+						m.CurrentMode = ModeNormal
+					} else if m.SessionTimeRemainingSeconds == 60 {
+						m.SessionExpiryPromptOpen = true
+					}
+				}
+			}
+		}
+
 		// Check for auto-activation tasks
 		if m.CurrentMode == ModeNormal && !m.PromptOpen && !m.ReviewOpen {
 			now := time.Now()
@@ -80,6 +134,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.SessionExpiryPromptOpen {
+			switch msg.String() {
+			case "y", "Y", "enter":
+				m.SessionTimeRemainingSeconds = m.DB.GetUserSettings().LockTimeoutMinutes * 60
+				m.SessionExpiryPromptOpen = false
+				m.StatusMsg = "Session timer reset."
+				return m, nil
+			case "n", "N", "esc":
+				m.SessionExpiryPromptOpen = false
+				m.StatusMsg = "Session will lock in 1 minute."
+				return m, nil
+			}
+			return m, nil // Swallow other keys while the prompt is open
+		}
+
 		if m.ConfirmOpen {
 			switch msg.String() {
 			case "y", "Y":
@@ -311,6 +380,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case ModeWorkspaceForm:
 			return m.handleWorkspaceFormKeys(msg)
+
+		case ModeProfileForm:
+			return m.handleProfileFormKeys(msg)
 
 		case ModeWorkspacePicker:
 			return m.handleWorkspacePickerKeys(msg)

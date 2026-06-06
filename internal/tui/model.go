@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strconv"
 	"time"
 
 	"stream/internal/db"
@@ -33,6 +34,7 @@ const (
 	ModeTaskMove        UIState = "TASK_MOVE"
 	ModeWorkspaceForm   UIState = "WORKSPACE_WIZARD"
 	ModeWorkspacePicker UIState = "WS_PICKER"
+	ModeProfileForm     UIState = "PROFILE_WIZARD"
 )
 
 type TickMsg struct {
@@ -190,6 +192,42 @@ func NewWorkspaceForm() WorkspaceForm {
 	}
 }
 
+type ProfileForm struct {
+	Username         string
+	Password         string
+	LockTimeoutMins  int
+	ActiveField      int // 0: Username, 1: Password, 2: Lock Timeout (Mins), 3: Submit
+	UsernameInput    textinput.Model
+	PasswordInput    textinput.Model
+	LockTimeoutInput textinput.Model
+}
+
+func NewProfileForm(username string, timeoutMins int) ProfileForm {
+	u := textinput.New()
+	u.Placeholder = "Doan Huu Quoc"
+	u.SetValue(username)
+	u.Focus()
+
+	p := textinput.New()
+	p.Placeholder = "(leave empty to keep, 'none' to disable)"
+	p.EchoMode = textinput.EchoPassword
+	p.EchoCharacter = '•'
+
+	t := textinput.New()
+	t.Placeholder = "5"
+	t.SetValue(strconv.Itoa(timeoutMins))
+
+	return ProfileForm{
+		Username:         username,
+		Password:         "",
+		LockTimeoutMins:  timeoutMins,
+		ActiveField:      0,
+		UsernameInput:    u,
+		PasswordInput:    p,
+		LockTimeoutInput: t,
+	}
+}
+
 type Model struct {
 	DB           *db.JSONDB
 	Sync         *sync.SyncEngine
@@ -268,9 +306,16 @@ type Model struct {
 	AnalyticsFocusRow    int
 
 	// Task move lock state
-	TaskMovePrefix           string
+	TaskMovePrefix             string
 	TaskMoveOriginalTimeWindow model.TimeWindow
 	ZenPrefix                  string
+
+	// User Profile & Security
+	ProfileForm                 ProfileForm
+	IsLocked                    bool
+	LockPasswordInput           textinput.Model
+	SessionTimeRemainingSeconds int
+	SessionExpiryPromptOpen     bool
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
@@ -278,20 +323,32 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 	cmdInput.Placeholder = "Search commands, tasks, or settings..."
 	cmdInput.Prompt = "🔍  "
 
+	settings := database.GetUserSettings()
+	lockPass := textinput.New()
+	lockPass.Placeholder = "Enter password to unlock..."
+	lockPass.EchoMode = textinput.EchoPassword
+	lockPass.EchoCharacter = '•'
+	lockPass.Focus()
+
 	m := Model{
-		DB:             database,
-		Sync:           syncEngine,
-		Theme:          NewTheme(),
-		Layout:         computeLayout(120, 40), // sensible default before first WindowSizeMsg
-		CurrentView:    DayView,
-		CurrentMode:    ModeNormal,
-		SelectedDay:    time.Now(),
-		LastSyncTime:   time.Now(),
-		CommandInput:   cmdInput,
-		TodoShelfFocus: false,
-		TimelineHour:   9,
-		Form:           NewTaskForm(),
-		WorkspaceForm:  NewWorkspaceForm(),
+		DB:                          database,
+		Sync:                        syncEngine,
+		Theme:                       NewTheme(),
+		Layout:                      computeLayout(120, 40), // sensible default before first WindowSizeMsg
+		CurrentView:                 DayView,
+		CurrentMode:                 ModeNormal,
+		SelectedDay:                 time.Now(),
+		LastSyncTime:                time.Now(),
+		CommandInput:                cmdInput,
+		TodoShelfFocus:              false,
+		TimelineHour:                9,
+		Form:                        NewTaskForm(),
+		WorkspaceForm:               NewWorkspaceForm(),
+		ProfileForm:                 NewProfileForm(settings.Username, settings.LockTimeoutMinutes),
+		IsLocked:                    false,
+		LockPasswordInput:           lockPass,
+		SessionTimeRemainingSeconds: settings.LockTimeoutMinutes * 60,
+		SessionExpiryPromptOpen:     false,
 	}
 
 	m.refreshWorkspaces()

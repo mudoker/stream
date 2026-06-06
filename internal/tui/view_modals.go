@@ -740,3 +740,127 @@ func (m Model) renderAnchorPromptModal() string {
 	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(lines, "\n"), innerW))
 }
 
+func (m Model) renderLockScreen() string {
+	const innerW = 44
+	var fields []string
+
+	title := lipgloss.NewStyle().Foreground(m.Theme.P0Color).Bold(true).Render("🔒 STREAM SESSION LOCKED")
+	fields = append(fields, title)
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
+	fields = append(fields, lipgloss.NewStyle().Foreground(m.Theme.Fg).Render("This terminal session is protected by a password."))
+	fields = append(fields, "")
+	
+	inputStr := m.LockPasswordInput.View()
+	fields = append(fields, "  "+inputStr)
+	fields = append(fields, "")
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
+
+	statusStr := "Press Enter to unlock"
+	statusColor := m.Theme.Muted
+	if strings.Contains(m.StatusMsg, "Incorrect") || strings.Contains(m.StatusMsg, "❌") {
+		statusStr = m.StatusMsg
+		statusColor = m.Theme.P0Color
+	}
+	fields = append(fields, lipgloss.NewStyle().Foreground(statusColor).Render(statusStr))
+
+	modalBox := m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(fields, "\n"), innerW))
+
+	// Center the box in the terminal window
+	modalW := lipgloss.Width(modalBox)
+	modalH := lipgloss.Height(modalBox)
+	topPad := (m.Height - modalH) / 2
+	leftPad := (m.Width - modalW) / 2
+	if topPad < 0 {
+		topPad = 0
+	}
+	if leftPad < 0 {
+		leftPad = 0
+	}
+
+	// Build full terminal background padded with empty lines
+	var lines []string
+	for i := 0; i < topPad; i++ {
+		lines = append(lines, "")
+	}
+	modalLines := strings.Split(modalBox, "\n")
+	leftSpace := strings.Repeat(" ", leftPad)
+	for _, ml := range modalLines {
+		lines = append(lines, leftSpace+ml)
+	}
+	for len(lines) < m.Height {
+		lines = append(lines, "")
+	}
+
+	// Clamp to terminal height
+	if len(lines) > m.Height {
+		lines = lines[:m.Height]
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderProfileFormModal() string {
+	f := m.ProfileForm
+	const innerW = 54
+
+	var fields []string
+	title := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("Profile & Security Settings")
+	fields = append(fields, title)
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
+
+	renderField := func(num, label string, input string, index int) string {
+		numStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(num)
+		lblStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg)
+		if f.ActiveField == index {
+			lblStyle = lblStyle.Foreground(m.Theme.Accent).Bold(true)
+		}
+		return fmt.Sprintf("  %s  %-20s %s", numStyle, lblStyle.Render(label), input)
+	}
+
+	fields = append(fields, renderField("1", "Display Username", f.UsernameInput.View(), 0))
+	fields = append(fields, renderField("2", "Password/Key", f.PasswordInput.View(), 1))
+	fields = append(fields, renderField("3", "Lock Timeout (Mins)", f.LockTimeoutInput.View(), 2))
+	fields = append(fields, "")
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
+
+	submitFg := m.Theme.Muted
+	submitText := "  Submit  "
+	if f.ActiveField == 3 {
+		submitFg = m.Theme.SuccessColor
+		submitText = "[ Submit ]"
+	}
+	submitBtn := lipgloss.NewStyle().
+		Foreground(submitFg).
+		Bold(true).
+		Render(submitText)
+	fields = append(fields, "  "+submitBtn)
+
+	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(fields, "\n"), innerW))
+}
+
+func (m Model) renderSessionExpiryModal() string {
+	const innerW = 46
+	var fields []string
+
+	title := lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Bold(true).Render("⚠️  SESSION EXPIRES IN 1 MINUTE")
+	fields = append(fields, title)
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
+	fields = append(fields, lipgloss.NewStyle().Foreground(m.Theme.Fg).Render("Your session is about to expire."))
+	fields = append(fields, lipgloss.NewStyle().Foreground(m.Theme.Fg).Render("Would you like to extend your session?"))
+	fields = append(fields, "")
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
+
+	yesBtn := lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true).Render("[Y] Yes, Reset Timer")
+	noBtn := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("[N] No, Allow Lock")
+	fields = append(fields, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+
+	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(fields, "\n"), innerW))
+}
+
+

@@ -119,15 +119,18 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 		return nil
 	}
 
-	// Sort tasks by start time, then end time, then priority weight
+	// Sort tasks by start time, then actual end time, then priority weight.
+	// Use the real end time here so short tasks ( < 1h ) don't artificially
+	// expand for overlap grouping and force unrelated tasks into the same
+	// columns. getEffectiveEnd() is intentionally avoided here.
 	sort.Slice(anchored, func(i, j int) bool {
 		startI := anchored[i].TimeWindow.Start
 		startJ := anchored[j].TimeWindow.Start
 		if !startI.Equal(startJ) {
 			return startI.Before(startJ)
 		}
-		endI := getEffectiveEnd(anchored[i])
-		endJ := getEffectiveEnd(anchored[j])
+		endI := anchored[i].TimeWindow.End
+		endJ := anchored[j].TimeWindow.End
 		if !endI.Equal(endJ) {
 			return endI.Before(endJ)
 		}
@@ -144,7 +147,11 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 		var nextActive []model.Task
 		var nextCols []int
 		for j, act := range active {
-			effEnd := getEffectiveEnd(act)
+			// Use the actual end time when deciding whether an active task
+			// still overlaps the current task's start. Using getEffectiveEnd
+			// here caused short tasks to be treated as long and incorrectly
+			// kept in the active set.
+			effEnd := act.TimeWindow.End
 			if effEnd.After(task.TimeWindow.Start) {
 				nextActive = append(nextActive, act)
 				nextCols = append(nextCols, cols[j])
@@ -193,10 +200,11 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 
 			// Check if intervals overlap
 			startI := tI.TimeWindow.Start
-			endI := getEffectiveEnd(tI)
+			endI := tI.TimeWindow.End
 			startJ := tJ.TimeWindow.Start
-			endJ := getEffectiveEnd(tJ)
+			endJ := tJ.TimeWindow.End
 
+			// Two intervals overlap if each starts before the other ends.
 			overlap := startI.Before(endJ) && startJ.Before(endI)
 			if overlap {
 				if results[j].ColIndex > maxCol {

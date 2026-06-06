@@ -88,10 +88,16 @@ func (m Model) renderDashboard(height int) string {
 	var leftHeights []int
 	var rightHeights []int
 	
-	// Distribute available dashboard rows across three panels so that the
-	// bottom card remains fully visible even on shorter terminal heights.
-	leftHeights = partitionHeights(availH, 3)
-	rightHeights = partitionHeights(availH, 3)
+	defaultH := 45 // default detailed height
+	if availH > defaultH {
+		// Stretch dynamically to fill height
+		leftHeights = partitionHeights(availH, 3)
+		rightHeights = partitionHeights(availH, 3)
+	} else {
+		// Use fixed detailed heights
+		leftHeights = []int{15, 15, 15}
+		rightHeights = []int{11, 17, 17}
+	}
 
 	var leftPanels []string
 	leftPanels = append(leftPanels,
@@ -187,7 +193,7 @@ func (m Model) renderPanel(title string, lines []string, w, h int, borderCol lip
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderCol).
 		Width(w - 2).
-		Height(h).
+		Height(innerH).
 		Padding(0, 2).
 		Render(joined)
 }
@@ -278,7 +284,7 @@ func (m Model) renderAgendaPanel(w, h int) string {
 			}
 
 			if t.LifecycleState == model.StateCompleted {
-				line = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(line)
+				line = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Faint(true).Render(line)
 			} else if t.LifecycleState == model.StateActive {
 				line = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(line)
 			} else {

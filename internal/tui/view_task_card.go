@@ -42,12 +42,15 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 
 	// Card border
 	borderColor := pColor
-	if isZenFocus {
-		borderColor = m.Theme.SuccessColor // High-contrast Green for Zen Focus
+	isCompleted := task.LifecycleState == model.StateCompleted
+	if isCompleted {
+		borderColor = lipgloss.Color("#45475a") // Dim border for completed
+	} else if isZenFocus {
+		borderColor = m.Theme.SuccessColor
 	} else if isSelected {
-		borderColor = lipgloss.Color("#ff8700") // High-contrast Orange for selection
+		borderColor = lipgloss.Color("#ff8700")
 	} else if hasCollision {
-		borderColor = lipgloss.Color("#ff0000") // Red for Overlap Warning
+		borderColor = lipgloss.Color("#ff0000")
 	} else if isActive {
 		borderColor = m.Theme.Accent
 	}
@@ -140,7 +143,9 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 	}
 
 	titleStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true)
-	if isZenFocus {
+	if isCompleted {
+		titleStyle = titleStyle.Foreground(lipgloss.Color("#a6e3a1")).Faint(true)
+	} else if isZenFocus {
 		titleStyle = titleStyle.Foreground(m.Theme.SuccessColor)
 	} else if isSelected {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff8700"))
@@ -220,7 +225,10 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 // renderShortCard renders a compact card for h < 4 rows using a left strip bar.
 func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color, isActive bool, isSelected bool, hasCollision bool, isZenFocus bool, timeStr string) string {
 	stripColor := pColor
-	if isZenFocus {
+	isCompleted := task.LifecycleState == model.StateCompleted
+	if isCompleted {
+		stripColor = lipgloss.Color("#45475a") // dim strip for completed
+	} else if isZenFocus {
 		stripColor = m.Theme.SuccessColor
 	} else if isSelected {
 		stripColor = lipgloss.Color("#ff8700")
@@ -263,7 +271,9 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 	}
 
 	var textStyle lipgloss.Style
-	if isZenFocus {
+	if isCompleted {
+		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Faint(true)
+	} else if isZenFocus {
 		textStyle = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true)
 	} else if isSelected {
 		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff8700")).Bold(true)

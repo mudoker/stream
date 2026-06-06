@@ -41,6 +41,7 @@ type TimeWindow struct {
 
 type ExecutionMetrics struct {
 	ElapsedFocusSeconds     int `json:"elapsed_focus_seconds"`
+	ElapsedBreakSeconds     int `json:"elapsed_break_seconds"`
 	TotalCompletedPomodoros int `json:"total_completed_pomodoros"`
 	TargetPomodoros         int `json:"target_pomodoros"`
 	InterruptionCount       int `json:"interruption_count"`

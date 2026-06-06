@@ -259,18 +259,20 @@ func NewZenTimer(t model.Task) *ZenTimer {
 	}
 }
 
-func (zt *ZenTimer) RecordElapsedFocus() int {
+func (zt *ZenTimer) RecordElapsedTimes() int {
 	if zt.CurrentSessionIdx >= 0 && zt.CurrentSessionIdx < len(zt.Sessions) {
 		sess := zt.Sessions[zt.CurrentSessionIdx]
-		if sess.Type == FocusSession {
-			elapsed := zt.TotalDuration - zt.TimeRemaining
-			if elapsed > 0 {
-				elapsedSecs := int(elapsed.Seconds())
+		elapsed := zt.TotalDuration - zt.TimeRemaining
+		if elapsed > 0 {
+			elapsedSecs := int(elapsed.Seconds())
+			if sess.Type == FocusSession {
 				zt.Task.ExecutionMetrics.ElapsedFocusSeconds += elapsedSecs
-				// Set TotalDuration equal to TimeRemaining to avoid double counting
-				zt.TotalDuration = zt.TimeRemaining
-				return elapsedSecs
+			} else if sess.Type == BreakSession {
+				zt.Task.ExecutionMetrics.ElapsedBreakSeconds += elapsedSecs
 			}
+			// Set TotalDuration equal to TimeRemaining to avoid double counting
+			zt.TotalDuration = zt.TimeRemaining
+			return elapsedSecs
 		}
 	}
 	return 0
@@ -283,8 +285,8 @@ func (zt *ZenTimer) Tick() bool {
 
 	zt.TimeRemaining -= time.Second
 	if zt.TimeRemaining <= 0 {
-		// Record elapsed focus time for the session block we are leaving
-		zt.RecordElapsedFocus()
+		// Record elapsed focus/break time for the session block we are leaving
+		zt.RecordElapsedTimes()
 
 		// Increment completed pomodoros if leaving a focus session
 		if zt.CurrentSessionIdx >= 0 && zt.CurrentSessionIdx < len(zt.Sessions) {

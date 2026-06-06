@@ -67,7 +67,7 @@ func (m *Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.StatusMsg = fmt.Sprintf("Subtracted %s from countdown.", formatDuration(dur))
 	case "r":
 		// Restart current session block
-		m.ZenTimer.RecordElapsedFocus()
+		m.ZenTimer.RecordElapsedTimes()
 		if m.DB != nil {
 			m.DB.UpdateTask(m.ZenTimer.Task)
 			m.refreshTasks()
@@ -78,7 +78,7 @@ func (m *Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.StatusMsg = "Timer RESTARTED"
 	case "q":
 		// Stop/Abort focus session completely
-		m.ZenTimer.RecordElapsedFocus()
+		m.ZenTimer.RecordElapsedTimes()
 		t := m.ZenTimer.Task
 		t.LifecycleState = model.StateReady
 		if m.DB != nil {
@@ -90,7 +90,7 @@ func (m *Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.StatusMsg = "Timer STOPPED"
 	case "b":
 		// Force Break
-		m.ZenTimer.RecordElapsedFocus()
+		m.ZenTimer.RecordElapsedTimes()
 		finished := m.ZenTimer.NextSession()
 		if m.DB != nil {
 			m.DB.UpdateTask(m.ZenTimer.Task)

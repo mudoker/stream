@@ -122,7 +122,9 @@ func (m Model) renderDetailPanel(height int) string {
 	sb.WriteString(fmt.Sprintf(" • Focus/Rest:      %s\n", info.RatioStr))
 	sb.WriteString(fmt.Sprintf(" • Efficiency:      %s\n", info.EfficiencyStr))
 	sb.WriteString(fmt.Sprintf(" • Interruptions:   %d\n", t.ExecutionMetrics.InterruptionCount))
-	sb.WriteString(fmt.Sprintf(" • Focus Quality:   %s\n", info.QualityStyled))
+	if t.ExecutionMetrics.ElapsedFocusSeconds > 0 {
+		sb.WriteString(fmt.Sprintf(" • Focus Quality:   %s\n", info.QualityStyled))
+	}
 
 	return lipgloss.NewStyle().
 		Foreground(m.Theme.Fg).
@@ -180,7 +182,9 @@ func (m Model) renderDetailModal() string {
 	sb.WriteString(fmt.Sprintf("  • Efficiency:      %s\n", info.EfficiencyStr))
 	sb.WriteString(fmt.Sprintf("  • Pomodoros:       %d / %d\n", t.ExecutionMetrics.TotalCompletedPomodoros, t.ExecutionMetrics.TargetPomodoros))
 	sb.WriteString(fmt.Sprintf("  • Interruptions:   %d\n", t.ExecutionMetrics.InterruptionCount))
-	sb.WriteString(fmt.Sprintf("  • Focus Quality:   %s\n", info.QualityStyled))
+	if t.ExecutionMetrics.ElapsedFocusSeconds > 0 {
+		sb.WriteString(fmt.Sprintf("  • Focus Quality:   %s\n", info.QualityStyled))
+	}
 
 	sb.WriteString("\n")
 	sb.WriteString(m.modalSep(innerW) + "\n")

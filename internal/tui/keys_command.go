@@ -30,14 +30,30 @@ var DefaultCommands = []CommandEntry{
 	{"week", "Switch to week lanes view"},
 	{"day", "Switch to day timeline view"},
 	{"analytics", "Switch to analytics view"},
+	{"ws-create", "Create a new workspace"},
+	{"ws-edit", "Edit active workspace"},
+	{"ws-delete", "Delete active workspace or specify name"},
 	{"quit", "Exit stream"},
+}
+
+func (m *Model) getCommandList() []CommandEntry {
+	var list []CommandEntry
+	list = append(list, DefaultCommands...)
+
+	for _, ws := range m.Workspaces {
+		list = append(list, CommandEntry{
+			Name: fmt.Sprintf("ws-switch %s", ws.Name),
+			Desc: fmt.Sprintf("Switch to workspace: %s %s", ws.Icon, ws.Name),
+		})
+	}
+	return list
 }
 
 func (m *Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	val := strings.ToLower(m.CommandInput.Value())
 	var filtered []CommandEntry
-	for _, c := range DefaultCommands {
-		if strings.Contains(c.Name, val) {
+	for _, c := range m.getCommandList() {
+		if strings.Contains(strings.ToLower(c.Name), val) || strings.Contains(strings.ToLower(c.Desc), val) {
 			filtered = append(filtered, c)
 		}
 	}
@@ -131,6 +147,7 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 		title := strings.Join(parts[1:], " ")
 		newTask := model.Task{
 			UUID:           uuid.New().String(),
+			WorkspaceUUID:  m.ActiveWorkspaceUUID,
 			Title:          title,
 			Priority:       model.P2,
 			StoryPoints:    3,
@@ -150,6 +167,100 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 		m.refreshTasks()
 		m.Sync.TriggerSync()
 		m.StatusMsg = fmt.Sprintf("Task '%s' created.", title)
+
+	case "ws-switch":
+		if len(parts) < 2 {
+			m.StatusMsg = "Usage: ws-switch <workspace name>"
+			return m, nil
+		}
+		targetName := strings.Join(parts[1:], " ")
+		var targetWS *model.Workspace
+		for _, ws := range m.Workspaces {
+			if strings.EqualFold(ws.Name, targetName) {
+				targetWS = &ws
+				break
+			}
+		}
+		if targetWS == nil {
+			m.StatusMsg = fmt.Sprintf("Workspace '%s' not found.", targetName)
+		} else {
+			m.ActiveWorkspaceUUID = targetWS.UUID
+			m.refreshTasks()
+			m.selectDefaultTaskForSelectedDay()
+			m.StatusMsg = fmt.Sprintf("Switched to workspace '%s'.", targetWS.Name)
+		}
+
+	case "ws-create":
+		m.IsEditingWorkspace = false
+		m.WorkspaceForm = NewWorkspaceForm()
+		m.CurrentMode = ModeWorkspaceForm
+		m.StatusMsg = "Entering Workspace Creation Form. Press Esc to cancel."
+
+	case "ws-edit":
+		var activeWS model.Workspace
+		found := false
+		for _, ws := range m.Workspaces {
+			if ws.UUID == m.ActiveWorkspaceUUID {
+				activeWS = ws
+				found = true
+				break
+			}
+		}
+		if !found {
+			m.StatusMsg = "No active workspace to edit."
+			return m, nil
+		}
+		m.IsEditingWorkspace = true
+		m.EditingWorkspaceUUID = activeWS.UUID
+		m.WorkspaceForm = NewWorkspaceForm()
+		m.WorkspaceForm.NameInput.SetValue(activeWS.Name)
+		m.WorkspaceForm.IconInput.SetValue(activeWS.Icon)
+		m.WorkspaceForm.BadgeInput.SetValue(activeWS.Badge)
+		m.CurrentMode = ModeWorkspaceForm
+		m.StatusMsg = fmt.Sprintf("Editing workspace '%s'. Press Esc to cancel.", activeWS.Name)
+
+	case "ws-delete":
+		var wsToDelete model.Workspace
+		if len(parts) > 1 {
+			targetName := strings.Join(parts[1:], " ")
+			found := false
+			for _, ws := range m.Workspaces {
+				if strings.EqualFold(ws.Name, targetName) {
+					wsToDelete = ws
+					found = true
+					break
+				}
+			}
+			if !found {
+				m.StatusMsg = fmt.Sprintf("Workspace '%s' not found.", targetName)
+				return m, nil
+			}
+		} else {
+			for _, ws := range m.Workspaces {
+				if ws.UUID == m.ActiveWorkspaceUUID {
+					wsToDelete = ws
+					break
+				}
+			}
+		}
+
+		if len(m.Workspaces) <= 1 {
+			m.StatusMsg = "Cannot delete the last workspace."
+			return m, nil
+		}
+
+		err := m.DB.DeleteWorkspace(wsToDelete.UUID)
+		if err != nil {
+			m.StatusMsg = fmt.Sprintf("Error deleting workspace: %v", err)
+		} else {
+			if m.ActiveWorkspaceUUID == wsToDelete.UUID {
+				m.ActiveWorkspaceUUID = ""
+			}
+			m.refreshWorkspaces()
+			m.refreshTasks()
+			m.selectDefaultTaskForSelectedDay()
+			m.StatusMsg = fmt.Sprintf("Workspace '%s' and its tasks deleted.", wsToDelete.Name)
+		}
 
 	case "review":
 		today := time.Now()

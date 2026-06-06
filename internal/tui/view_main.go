@@ -115,13 +115,15 @@ func (m Model) View() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.CurrentMode == ModeForm || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen {
+	if m.CurrentMode == ModeForm || m.CurrentMode == ModeWorkspaceForm || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen {
 		var modalStr string
 		switch {
 		case m.ConfirmOpen:
 			modalStr = m.renderConfirmModal()
 		case m.CurrentMode == ModeForm:
 			modalStr = m.renderFormModal()
+		case m.CurrentMode == ModeWorkspaceForm:
+			modalStr = m.renderWorkspaceFormModal()
 		case m.PromptOpen:
 			modalStr = m.renderPromptModal()
 		case m.ReviewOpen:
@@ -204,29 +206,47 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 
 	// WORKSPACES Section Divider (1 leading space)
 	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(" WORKSPACES"))
-	wsIcon := "💼"
-	wsLabel := "Tuturuuu iOS"
-	wsBadge := "[β]"
-	wsTextLeft := fmt.Sprintf("  %s %s", wsIcon, wsLabel) // 2 leading spaces for icon alignment
-	wsTextRight := wsBadge
-	wsLeftW := lipgloss.Width(wsTextLeft)
-	wsRightW := lipgloss.Width(wsTextRight)
-	if wsLeftW+wsRightW+1 > innerW {
-		maxLabelW := innerW - lipgloss.Width("  💼 ") - wsRightW - 2
-		if maxLabelW > 3 {
-			wsLabel = string([]rune(wsLabel)[:maxLabelW-3]) + "..."
-		} else {
-			wsLabel = string([]rune(wsLabel)[:maxLabelW])
+	for _, ws := range m.Workspaces {
+		wsIcon := ws.Icon
+		if wsIcon == "" {
+			wsIcon = "💼"
 		}
-		wsTextLeft = fmt.Sprintf("  %s %s", wsIcon, wsLabel)
-		wsLeftW = lipgloss.Width(wsTextLeft)
+		wsLabel := ws.Name
+		wsBadge := ws.Badge
+
+		isActive := ws.UUID == m.ActiveWorkspaceUUID
+		var rowStyle lipgloss.Style
+		if isActive {
+			rowStyle = lipgloss.NewStyle().
+				Foreground(m.Theme.Accent).
+				Bold(true)
+		} else {
+			rowStyle = lipgloss.NewStyle().
+				Foreground(m.Theme.Fg)
+		}
+
+		wsTextLeft := fmt.Sprintf("  %s %s", wsIcon, wsLabel)
+		wsTextRight := wsBadge
+		wsLeftW := lipgloss.Width(wsTextLeft)
+		wsRightW := lipgloss.Width(wsTextRight)
+		if wsLeftW+wsRightW+1 > innerW {
+			maxLabelW := innerW - lipgloss.Width("  💼 ") - wsRightW - 2
+			if maxLabelW > 3 {
+				wsLabel = string([]rune(wsLabel)[:maxLabelW-3]) + "..."
+			} else if maxLabelW > 0 {
+				wsLabel = string([]rune(wsLabel)[:maxLabelW])
+			}
+			wsTextLeft = fmt.Sprintf("  %s %s", wsIcon, wsLabel)
+			wsLeftW = lipgloss.Width(wsTextLeft)
+		}
+		wsPad := innerW - wsLeftW - wsRightW - 1
+		if wsPad < 0 {
+			wsPad = 0
+		}
+		wsRow := wsTextLeft + strings.Repeat(" ", wsPad) + wsTextRight + " "
+		rows = append(rows, rowStyle.Width(innerW).Render(wsRow))
 	}
-	wsPad := innerW - wsLeftW - wsRightW - 1
-	if wsPad < 0 {
-		wsPad = 0
-	}
-	wsRow := wsTextLeft + strings.Repeat(" ", wsPad) + wsTextRight + " "
-	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Fg).Width(innerW).Render(wsRow), "")
+	rows = append(rows, "")
 
 	// VIEWS Category Divider (1 leading space)
 	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(" VIEWS"), "")
@@ -391,6 +411,8 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 	case ModeCommand:
 		modeColor = m.Theme.P1Color
 	case ModeForm:
+		modeColor = m.Theme.Accent
+	case ModeWorkspaceForm:
 		modeColor = m.Theme.Accent
 	}
 	modeBadge := lipgloss.NewStyle().Foreground(modeColor).Bold(true).

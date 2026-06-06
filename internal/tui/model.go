@@ -24,11 +24,12 @@ const (
 type UIState string
 
 const (
-	ModeNormal  UIState = "NORMAL"
-	ModeInsert  UIState = "INSERT" // For inline text entry
-	ModeZen     UIState = "ZEN"    // Zen Mode Pomodoro Focus
-	ModeCommand UIState = "COMMAND"
-	ModeForm    UIState = "WIZARD" // Task Creation Form Wizard
+	ModeNormal        UIState = "NORMAL"
+	ModeInsert        UIState = "INSERT" // For inline text entry
+	ModeZen           UIState = "ZEN"    // Zen Mode Pomodoro Focus
+	ModeCommand       UIState = "COMMAND"
+	ModeForm          UIState = "WIZARD" // Task Creation Form Wizard
+	ModeWorkspaceForm UIState = "WORKSPACE_WIZARD"
 )
 
 type TickMsg struct {
@@ -141,6 +142,39 @@ func NewTaskForm() TaskForm {
 	}
 }
 
+type WorkspaceForm struct {
+	Name        string
+	Icon        string
+	Badge       string
+	ActiveField int // 0: Name, 1: Icon, 2: Badge, 3: Submit
+	NameInput   textinput.Model
+	IconInput   textinput.Model
+	BadgeInput  textinput.Model
+}
+
+func NewWorkspaceForm() WorkspaceForm {
+	name := textinput.New()
+	name.Placeholder = "Aether Workspace"
+	name.Focus()
+
+	icon := textinput.New()
+	icon.Placeholder = "🚀"
+	icon.SetValue("🚀")
+
+	badge := textinput.New()
+	badge.Placeholder = "[Dev]"
+
+	return WorkspaceForm{
+		Name:        "",
+		Icon:        "🚀",
+		Badge:       "",
+		ActiveField: 0,
+		NameInput:   name,
+		IconInput:   icon,
+		BadgeInput:  badge,
+	}
+}
+
 type Model struct {
 	DB           *db.JSONDB
 	Sync         *sync.SyncEngine
@@ -173,6 +207,13 @@ type Model struct {
 
 	// Task Creation Wizard
 	Form TaskForm
+
+	// Workspace State & Form
+	Workspaces           []model.Workspace
+	ActiveWorkspaceUUID  string
+	WorkspaceForm        WorkspaceForm
+	IsEditingWorkspace   bool
+	EditingWorkspaceUUID string
 
 	// Auto-activation Task Prompt
 	PromptOpen bool
@@ -217,15 +258,30 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		TodoShelfFocus: false,
 		TimelineHour:   9,
 		Form:           NewTaskForm(),
+		WorkspaceForm:  NewWorkspaceForm(),
 	}
 
+	m.refreshWorkspaces()
 	m.refreshTasks()
 	m.selectDefaultTaskForSelectedDay()
 	return m
 }
 
+func (m *Model) refreshWorkspaces() {
+	m.Workspaces = m.DB.GetWorkspaces()
+	if m.ActiveWorkspaceUUID == "" && len(m.Workspaces) > 0 {
+		m.ActiveWorkspaceUUID = m.Workspaces[0].UUID
+	}
+}
+
 func (m *Model) refreshTasks() {
-	m.Tasks = m.DB.GetTasks()
+	allTasks := m.DB.GetTasks()
+	m.Tasks = nil
+	for _, t := range allTasks {
+		if t.WorkspaceUUID == m.ActiveWorkspaceUUID {
+			m.Tasks = append(m.Tasks, t)
+		}
+	}
 
 	// Automatically transition expired incomplete tasks to OVERDUE
 	now := time.Now()

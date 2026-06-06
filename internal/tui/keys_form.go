@@ -211,3 +211,118 @@ func (m *Model) submitForm() {
 		m.StatusMsg = fmt.Sprintf("Task '%s' created successfully.", title)
 	}
 }
+
+func (m *Model) handleWorkspaceFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
+	switch key {
+	case "up", "shift+tab":
+		m.WorkspaceForm.ActiveField = (m.WorkspaceForm.ActiveField - 1 + 4) % 4
+		m.focusWorkspaceFormFields()
+		return m, nil
+	case "down", "tab":
+		m.WorkspaceForm.ActiveField = (m.WorkspaceForm.ActiveField + 1) % 4
+		m.focusWorkspaceFormFields()
+		return m, nil
+	case "enter":
+		if m.WorkspaceForm.ActiveField == 3 { // Submit
+			m.submitWorkspaceForm()
+			m.CurrentMode = ModeNormal
+			return m, nil
+		}
+		m.WorkspaceForm.ActiveField = (m.WorkspaceForm.ActiveField + 1) % 4
+		m.focusWorkspaceFormFields()
+		return m, nil
+	case "esc":
+		m.CurrentMode = ModeNormal
+		m.IsEditingWorkspace = false
+		m.EditingWorkspaceUUID = ""
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	switch m.WorkspaceForm.ActiveField {
+	case 0:
+		m.WorkspaceForm.NameInput, cmd = m.WorkspaceForm.NameInput.Update(msg)
+	case 1:
+		m.WorkspaceForm.IconInput, cmd = m.WorkspaceForm.IconInput.Update(msg)
+	case 2:
+		m.WorkspaceForm.BadgeInput, cmd = m.WorkspaceForm.BadgeInput.Update(msg)
+	}
+
+	return m, cmd
+}
+
+func (m *Model) focusWorkspaceFormFields() {
+	m.WorkspaceForm.NameInput.Blur()
+	m.WorkspaceForm.IconInput.Blur()
+	m.WorkspaceForm.BadgeInput.Blur()
+
+	switch m.WorkspaceForm.ActiveField {
+	case 0:
+		m.WorkspaceForm.NameInput.Focus()
+	case 1:
+		m.WorkspaceForm.IconInput.Focus()
+	case 2:
+		m.WorkspaceForm.BadgeInput.Focus()
+	}
+}
+
+func (m *Model) submitWorkspaceForm() {
+	name := m.WorkspaceForm.NameInput.Value()
+	if strings.TrimSpace(name) == "" {
+		m.StatusMsg = "Workspace name cannot be empty."
+		return
+	}
+
+	icon := m.WorkspaceForm.IconInput.Value()
+	if strings.TrimSpace(icon) == "" {
+		icon = "💼"
+	}
+
+	badge := m.WorkspaceForm.BadgeInput.Value()
+
+	var ws model.Workspace
+	isEdit := m.IsEditingWorkspace
+	if isEdit {
+		for _, w := range m.Workspaces {
+			if w.UUID == m.EditingWorkspaceUUID {
+				ws = w
+				break
+			}
+		}
+	} else {
+		ws = model.Workspace{
+			UUID:      uuid.New().String(),
+			CreatedAt: time.Now(),
+		}
+	}
+
+	ws.Name = name
+	ws.Icon = icon
+	ws.Badge = badge
+	ws.UpdatedAt = time.Now()
+
+	if isEdit {
+		err := m.DB.UpdateWorkspace(ws)
+		if err != nil {
+			m.StatusMsg = fmt.Sprintf("Error updating workspace: %v", err)
+		} else {
+			m.StatusMsg = fmt.Sprintf("Workspace '%s' updated successfully.", name)
+		}
+	} else {
+		err := m.DB.AddWorkspace(ws)
+		if err != nil {
+			m.StatusMsg = fmt.Sprintf("Error creating workspace: %v", err)
+		} else {
+			m.ActiveWorkspaceUUID = ws.UUID // Switch to it!
+			m.StatusMsg = fmt.Sprintf("Workspace '%s' created successfully.", name)
+		}
+	}
+
+	m.IsEditingWorkspace = false
+	m.EditingWorkspaceUUID = ""
+	m.refreshWorkspaces()
+	m.refreshTasks()
+	m.selectDefaultTaskForSelectedDay()
+}

@@ -108,7 +108,11 @@ func (m Model) renderFormModal() string {
 	const innerW = 52
 
 	var fields []string
-	title := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("Create Task")
+	headerText := "Create Task"
+	if m.IsEditing {
+		headerText = "Edit Task"
+	}
+	title := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(headerText)
 	fields = append(fields, title)
 	fields = append(fields, m.modalSep(innerW))
 	fields = append(fields, "")
@@ -155,6 +159,51 @@ func (m Model) renderFormModal() string {
 	submitFg := m.Theme.Muted
 	submitText := "  Submit  "
 	if f.ActiveField == 7 {
+		submitFg = m.Theme.SuccessColor
+		submitText = "[ Submit ]"
+	}
+	submitBtn := lipgloss.NewStyle().
+		Foreground(submitFg).
+		Bold(true).
+		Render(submitText)
+	fields = append(fields, "  "+submitBtn)
+
+	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(fields, "\n"), innerW))
+}
+
+func (m Model) renderWorkspaceFormModal() string {
+	f := m.WorkspaceForm
+	const innerW = 52
+
+	var fields []string
+	headerText := "Create Workspace"
+	if m.IsEditingWorkspace {
+		headerText = "Edit Workspace"
+	}
+	title := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(headerText)
+	fields = append(fields, title)
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
+
+	renderField := func(num, label string, input string, index int) string {
+		numStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(num)
+		lblStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg)
+		if f.ActiveField == index {
+			lblStyle = lblStyle.Foreground(m.Theme.Accent).Bold(true)
+		}
+		return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), input)
+	}
+
+	fields = append(fields, renderField("1", "Name", f.NameInput.View(), 0))
+	fields = append(fields, renderField("2", "Icon", f.IconInput.View(), 1))
+	fields = append(fields, renderField("3", "Badge", f.BadgeInput.View(), 2))
+	fields = append(fields, "")
+	fields = append(fields, m.modalSep(innerW))
+	fields = append(fields, "")
+
+	submitFg := m.Theme.Muted
+	submitText := "  Submit  "
+	if f.ActiveField == 3 {
 		submitFg = m.Theme.SuccessColor
 		submitText = "[ Submit ]"
 	}

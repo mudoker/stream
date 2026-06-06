@@ -131,9 +131,13 @@ func (m Model) renderMonthView(height int) string {
 		}
 		gridContent := strings.Join(gridRows, "\n")
 
+		titleColor := m.Theme.Accent
+		if m.SidebarFocus {
+			titleColor = m.Theme.Muted
+		}
 		monthBlock := fmt.Sprintf(
 			"  %s\n  Mo  Tu  We  Th  Fr  Sa  Su\n  ───────────────────────────\n%s",
-			lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(title),
+			lipgloss.NewStyle().Foreground(titleColor).Bold(true).Render(title),
 			gridContent,
 		)
 		monthBlocks = append(monthBlocks, monthBlock)
@@ -252,9 +256,13 @@ func (m Model) renderWeekView(height int) string {
 	endStr := strings.ToUpper(weekEnd.Format("January 2, 2006"))
 
 	weekTitle := fmt.Sprintf("◀  WEEK %d (%s - %s)  ▶", weekNum, startStr, endStr)
+	titleColor := m.Theme.Fg
+	if m.SidebarFocus {
+		titleColor = m.Theme.Muted
+	}
 	titleStyle := lipgloss.NewStyle().
-		Foreground(m.Theme.Fg).
-		Bold(true).
+		Foreground(titleColor).
+		Bold(!m.SidebarFocus).
 		Align(lipgloss.Center).
 		Width(m.Layout.WorkspaceW - 4)
 	renderedTitle := titleStyle.Render(weekTitle)

@@ -42,6 +42,8 @@ func (m Model) View() string {
 	sidebarBorderCol := lipgloss.Color("#2a2c37")
 	if m.SidebarFocus {
 		sidebarBorderCol = m.Theme.Accent
+	} else if m.CurrentView == DayView && !m.TodoShelfFocus { // Timeline is focused
+		sidebarBorderCol = m.Theme.Accent
 	}
 	sidebarStyle := lipgloss.NewStyle().
 		Width(l.SidebarW).
@@ -67,6 +69,8 @@ func (m Model) View() string {
 
 	todoBorderCol := lipgloss.Color("#2a2c37")
 	if m.TodoShelfFocus && !m.SidebarFocus {
+		todoBorderCol = m.Theme.Accent
+	} else if !m.SidebarFocus && !m.TodoShelfFocus { // Timeline is focused
 		todoBorderCol = m.Theme.Accent
 	}
 	todoStyle := lipgloss.NewStyle().
@@ -209,6 +213,10 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 	// WORKSPACES Section Divider (1 leading space)
 	// Show index counter when multiple workspaces exist
 	wsHeaderText := " WORKSPACES"
+	wsHeaderColor := m.Theme.Muted
+	if m.SidebarFocus {
+		wsHeaderColor = m.Theme.Accent
+	}
 	if len(m.Workspaces) > 1 {
 		activeIdx := 0
 		for i, ws := range m.Workspaces {
@@ -218,7 +226,7 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 			}
 		}
 		counterStr := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("%d/%d  w/W", activeIdx+1, len(m.Workspaces)))
-		headerLeft := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(wsHeaderText)
+		headerLeft := lipgloss.NewStyle().Foreground(wsHeaderColor).Bold(m.SidebarFocus).Render(wsHeaderText)
 		heatWL := lipgloss.Width(headerLeft)
 		heatWR := lipgloss.Width(counterStr)
 		heatPad := innerW - heatWL - heatWR
@@ -227,7 +235,7 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 		}
 		rows = append(rows, headerLeft+strings.Repeat(" ", heatPad)+counterStr)
 	} else {
-		rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(wsHeaderText))
+		rows = append(rows, lipgloss.NewStyle().Foreground(wsHeaderColor).Bold(m.SidebarFocus).Render(wsHeaderText))
 	}
 
 	for i, ws := range m.Workspaces {
@@ -244,8 +252,12 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 		cursor := "  "
 		var rowStyle lipgloss.Style
 		if isActive {
-			cursor = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("›")
-			rowStyle = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true)
+			cursorCol := m.Theme.Accent
+			if !m.SidebarFocus {
+				cursorCol = m.Theme.Muted
+			}
+			cursor = lipgloss.NewStyle().Foreground(cursorCol).Bold(m.SidebarFocus).Render("›")
+			rowStyle = lipgloss.NewStyle().Foreground(cursorCol).Bold(m.SidebarFocus)
 		} else {
 			cursor = lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("%d", i+1))
 			rowStyle = lipgloss.NewStyle().Foreground(m.Theme.Fg)
@@ -275,7 +287,11 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 	rows = append(rows, "")
 
 	// VIEWS Category Divider (1 leading space)
-	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(" VIEWS"), "")
+	viewsHeaderColor := m.Theme.Muted
+	if m.SidebarFocus {
+		viewsHeaderColor = m.Theme.Accent
+	}
+	rows = append(rows, lipgloss.NewStyle().Foreground(viewsHeaderColor).Bold(m.SidebarFocus).Render(" VIEWS"), "")
 
 	type navItem struct {
 		label string
@@ -300,7 +316,12 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 		// Selected prefix is 1 char: "┃", unselected is " " (1 space) for 1-char left margin
 		var leftText string
 		if isSelected {
-			leftText = fmt.Sprintf("┃%s %s", item.icon, item.label)
+			cursorCol := m.Theme.Accent
+			if !m.SidebarFocus {
+				cursorCol = m.Theme.Muted
+			}
+			cursor := lipgloss.NewStyle().Foreground(cursorCol).Bold(m.SidebarFocus).Render("┃")
+			leftText = fmt.Sprintf("%s%s %s", cursor, item.icon, item.label)
 		} else {
 			leftText = fmt.Sprintf(" %s %s", item.icon, item.label)
 		}
@@ -316,7 +337,12 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 				item.label = string([]rune(item.label)[:maxLabelW])
 			}
 			if isSelected {
-				leftText = fmt.Sprintf("┃%s %s", item.icon, item.label)
+				cursorCol := m.Theme.Accent
+				if !m.SidebarFocus {
+					cursorCol = m.Theme.Muted
+				}
+				cursor := lipgloss.NewStyle().Foreground(cursorCol).Bold(m.SidebarFocus).Render("┃")
+				leftText = fmt.Sprintf("%s%s %s", cursor, item.icon, item.label)
 			} else {
 				leftText = fmt.Sprintf(" %s %s", item.icon, item.label)
 			}
@@ -331,9 +357,13 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 
 		var renderedRow string
 		if isSelected {
+			fgColor := lipgloss.Color("#ffffff")
+			if !m.SidebarFocus {
+				fgColor = m.Theme.Fg
+			}
 			renderedRow = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#ffffff")). // Maximum brightness
-				Bold(true).
+				Foreground(fgColor).
+				Bold(m.SidebarFocus).
 				Width(innerW).
 				Render(rowText)
 		} else {
@@ -348,7 +378,11 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 	rows = append(rows, "", sep, "")
 
 	// LIFECYCLE Category Divider (1 leading space)
-	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(" LIFECYCLE"), "")
+	lifecycleHeaderColor := m.Theme.Muted
+	if m.SidebarFocus {
+		lifecycleHeaderColor = m.Theme.Accent
+	}
+	rows = append(rows, lipgloss.NewStyle().Foreground(lifecycleHeaderColor).Bold(m.SidebarFocus).Render(" LIFECYCLE"), "")
 
 	p0Bullet := lipgloss.NewStyle().Foreground(m.Theme.P0Color).Render("󰀦")
 	p0TextLeft := fmt.Sprintf("  %s P0 Urgent", p0Bullet) // 2 leading spaces for icon alignment

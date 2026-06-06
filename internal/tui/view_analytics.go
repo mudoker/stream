@@ -15,8 +15,14 @@ func (m Model) renderAnalyticsView(height int) string {
 	workspaceWidth := m.Layout.WorkspaceW - 4
 
 	// ── Page Header ──────────────────────────────────────────────
-	header := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("▲ Analytics")
-	subhead := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(today.Format("January 2006"))
+	var header, subhead string
+	if !m.SidebarFocus {
+		header = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("▲ Analytics")
+		subhead = lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).Render(today.Format("January 2006"))
+	} else {
+		header = lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("▲ Analytics")
+		subhead = lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render(today.Format("January 2006"))
+	}
 	headerLine := header + "  " + subhead
 
 	// ── Top Metric Banner Box ────────────────────────────────────

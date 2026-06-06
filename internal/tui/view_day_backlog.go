@@ -18,13 +18,24 @@ func (m Model) renderTodoShelf(appContentHeight int) string {
 		innerW = 10
 	}
 
-	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).
+	isTodoFocused := m.TodoShelfFocus && !m.SidebarFocus
+	var titleStr string
+	var sepColor lipgloss.Color
+	if isTodoFocused {
+		titleStr = lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("● ") +
+			lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("BACKLOG")
+		sepColor = m.Theme.Accent
+	} else {
+		titleStr = "  " + lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("BACKLOG")
+		sepColor = lipgloss.Color("#2a2c37")
+	}
+
+	sep := lipgloss.NewStyle().Foreground(sepColor).
 		Render(strings.Repeat("─", innerW))
-	mutedB := lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true)
 
 	var rows []string
 	rows = append(rows,
-		mutedB.Render("BACKLOG"),
+		titleStr,
 		"",
 		sep,
 		"",

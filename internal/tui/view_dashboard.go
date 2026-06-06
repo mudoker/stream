@@ -44,13 +44,26 @@ func (m Model) renderDashboard(height int) string {
 	workspaceWidth := m.Layout.WorkspaceW - 4
 
 	// ── Page Header ──────────────────────────────────────────────
-	headerDate := lipgloss.NewStyle().
-		Foreground(m.Theme.Accent).
-		Bold(true).
-		Render(today.Format("Monday, January 2"))
-	subDate := lipgloss.NewStyle().
-		Foreground(m.Theme.Muted).
-		Render(today.Format("2006"))
+	var headerDate, subDate string
+	if !m.SidebarFocus {
+		headerDate = lipgloss.NewStyle().
+			Foreground(m.Theme.Accent).
+			Bold(true).
+			Render(today.Format("Monday, January 2"))
+		subDate = lipgloss.NewStyle().
+			Foreground(m.Theme.Fg).
+			Bold(true).
+			Render(today.Format("2006"))
+	} else {
+		headerDate = lipgloss.NewStyle().
+			Foreground(m.Theme.Muted).
+			Bold(true).
+			Render(today.Format("Monday, January 2"))
+		subDate = lipgloss.NewStyle().
+			Foreground(m.Theme.Muted).
+			Bold(true).
+			Render(today.Format("2006"))
+	}
 	headerLine := headerDate + "  " + subDate
 
 	// ── High-Fidelity Performance Banner ──────────────────────────

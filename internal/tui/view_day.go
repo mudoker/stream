@@ -34,24 +34,41 @@ func (m Model) renderDayTimeline(appContentHeight int) string {
 	}
 
 	// ── Header ──────────────────────────────────────────────────────
+	isTimelineFocused := !m.SidebarFocus && !m.TodoShelfFocus
+
+	var dayName, dayDate string
+	var prefix string
+	var sepColor lipgloss.Color
+	if isTimelineFocused {
+		prefix = lipgloss.NewStyle().Foreground(m.Theme.Accent).Render("● ")
+		dayName = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).
+			Render(m.SelectedDay.Format("Monday"))
+		dayDate = lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).
+			Render(m.SelectedDay.Format("January 2, 2006"))
+		sepColor = m.Theme.Accent
+	} else {
+		prefix = "  "
+		dayName = lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).
+			Render(m.SelectedDay.Format("Monday"))
+		dayDate = lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).
+			Render(m.SelectedDay.Format("January 2, 2006"))
+		sepColor = lipgloss.Color("#2a2c37")
+	}
+
 	sep := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#2a2c37")).
+		Foreground(sepColor).
 		Render(strings.Repeat("─", l.TimelineW-2))
 
-	dayName := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).
-		Render(m.SelectedDay.Format("Monday"))
-	dayDate := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true).
-		Render(m.SelectedDay.Format("January 2, 2006"))
 	navHint := lipgloss.NewStyle().Foreground(m.Theme.Muted).
 		Render("H ◂ · ▸ L")
 
 	// Right-align navHint in the header line
-	usedW := lipgloss.Width(dayName) + 2 + lipgloss.Width(dayDate)
+	usedW := lipgloss.Width(prefix) + lipgloss.Width(dayName) + 2 + lipgloss.Width(dayDate)
 	padW := (l.TimelineW - 2) - usedW - lipgloss.Width(navHint)
 	if padW < 1 {
 		padW = 1
 	}
-	headerLine := dayName + "  " + dayDate + strings.Repeat(" ", padW) + navHint
+	headerLine := prefix + dayName + "  " + dayDate + strings.Repeat(" ", padW) + navHint
 
 	// ── Resolve overlapping tasks and overlay cards ──────────────────
 	var anchoredTasks []model.Task

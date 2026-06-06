@@ -75,8 +75,8 @@ func TestRenderTaskCardMaintainsClosedRectangle(t *testing.T) {
 		Title: "Border Test",
 		Priority: model.P2,
 		TimeWindow: model.TimeWindow{
-			Start: time.Date(2026, 6, 6, 13, 0, 0, 0, time.UTC),
-			End:   time.Date(2026, 6, 6, 14, 0, 0, 0, time.UTC),
+			Start: time.Date(2026, 6, 6, 13, 0, 0, 0, time.Local),
+			End:   time.Date(2026, 6, 6, 14, 0, 0, 0, time.Local),
 		},
 		StoryPoints: 3,
 	}
@@ -92,14 +92,14 @@ func TestDayViewSpatialNavigation(t *testing.T) {
 	m := Model{
 		Layout:     computeLayout(120, 30),
 		Theme:      NewTheme(),
-		SelectedDay: time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC),
+		SelectedDay: time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local),
 	}
 
 	tasks := []model.Task{
-		{UUID: "A", Title: "A", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 0, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 14, 0, 0, 0, time.UTC)}},
-		{UUID: "B", Title: "B", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 0, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 14, 0, 0, 0, time.UTC)}},
-		{UUID: "C", Title: "C", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 14, 0, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC)}},
-		{UUID: "D", Title: "D", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 14, 0, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC)}},
+		{UUID: "A", Title: "A", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 0, 0, 0, time.Local), End: time.Date(2026, 6, 6, 14, 0, 0, 0, time.Local)}},
+		{UUID: "B", Title: "B", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 0, 0, 0, time.Local), End: time.Date(2026, 6, 6, 14, 0, 0, 0, time.Local)}},
+		{UUID: "C", Title: "C", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 14, 0, 0, 0, time.Local), End: time.Date(2026, 6, 6, 15, 0, 0, 0, time.Local)}},
+		{UUID: "D", Title: "D", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 14, 0, 0, 0, time.Local), End: time.Date(2026, 6, 6, 15, 0, 0, 0, time.Local)}},
 	}
 	m.Tasks = tasks
 
@@ -132,16 +132,16 @@ func TestRegressionOverlappingScheduleBorderIntegrity(t *testing.T) {
 	m := Model{
 		Layout:      computeLayout(120, 40),
 		Theme:       NewTheme(),
-		SelectedDay: time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC),
+		SelectedDay: time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local),
 	}
 
 	tasks := []model.Task{
-		{UUID: "A", Title: "A", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 0, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 17, 0, 0, 0, time.UTC)}},
-		{UUID: "B", Title: "B", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 30, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 14, 30, 0, 0, time.UTC)}},
-		{UUID: "C", Title: "C", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 14, 0, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC)}},
-		{UUID: "D", Title: "D", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 15, 0, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 16, 0, 0, 0, time.UTC)}},
-		{UUID: "E", Title: "E", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 15, 30, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 16, 15, 0, 0, time.UTC)}},
-		{UUID: "F", Title: "F", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 16, 30, 0, 0, time.UTC), End: time.Date(2026, 6, 6, 17, 30, 0, 0, time.UTC)}},
+		{UUID: "A", Title: "A", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 0, 0, 0, time.Local), End: time.Date(2026, 6, 6, 17, 0, 0, 0, time.Local)}},
+		{UUID: "B", Title: "B", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 30, 0, 0, time.Local), End: time.Date(2026, 6, 6, 14, 30, 0, 0, time.Local)}},
+		{UUID: "C", Title: "C", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 14, 0, 0, 0, time.Local), End: time.Date(2026, 6, 6, 15, 0, 0, 0, time.Local)}},
+		{UUID: "D", Title: "D", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 15, 0, 0, 0, time.Local), End: time.Date(2026, 6, 6, 16, 0, 0, 0, time.Local)}},
+		{UUID: "E", Title: "E", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 15, 30, 0, 0, time.Local), End: time.Date(2026, 6, 6, 16, 15, 0, 0, time.Local)}},
+		{UUID: "F", Title: "F", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 16, 30, 0, 0, time.Local), End: time.Date(2026, 6, 6, 17, 30, 0, 0, time.Local)}},
 	}
 	m.Tasks = tasks
 

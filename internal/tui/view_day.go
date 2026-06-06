@@ -168,18 +168,11 @@ func (m Model) renderDayTimeline(appContentHeight int) string {
 	// Overlay tasks onto the columns
 	for _, rc := range cols {
 		startRow := timeToRow(rc.Task.TimeWindow.Start)
-		endRow := timeToRow(rc.Task.TimeWindow.End)
-		
-		// If end time is exactly on a 15-minute boundary (minute % 15 == 0),
-		// add 1 to ensure the card extends to cover that full time slot
-		if rc.Task.TimeWindow.End.Minute()%15 == 0 && rc.Task.TimeWindow.End.Second() == 0 && rc.Task.TimeWindow.End.Nanosecond() == 0 {
-			endRow++
+		durationMinutes := int(rc.Task.TimeWindow.End.Sub(rc.Task.TimeWindow.Start).Minutes())
+		h := (durationMinutes + 14) / 15
+		if startRow+h > totalRows {
+			h = totalRows - startRow
 		}
-		
-		if endRow > totalRows {
-			endRow = totalRows
-		}
-		h := endRow - startRow
 		if h < 1 {
 			h = 1
 		}
@@ -248,12 +241,15 @@ func (m Model) buildNowLine(width int, now time.Time) string {
 		Render(badge + rest)
 }
 
-// timeToRow converts a time.Time to its 15-minute row index (0–95).
+// timeToRow converts a time.Time to its 15-minute row index (0–95) in local time.
 func timeToRow(t time.Time) int {
-	return (t.Hour() * rowsPerHour) + (t.Minute() / 15)
+	local := t.Local()
+	return (local.Hour() * rowsPerHour) + (local.Minute() / 15)
 }
 
-// sameDay returns true if a and b are on the same calendar day.
+// sameDay returns true if a and b are on the same calendar day in local time.
 func sameDay(a, b time.Time) bool {
-	return a.Year() == b.Year() && a.Month() == b.Month() && a.Day() == b.Day()
+	aLocal := a.Local()
+	bLocal := b.Local()
+	return aLocal.Year() == bLocal.Year() && aLocal.Month() == bLocal.Month() && aLocal.Day() == bLocal.Day()
 }

@@ -294,15 +294,12 @@ func (m *Model) handleDashboardOrAnalyticsNav(key string) {
 			m.DashboardFocusRow = (m.DashboardFocusRow + 1) % 3
 		}
 
-		availH := m.Height - 8
+		availH := m.Height - 10
 		if availH < 10 {
 			availH = 10
 		}
 
-		rowHeights := []int{15, 15, 15}
-		if availH > 45 {
-			rowHeights = partitionHeights(availH, 3)
-		}
+		rowHeights := partitionHeights(availH, 3)
 
 		var yStart, yEnd int
 		for i := 0; i < m.DashboardFocusRow; i++ {
@@ -334,7 +331,7 @@ func (m *Model) handleDashboardOrAnalyticsNav(key string) {
 		yStart := m.AnalyticsFocusRow * 13
 		yEnd := (m.AnalyticsFocusRow + 1) * 13
 
-		gridHeight := m.Height - 8
+		gridHeight := m.Height - 10
 		if gridHeight < 10 {
 			gridHeight = 10
 		}

@@ -86,6 +86,27 @@ func TestComputeTaskMetricsInfo(t *testing.T) {
 	}
 }
 
+func TestRenderSettingsCardExactHeight(t *testing.T) {
+	m := Model{Theme: NewTheme(), Layout: Layout{WorkspaceW: 120}}
+	card := m.renderSettingsCard("Google Calendar Sync", "  [:auth]  Authenticate GCal API\n  [:sync]  Force background sync", 50, 18)
+	lines := strings.Split(card, "\n")
+	if len(lines) != 18 {
+		t.Fatalf("Expected settings card height 18, got %d", len(lines))
+	}
+}
+
+func TestPartitionHeightsDistributesSmallSpace(t *testing.T) {
+	availH := 28 - 8
+	rowHeights := partitionHeights(availH, 3)
+	sum := rowHeights[0] + rowHeights[1] + rowHeights[2]
+	if sum != availH {
+		t.Fatalf("Expected partition sum %d, got %d", availH, sum)
+	}
+	if rowHeights[0] == 15 && rowHeights[1] == 15 && rowHeights[2] == 15 {
+		t.Fatalf("Expected small available space to use distributed heights, not fixed 15s")
+	}
+}
+
 func TestModalOverlayBorderAlignment(t *testing.T) {
 	// Prepare a model with fixed terminal size
 	// Use a larger virtual terminal to ensure modals fit during tests.

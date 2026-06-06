@@ -18,6 +18,10 @@ func (m Model) View() string {
 		return "Initializing workspace..."
 	}
 
+	if m.IsLocked {
+		return m.renderLockScreen()
+	}
+
 	// Zen Mode is a full-screen takeover
 	if m.CurrentMode == ModeZen {
 		return m.renderZenMode()
@@ -47,8 +51,8 @@ func (m Model) View() string {
 	}
 	sidebarStyle := lipgloss.NewStyle().
 		Width(l.SidebarW).
-		Height(appContentHeight).
-		MaxHeight(appContentHeight).
+		Height(appContentHeight - 2).
+		MaxHeight(appContentHeight - 2).
 		BorderRight(true).
 		BorderStyle(lipgloss.Border{Right: "│"}).
 		BorderForeground(sidebarBorderCol).
@@ -57,8 +61,8 @@ func (m Model) View() string {
 	// ── Workspace (non-day views use the full workspace width) ────────
 	workspaceStyle := lipgloss.NewStyle().
 		Width(l.WorkspaceW).
-		Height(appContentHeight).
-		MaxHeight(appContentHeight).
+		Height(appContentHeight - 2).
+		MaxHeight(appContentHeight - 2).
 		Padding(1, 2)
 
 	// ── Day View: three-column layout ────────────────────────────────
@@ -89,7 +93,7 @@ func (m Model) View() string {
 		todoContent := m.renderTodoShelf(appContentHeight)
 
 		canvas = lipgloss.JoinHorizontal(lipgloss.Top,
-			sidebarStyle.Render(m.renderArcSidebar(appContentHeight)),
+			sidebarStyle.Render(m.renderArcSidebar(appContentHeight - 2)),
 			timelineStyle.Render(timelineContent),
 			todoStyle.Render(todoContent),
 		)
@@ -98,19 +102,19 @@ func (m Model) View() string {
 		var workspaceContent string
 		switch m.CurrentView {
 		case DashboardView:
-			workspaceContent = m.renderDashboard(appContentHeight)
+			workspaceContent = m.renderDashboard(appContentHeight - 2)
 		case MonthView:
-			workspaceContent = m.renderMonthView(appContentHeight)
+			workspaceContent = m.renderMonthView(appContentHeight - 2)
 		case WeekView:
-			workspaceContent = m.renderWeekView(appContentHeight)
+			workspaceContent = m.renderWeekView(appContentHeight - 2)
 		case AnalyticsView:
-			workspaceContent = m.renderAnalyticsView(appContentHeight)
+			workspaceContent = m.renderAnalyticsView(appContentHeight - 2)
 		case SettingsView:
-			workspaceContent = m.renderSettingsView(appContentHeight)
+			workspaceContent = m.renderSettingsView(appContentHeight - 2)
 		}
 
 		canvas = lipgloss.JoinHorizontal(lipgloss.Top,
-			sidebarStyle.Render(m.renderArcSidebar(appContentHeight)),
+			sidebarStyle.Render(m.renderArcSidebar(appContentHeight - 2)),
 			workspaceStyle.Render(workspaceContent),
 		)
 	}
@@ -121,9 +125,11 @@ func (m Model) View() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.CurrentMode == ModeForm || m.CurrentMode == ModeWorkspaceForm || m.CurrentMode == ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen {
+	if m.CurrentMode == ModeForm || m.CurrentMode == ModeWorkspaceForm || m.CurrentMode == ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.CurrentMode == ModeProfileForm || m.SessionExpiryPromptOpen {
 		var modalStr string
 		switch {
+		case m.SessionExpiryPromptOpen:
+			modalStr = m.renderSessionExpiryModal()
 		case m.ConfirmOpen:
 			modalStr = m.renderConfirmModal()
 		case m.AnchorPromptOpen:
@@ -134,6 +140,8 @@ func (m Model) View() string {
 			modalStr = m.renderWorkspaceFormModal()
 		case m.CurrentMode == ModeWorkspacePicker:
 			modalStr = m.renderWorkspacePickerModal()
+		case m.CurrentMode == ModeProfileForm:
+			modalStr = m.renderProfileFormModal()
 		case m.PromptOpen:
 			modalStr = m.renderPromptModal()
 		case m.ReviewOpen:
@@ -203,6 +211,9 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 
 	// User Context Node (with exactly 1 cell padding)
 	userName := "Doan Huu Quoc"
+	if m.DB != nil {
+		userName = m.DB.GetUserSettings().Username
+	}
 	profileText := "👤 " + userName
 	if len([]rune(profileText)) > innerW {
 		profileText = "👤 " + string([]rune(userName)[:innerW-5]) + "..."

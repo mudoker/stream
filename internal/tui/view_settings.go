@@ -47,7 +47,8 @@ func (m Model) renderSettingsCard(title string, content string, width int, heigh
 	}
 	paddedContent := padLines(content, contentH)
 
-	return lipgloss.JoinVertical(lipgloss.Left, header, bodyStyle.Render(paddedContent))
+	cardBody := lipgloss.JoinVertical(lipgloss.Left, header, bodyStyle.Render(paddedContent))
+	return lipgloss.NewStyle().Height(height).MaxHeight(height).Render(cardBody)
 }
 
 func (m Model) renderSettingsView(height int) string {
@@ -110,8 +111,8 @@ func (m Model) renderSettingsView(height int) string {
 	sbSync.WriteString(fmt.Sprintf("  %-13s │  %s\n\n", "API Server", valStyle.Render("http://localhost:8080")))
 	
 	sbSync.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("COMMANDS\n"))
-	sbSync.WriteString(fmt.Sprintf("  %-14s  %s\n", cmdStyle.Render("[:auth]"), valStyle.Render("Authenticate GCal API")))
-	sbSync.WriteString(fmt.Sprintf("  %-14s  %s", cmdStyle.Render("[:sync]"), valStyle.Render("Force background sync")))
+	sbSync.WriteString(fmt.Sprintf("  %s     %s\n", cmdStyle.Render(fmt.Sprintf("%-12s", "[:auth]")), valStyle.Render("Authenticate GCal API")))
+	sbSync.WriteString(fmt.Sprintf("  %s     %s", cmdStyle.Render(fmt.Sprintf("%-12s", "[:sync]")), valStyle.Render("Force background sync")))
 
 	// ── CARD 2: Active Workspace ──
 	var sbWS strings.Builder
@@ -125,9 +126,10 @@ func (m Model) renderSettingsView(height int) string {
 	sbWS.WriteString(fmt.Sprintf("  %-13s │  %s\n\n", "UUID", valStyle.Render(uuidStr)))
 
 	sbWS.WriteString(lipgloss.NewStyle().Foreground(m.Theme.Muted).Bold(true).Render("COMMANDS\n"))
-	sbWS.WriteString(fmt.Sprintf("  %-14s  %s\n", cmdStyle.Render("[:ws-create]"), valStyle.Render("Create new workspace")))
-	sbWS.WriteString(fmt.Sprintf("  %-14s  %s\n", cmdStyle.Render("[:ws-edit]"), valStyle.Render("Edit active workspace")))
-	sbWS.WriteString(fmt.Sprintf("  %-14s  %s", cmdStyle.Render("[:ws-delete]"), valStyle.Render("Delete active workspace")))
+	sbWS.WriteString(fmt.Sprintf("  %s     %s\n", cmdStyle.Render(fmt.Sprintf("%-12s", "[:ws-create]")), valStyle.Render("Create new workspace")))
+	sbWS.WriteString(fmt.Sprintf("  %s     %s\n", cmdStyle.Render(fmt.Sprintf("%-12s", "[:ws-edit]")), valStyle.Render("Edit active workspace")))
+	sbWS.WriteString(fmt.Sprintf("  %s     %s\n", cmdStyle.Render(fmt.Sprintf("%-12s", "[:ws-delete]")), valStyle.Render("Delete active workspace")))
+	sbWS.WriteString(fmt.Sprintf("  %s     %s", cmdStyle.Render(fmt.Sprintf("%-12s", "[:profile]")), valStyle.Render("Edit profile & security")))
 
 	// ── CARD 3: Recent Activity Stream ──
 	type activityItem struct {
@@ -314,7 +316,7 @@ func (m Model) renderSettingsView(height int) string {
 		copyIcon := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("[📋]")
 		copyW := lipgloss.Width(copyIcon)
 		
-		leftW := 18 + pathW
+		leftW := 19 + pathW
 		spaceCount := innerW - leftW - copyW
 		if spaceCount < 1 {
 			spaceCount = 1

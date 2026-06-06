@@ -88,16 +88,10 @@ func (m Model) renderDashboard(height int) string {
 	var leftHeights []int
 	var rightHeights []int
 	
-	defaultH := 45 // default detailed height
-	if availH > defaultH {
-		// Stretch dynamically to fill height
-		leftHeights = partitionHeights(availH, 3)
-		rightHeights = partitionHeights(availH, 3)
-	} else {
-		// Use fixed detailed heights
-		leftHeights = []int{15, 15, 15}
-		rightHeights = []int{11, 17, 17}
-	}
+	// Distribute available dashboard rows across three panels so that the
+	// bottom card remains fully visible even on shorter terminal heights.
+	leftHeights = partitionHeights(availH, 3)
+	rightHeights = partitionHeights(availH, 3)
 
 	var leftPanels []string
 	leftPanels = append(leftPanels,

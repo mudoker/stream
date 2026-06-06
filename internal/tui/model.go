@@ -60,11 +60,11 @@ type Layout struct {
 // Todo shelf: 20% of workspace
 // Timeline: remaining workspace space
 func computeLayout(w, h int) Layout {
-	sidebarW := w * 15 / 100
-	if sidebarW < 14 {
-		sidebarW = 14
-	} else if sidebarW > 20 {
-		sidebarW = 20
+	sidebarW := w * 22 / 100
+	if sidebarW < 22 {
+		sidebarW = 22
+	} else if sidebarW > 28 {
+		sidebarW = 28
 	}
 
 	workspaceW := w - sidebarW - 1 // 1 for the sidebar right border
@@ -96,8 +96,8 @@ func computeLayout(w, h int) Layout {
 type TaskForm struct {
 	Title          string
 	Description    string
-	Priority       model.Priority
-	StoryPoints    int
+	PriorityIdx    int // 0: P0, 1: P1, 2: P2, 3: P3
+	SPIdx          int // index in []int{1, 2, 3, 5, 8, 13}
 	IsAnchored     bool
 	StartHour      int
 	StartMin       int
@@ -105,9 +105,6 @@ type TaskForm struct {
 	ActiveField    int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Anchored (Y/N), 5: Start Time, 6: Duration, 7: Submit
 	TitleInput     textinput.Model
 	DescInput      textinput.Model
-	PriorityInput  textinput.Model
-	SPInput        textinput.Model
-	AnchorInput    textinput.Model
 	StartTimeInput textinput.Model
 	DurationInput  textinput.Model
 }
@@ -120,34 +117,25 @@ func NewTaskForm() TaskForm {
 	d := textinput.New()
 	d.Placeholder = "Fix memory leak in pool..."
 
-	p := textinput.New()
-	p.Placeholder = "P0, P1, P2, P3"
-
-	sp := textinput.New()
-	sp.Placeholder = "3"
-
-	anc := textinput.New()
-	anc.Placeholder = "Y/N"
-
+	now := time.Now()
 	st := textinput.New()
-	st.Placeholder = "09:00"
+	st.Placeholder = now.Format("15:04")
+	st.SetValue(now.Format("15:04"))
 
 	dur := textinput.New()
 	dur.Placeholder = "60"
+	dur.SetValue("60")
 
 	return TaskForm{
-		Priority:       model.P2,
-		StoryPoints:    3,
+		PriorityIdx:    2,
+		SPIdx:          2,
 		IsAnchored:     true,
-		StartHour:      9,
-		StartMin:       0,
+		StartHour:      now.Hour(),
+		StartMin:       now.Minute(),
 		DurationMins:   60,
 		ActiveField:    0,
 		TitleInput:     t,
 		DescInput:      d,
-		PriorityInput:  p,
-		SPInput:        sp,
-		AnchorInput:    anc,
 		StartTimeInput: st,
 		DurationInput:  dur,
 	}
@@ -170,6 +158,7 @@ type Model struct {
 
 	SelectedTaskUUID string
 	TodoShelfFocus   bool // DayView specific: toggle between timeline and todo shelf
+	SidebarFocus     bool // Global sidebar navigation focus toggle
 	TimelineHour     int  // DayView specific: selected hour on timeline (0-23)
 
 	// Command Palette
@@ -195,16 +184,25 @@ type Model struct {
 	ReviewTasksDeferred  int
 	ReviewFocusSeconds   int
 
+	// Confirmation Dialog
+	ConfirmOpen          bool
+	ConfirmTask          model.Task
+
+	// Task Edit Mode
+	IsEditing            bool
+	EditingTaskUUID      string
+
 	// Scrolling & Help View States
-	HelpOpen          bool
-	ScrollOffset      int
-	ShelfScrollOffset int
+	HelpOpen             bool
+	ScrollOffset         int
+	ShelfScrollOffset    int
+	CommandSelectedIndex int
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 	cmdInput := textinput.New()
-	cmdInput.Placeholder = "Enter command (e.g. create task, day, week, month, sync, q)..."
-	cmdInput.Prompt = ": "
+	cmdInput.Placeholder = "Search commands, tasks, or settings..."
+	cmdInput.Prompt = "🔍  "
 
 	m := Model{
 		DB:             database,
@@ -222,6 +220,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 	}
 
 	m.refreshTasks()
+	m.selectDefaultTaskForSelectedDay()
 	return m
 }
 
@@ -246,6 +245,46 @@ func (m *Model) refreshTasks() {
 	}
 	if updatedAny {
 		m.Tasks = m.DB.GetTasks()
+	}
+}
+
+func (m *Model) cycleFocus() {
+	if m.CurrentView == DayView {
+		if m.SidebarFocus {
+			m.SidebarFocus = false
+			m.TodoShelfFocus = false
+		} else if m.TodoShelfFocus {
+			m.SidebarFocus = true
+			m.TodoShelfFocus = false
+		} else {
+			m.SidebarFocus = false
+			m.TodoShelfFocus = true
+		}
+	} else {
+		m.SidebarFocus = !m.SidebarFocus
+	}
+}
+
+func (m *Model) moveSidebarView(delta int) {
+	viewsOrder := []ViewType{
+		DashboardView,
+		MonthView,
+		WeekView,
+		DayView,
+		AnalyticsView,
+	}
+	currentIdx := -1
+	for i, v := range viewsOrder {
+		if v == m.CurrentView {
+			currentIdx = i
+			break
+		}
+	}
+	if currentIdx != -1 {
+		nextIdx := (currentIdx + delta + len(viewsOrder)) % len(viewsOrder)
+		m.CurrentView = viewsOrder[nextIdx]
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
 	}
 }
 

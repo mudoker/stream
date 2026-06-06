@@ -12,6 +12,9 @@ import (
 	"github.com/google/uuid"
 )
 
+var PriorityOptions = []string{"0 (Critical)", "1 (High)", "2 (Medium)", "3 (Low)"}
+var SPOptions = []int{1, 2, 3, 5, 8, 13}
+
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
@@ -24,6 +27,30 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Form.ActiveField = (m.Form.ActiveField - 1 + 8) % 8
 		m.focusFormFields()
 		return m, nil
+	case "left":
+		switch m.Form.ActiveField {
+		case 2: // Priority
+			m.Form.PriorityIdx = (m.Form.PriorityIdx - 1 + 4) % 4
+			return m, nil
+		case 3: // Story Points
+			m.Form.SPIdx = (m.Form.SPIdx - 1 + 6) % 6
+			return m, nil
+		case 4: // Anchored
+			m.Form.IsAnchored = !m.Form.IsAnchored
+			return m, nil
+		}
+	case "right", " ":
+		switch m.Form.ActiveField {
+		case 2: // Priority
+			m.Form.PriorityIdx = (m.Form.PriorityIdx + 1) % 4
+			return m, nil
+		case 3: // Story Points
+			m.Form.SPIdx = (m.Form.SPIdx + 1) % 6
+			return m, nil
+		case 4: // Anchored
+			m.Form.IsAnchored = !m.Form.IsAnchored
+			return m, nil
+		}
 	case "enter":
 		if m.Form.ActiveField == 7 { // Submit
 			m.submitForm()
@@ -35,6 +62,8 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "esc":
 		m.CurrentMode = ModeNormal
+		m.IsEditing = false
+		m.EditingTaskUUID = ""
 		return m, nil
 	}
 
@@ -44,12 +73,6 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Form.TitleInput, cmd = m.Form.TitleInput.Update(msg)
 	case 1:
 		m.Form.DescInput, cmd = m.Form.DescInput.Update(msg)
-	case 2:
-		m.Form.PriorityInput, cmd = m.Form.PriorityInput.Update(msg)
-	case 3:
-		m.Form.SPInput, cmd = m.Form.SPInput.Update(msg)
-	case 4:
-		m.Form.AnchorInput, cmd = m.Form.AnchorInput.Update(msg)
 	case 5:
 		m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
 	case 6:
@@ -62,9 +85,6 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) focusFormFields() {
 	m.Form.TitleInput.Blur()
 	m.Form.DescInput.Blur()
-	m.Form.PriorityInput.Blur()
-	m.Form.SPInput.Blur()
-	m.Form.AnchorInput.Blur()
 	m.Form.StartTimeInput.Blur()
 	m.Form.DurationInput.Blur()
 
@@ -73,12 +93,6 @@ func (m *Model) focusFormFields() {
 		m.Form.TitleInput.Focus()
 	case 1:
 		m.Form.DescInput.Focus()
-	case 2:
-		m.Form.PriorityInput.Focus()
-	case 3:
-		m.Form.SPInput.Focus()
-	case 4:
-		m.Form.AnchorInput.Focus()
 	case 5:
 		m.Form.StartTimeInput.Focus()
 	case 6:
@@ -93,20 +107,20 @@ func (m *Model) submitForm() {
 		return
 	}
 
-	priorityVal := model.Priority(strings.ToUpper(m.Form.PriorityInput.Value()))
-	if priorityVal != model.P0 && priorityVal != model.P1 && priorityVal != model.P2 && priorityVal != model.P3 {
+	var priorityVal model.Priority
+	switch m.Form.PriorityIdx {
+	case 0:
+		priorityVal = model.P0
+	case 1:
+		priorityVal = model.P1
+	case 2:
 		priorityVal = model.P2
+	case 3:
+		priorityVal = model.P3
 	}
 
-	spVal, err := strconv.Atoi(m.Form.SPInput.Value())
-	if err != nil || spVal <= 0 {
-		spVal = 3
-	}
-
-	anchored := true
-	if strings.ToUpper(m.Form.AnchorInput.Value()) == "N" {
-		anchored = false
-	}
+	spVal := SPOptions[m.Form.SPIdx]
+	anchored := m.Form.IsAnchored
 
 	var startTime time.Time
 	duration := 60
@@ -135,6 +149,17 @@ func (m *Model) submitForm() {
 		startTime = time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), hour, min, 0, 0, now.Location())
 	}
 
+	var isEdit = m.IsEditing
+	var existingTask model.Task
+	if isEdit {
+		for _, t := range m.Tasks {
+			if t.UUID == m.EditingTaskUUID {
+				existingTask = t
+				break
+			}
+		}
+	}
+
 	newTask := model.Task{
 		UUID:        uuid.New().String(),
 		Title:       title,
@@ -145,20 +170,44 @@ func (m *Model) submitForm() {
 		UpdatedAt:   time.Now(),
 	}
 
+	if isEdit {
+		newTask.UUID = existingTask.UUID
+		newTask.CreatedAt = existingTask.CreatedAt
+		newTask.UpdatedAt = time.Now()
+		newTask.ExecutionMetrics = existingTask.ExecutionMetrics
+	}
+
 	if anchored {
 		newTask.SchedulingType = model.Anchored
 		newTask.TimeWindow = model.TimeWindow{
 			Start: startTime,
 			End:   startTime.Add(time.Duration(duration) * time.Minute),
 		}
-		newTask.LifecycleState = model.StateScheduled
+		if isEdit && existingTask.LifecycleState == model.StateCompleted {
+			newTask.LifecycleState = model.StateCompleted
+		} else {
+			newTask.LifecycleState = model.StateScheduled
+		}
 	} else {
 		newTask.SchedulingType = model.Floating
-		newTask.LifecycleState = model.StateReady
+		if isEdit && existingTask.LifecycleState == model.StateCompleted {
+			newTask.LifecycleState = model.StateCompleted
+		} else {
+			newTask.LifecycleState = model.StateReady
+		}
 	}
 
-	m.DB.AddTask(newTask)
-	m.refreshTasks()
-	m.Sync.TriggerSync()
-	m.StatusMsg = fmt.Sprintf("Task '%s' created successfully.", title)
+	if isEdit {
+		m.DB.UpdateTask(newTask)
+		m.IsEditing = false
+		m.EditingTaskUUID = ""
+		m.refreshTasks()
+		m.Sync.TriggerSync()
+		m.StatusMsg = fmt.Sprintf("Task '%s' updated successfully.", title)
+	} else {
+		m.DB.AddTask(newTask)
+		m.refreshTasks()
+		m.Sync.TriggerSync()
+		m.StatusMsg = fmt.Sprintf("Task '%s' created successfully.", title)
+	}
 }

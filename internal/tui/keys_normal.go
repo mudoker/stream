@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"time"
 
 	"stream/internal/model"
 
@@ -10,6 +11,20 @@ import (
 
 func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
+
+	if m.SidebarFocus {
+		switch key {
+		case "j":
+			m.moveSidebarView(1)
+			return m, nil
+		case "k":
+			m.moveSidebarView(-1)
+			return m, nil
+		case "tab":
+			m.cycleFocus()
+			return m, nil
+		}
+	}
 
 	// Global View Selectors
 	switch key {
@@ -38,6 +53,9 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		return m, nil
+	case "tab":
+		m.cycleFocus()
+		return m, nil
 	case "ctrl+d":
 		if m.CurrentView == DayView {
 			if m.TodoShelfFocus {
@@ -52,6 +70,16 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.TimelineHour = (m.TimelineHour + 2) % 24
 			}
+		} else if m.CurrentView == MonthView {
+			// Scroll forward by colsFit months
+			workspaceWidth := m.Layout.WorkspaceW - 4
+			colWidth := workspaceWidth / 2
+			innerW := colWidth - 6
+			colsFit := innerW / 29
+			if colsFit < 1 {
+				colsFit = 1
+			}
+			m.ScrollOffset += colsFit
 		} else {
 			m.ScrollOffset += 2
 		}
@@ -66,6 +94,16 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.TimelineHour = (m.TimelineHour - 2 + 24) % 24
 			}
+		} else if m.CurrentView == MonthView {
+			// Scroll backward by colsFit months (indefinitely back)
+			workspaceWidth := m.Layout.WorkspaceW - 4
+			colWidth := workspaceWidth / 2
+			innerW := colWidth - 6
+			colsFit := innerW / 29
+			if colsFit < 1 {
+				colsFit = 1
+			}
+			m.ScrollOffset -= colsFit
 		} else {
 			m.ScrollOffset -= 2
 			if m.ScrollOffset < 0 {
@@ -88,7 +126,6 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Form.TitleInput.Focus()
 		return m, nil
 	case "enter":
-		// Open Detail panel of active task
 		task, exists := m.getActiveTask()
 		if exists {
 			m.DetailTask = task
@@ -109,12 +146,21 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Delete Task
 		task, exists := m.getActiveTask()
 		if exists {
-			m.DB.DeleteTask(task.UUID)
-			m.refreshTasks()
-			m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", task.Title)
+			m.ConfirmTask = task
+			m.ConfirmOpen = true
 		}
 		return m, nil
+	case "t":
+		m.SelectedDay = time.Now()
+		m.ScrollOffset = 0
+		m.StatusMsg = "Jumped to today."
+		return m, nil
 	case "z":
+		if m.ZenTimer != nil && m.ZenTimer.Running {
+			m.CurrentMode = ModeZen
+			m.StatusMsg = "Returned to active Zen focus session."
+			return m, nil
+		}
 		task, exists := m.getActiveTask()
 		if exists {
 			m.startZenMode(task)
@@ -171,65 +217,71 @@ func (m *Model) handleWeekNav(key string) {
 
 func (m *Model) handleDayNav(key string) {
 	switch key {
-	case "h", "l", "tab":
-		m.TodoShelfFocus = !m.TodoShelfFocus
+	case "h":
+		if !m.TodoShelfFocus {
+			m.navigateHorizontal(-1)
+		}
+	case "l":
+		if !m.TodoShelfFocus {
+			m.navigateHorizontal(1)
+		}
 	case "j":
 		if m.TodoShelfFocus {
 			m.moveTaskSelection(1)
 		} else {
-			m.TimelineHour = (m.TimelineHour + 1) % 24
+			m.navigateVertical(1)
+			m.autoScrollToSelectedTask()
 		}
 	case "k":
 		if m.TodoShelfFocus {
 			m.moveTaskSelection(-1)
 		} else {
+			m.navigateVertical(-1)
+			m.autoScrollToSelectedTask()
+		}
+	case "J":
+		if !m.TodoShelfFocus {
+			m.TimelineHour = (m.TimelineHour + 1) % 24
+			m.selectFirstTaskInCurrentHour()
+		}
+	case "K":
+		if !m.TodoShelfFocus {
 			m.TimelineHour = (m.TimelineHour - 1 + 24) % 24
+			m.selectFirstTaskInCurrentHour()
 		}
 	case "H":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -1)
+		m.selectDefaultTaskForSelectedDay()
 	case "L":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, 1)
+		m.selectDefaultTaskForSelectedDay()
 	}
 }
 
 func (m *Model) getActiveTask() (model.Task, bool) {
+	if m.SelectedTaskUUID != "" {
+		for _, t := range m.Tasks {
+			if t.UUID == m.SelectedTaskUUID {
+				return t, true
+			}
+		}
+	}
 	if m.CurrentView == DayView {
 		if m.TodoShelfFocus {
 			shelf := m.getTodoShelfTasks()
 			if len(shelf) > 0 {
-				for _, t := range m.Tasks {
-					if t.UUID == m.SelectedTaskUUID {
-						return t, true
-					}
-				}
 				return shelf[0], true
 			}
 		} else {
-			for _, t := range m.Tasks {
-				if t.SchedulingType == model.Anchored {
-					startH := t.TimeWindow.Start.Hour()
-					endH := t.TimeWindow.End.Hour()
-					if t.TimeWindow.Start.Day() == m.SelectedDay.Day() &&
-						t.TimeWindow.Start.Month() == m.SelectedDay.Month() &&
-						t.TimeWindow.Start.Year() == m.SelectedDay.Year() &&
-						m.TimelineHour >= startH && m.TimelineHour < endH {
-						return t, true
-					}
-				}
+			dayTasks := m.getDayTasks()
+			if len(dayTasks) > 0 {
+				return dayTasks[0], true
 			}
 		}
 	} else {
-		var todayTasks []model.Task
-		for _, t := range m.Tasks {
-			if t.SchedulingType == model.Anchored &&
-				t.TimeWindow.Start.Day() == m.SelectedDay.Day() &&
-				t.TimeWindow.Start.Month() == m.SelectedDay.Month() &&
-				t.TimeWindow.Start.Year() == m.SelectedDay.Year() {
-				todayTasks = append(todayTasks, t)
-			}
-		}
-		if len(todayTasks) > 0 {
-			return todayTasks[0], true
+		dayTasks := m.getDayTasks()
+		if len(dayTasks) > 0 {
+			return dayTasks[0], true
 		}
 	}
 	return model.Task{}, false
@@ -282,4 +334,198 @@ func (m *Model) moveTaskSelection(dir int) {
 		idx = 0
 	}
 	m.SelectedTaskUUID = shelf[idx].UUID
+}
+
+func (m *Model) getAllActiveTasks() []model.Task {
+	var matching []model.Task
+	if m.CurrentView == DayView {
+		if m.TodoShelfFocus {
+			shelf := m.getTodoShelfTasks()
+			if len(shelf) > 0 {
+				for _, t := range m.Tasks {
+					if t.UUID == m.SelectedTaskUUID {
+						return []model.Task{t}
+					}
+				}
+				return []model.Task{shelf[0]}
+			}
+		} else {
+			return m.getDayTasks()
+		}
+	} else {
+		return m.getDayTasks()
+	}
+	return matching
+}
+
+func (m *Model) getDayTasks() []model.Task {
+	var anchored []model.Task
+	for _, t := range m.Tasks {
+		if t.SchedulingType == model.Anchored && sameDay(t.TimeWindow.Start, m.SelectedDay) {
+			anchored = append(anchored, t)
+		}
+	}
+	// Sort by start time
+	importSort(anchored)
+	return anchored
+}
+
+func (m *Model) selectDefaultTaskForSelectedDay() {
+	if m.TodoShelfFocus {
+		return
+	}
+	dayTasks := m.getDayTasks()
+	if len(dayTasks) > 0 {
+		m.SelectedTaskUUID = dayTasks[0].UUID
+		m.TimelineHour = dayTasks[0].TimeWindow.Start.Hour()
+	} else {
+		m.SelectedTaskUUID = ""
+	}
+}
+
+func (m *Model) selectFirstTaskInCurrentHour() {
+	dayTasks := m.getDayTasks()
+	for _, t := range dayTasks {
+		if t.TimeWindow.Start.Hour() == m.TimelineHour {
+			m.SelectedTaskUUID = t.UUID
+			return
+		}
+	}
+	for _, t := range dayTasks {
+		if m.TimelineHour >= t.TimeWindow.Start.Hour() && m.TimelineHour < t.TimeWindow.End.Hour() {
+			m.SelectedTaskUUID = t.UUID
+			return
+		}
+	}
+}
+
+func (m *Model) autoScrollToSelectedTask() {
+	if m.SelectedTaskUUID == "" {
+		return
+	}
+	for _, t := range m.Tasks {
+		if t.UUID == m.SelectedTaskUUID && t.SchedulingType == model.Anchored {
+			m.TimelineHour = t.TimeWindow.Start.Hour()
+			break
+		}
+	}
+}
+
+func (m *Model) navigateVertical(dir int) {
+	dayTasks := m.getDayTasks()
+	if len(dayTasks) == 0 {
+		return
+	}
+
+	idx := -1
+	for i, t := range dayTasks {
+		if t.UUID == m.SelectedTaskUUID {
+			idx = i
+			break
+		}
+	}
+
+	if idx == -1 {
+		if dir > 0 {
+			m.SelectedTaskUUID = dayTasks[0].UUID
+		} else {
+			m.SelectedTaskUUID = dayTasks[len(dayTasks)-1].UUID
+		}
+		return
+	}
+
+	idx += dir
+	if idx < 0 {
+		idx = len(dayTasks) - 1
+	} else if idx >= len(dayTasks) {
+		idx = 0
+	}
+	m.SelectedTaskUUID = dayTasks[idx].UUID
+}
+
+func (m *Model) navigateHorizontal(dir int) {
+	dayTasks := m.getDayTasks()
+	if len(dayTasks) <= 1 {
+		return
+	}
+
+	var currentTask model.Task
+	found := false
+	for _, t := range dayTasks {
+		if t.UUID == m.SelectedTaskUUID {
+			currentTask = t
+			found = true
+			break
+		}
+	}
+	if !found {
+		m.SelectedTaskUUID = dayTasks[0].UUID
+		return
+	}
+
+	resolved := ResolveOverlaps(dayTasks)
+	var currentCol int
+	for _, rc := range resolved {
+		if rc.Task.UUID == currentTask.UUID {
+			currentCol = rc.ColIndex
+			break
+		}
+	}
+
+	var candidates []ScheduledColumn
+	for _, rc := range resolved {
+		if rc.Task.UUID == currentTask.UUID {
+			continue
+		}
+		overlap := currentTask.TimeWindow.Start.Before(rc.Task.TimeWindow.End) &&
+			rc.Task.TimeWindow.Start.Before(currentTask.TimeWindow.End)
+		if overlap {
+			candidates = append(candidates, rc)
+		}
+	}
+
+	if len(candidates) == 0 {
+		return
+	}
+
+	var targetUUID string
+	if dir > 0 {
+		bestCol := 999
+		for _, c := range candidates {
+			if c.ColIndex > currentCol && c.ColIndex < bestCol {
+				bestCol = c.ColIndex
+				targetUUID = c.Task.UUID
+			}
+		}
+		if targetUUID == "" {
+			bestCol = 999
+			for _, c := range candidates {
+				if c.ColIndex < bestCol {
+					bestCol = c.ColIndex
+					targetUUID = c.Task.UUID
+				}
+			}
+		}
+	} else {
+		bestCol := -1
+		for _, c := range candidates {
+			if c.ColIndex < currentCol && c.ColIndex > bestCol {
+				bestCol = c.ColIndex
+				targetUUID = c.Task.UUID
+			}
+		}
+		if targetUUID == "" {
+			bestCol = -1
+			for _, c := range candidates {
+				if c.ColIndex > bestCol {
+					bestCol = c.ColIndex
+					targetUUID = c.Task.UUID
+				}
+			}
+		}
+	}
+
+	if targetUUID != "" {
+		m.SelectedTaskUUID = targetUUID
+	}
 }

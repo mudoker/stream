@@ -11,19 +11,73 @@ import (
 	"github.com/google/uuid"
 )
 
+type CommandEntry struct {
+	Name string
+	Desc string
+}
+
+var DefaultCommands = []CommandEntry{
+	{"create", "Anchor a new task for today at 9:00 AM"},
+	{"todo", "Add a floating task to the backlog shelf"},
+	{"complete", "Complete the selected task"},
+	{"delete", "Delete the selected task"},
+	{"sync", "Force Google Calendar sync"},
+	{"auth", "Authenticate with Google Calendar"},
+	{"stop", "Stop/Abort active Zen focus session"},
+	{"review", "Open daily shutdown review"},
+	{"dashboard", "Switch to dashboard view"},
+	{"month", "Switch to month grid view"},
+	{"week", "Switch to week lanes view"},
+	{"day", "Switch to day timeline view"},
+	{"analytics", "Switch to analytics view"},
+	{"quit", "Exit stream"},
+}
+
 func (m *Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	val := strings.ToLower(m.CommandInput.Value())
+	var filtered []CommandEntry
+	for _, c := range DefaultCommands {
+		if strings.Contains(c.Name, val) {
+			filtered = append(filtered, c)
+		}
+	}
+
 	switch msg.String() {
 	case "enter":
-		val := m.CommandInput.Value()
+		commandToRun := m.CommandInput.Value()
+		if len(filtered) > 0 && m.CommandSelectedIndex >= 0 && m.CommandSelectedIndex < len(filtered) {
+			commandToRun = filtered[m.CommandSelectedIndex].Name
+		}
 		m.CurrentMode = ModeNormal
-		return m.runCommand(val)
+		m.CommandSelectedIndex = 0
+		m.CommandInput.SetValue("")
+		return m.runCommand(commandToRun)
 	case "esc":
 		m.CurrentMode = ModeNormal
+		m.CommandSelectedIndex = 0
+		m.CommandInput.SetValue("")
+		return m, nil
+	case "up", "ctrl+k":
+		if len(filtered) > 0 {
+			m.CommandSelectedIndex--
+			if m.CommandSelectedIndex < 0 {
+				m.CommandSelectedIndex = len(filtered) - 1
+			}
+		}
+		return m, nil
+	case "down", "ctrl+j":
+		if len(filtered) > 0 {
+			m.CommandSelectedIndex++
+			if m.CommandSelectedIndex >= len(filtered) {
+				m.CommandSelectedIndex = 0
+			}
+		}
 		return m, nil
 	}
 
 	var cmd tea.Cmd
 	m.CommandInput, cmd = m.CommandInput.Update(msg)
+	m.CommandSelectedIndex = 0
 	return m, cmd
 }
 
@@ -138,10 +192,8 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 	case "delete":
 		task, exists := m.getActiveTask()
 		if exists {
-			m.DB.DeleteTask(task.UUID)
-			m.refreshTasks()
-			m.Sync.TriggerSync()
-			m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", task.Title)
+			m.ConfirmTask = task
+			m.ConfirmOpen = true
 		}
 
 	case "sync":
@@ -154,6 +206,18 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 			m.StatusMsg = fmt.Sprintf("Auth server error: %v", err)
 		} else {
 			m.StatusMsg = "Go to: " + url
+		}
+
+	case "stop":
+		if m.ZenTimer != nil {
+			t := m.ZenTimer.Task
+			t.LifecycleState = model.StateReady
+			m.DB.UpdateTask(t)
+			m.refreshTasks()
+			m.ZenTimer = nil
+			m.StatusMsg = "Zen focus session stopped."
+		} else {
+			m.StatusMsg = "No active focus session running."
 		}
 
 	default:

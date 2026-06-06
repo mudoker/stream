@@ -188,23 +188,30 @@ func (m Model) renderMonthView(height int) string {
 		for _, t := range selectedDayTasks {
 			isSelected := t.UUID == m.SelectedTaskUUID
 
-			timeText := fmt.Sprintf("● %s - %s", t.TimeWindow.Start.Format("15:04"), t.TimeWindow.End.Format("15:04"))
+			pColor := m.priorityColor(t.Priority)
+			pStyle := lipgloss.NewStyle().Foreground(pColor).Bold(true)
+
+			bullet := pStyle.Render("●")
 			titleText := sentenceCase(t.Title)
-			metaText := fmt.Sprintf("Priority: %s • %d SP", t.Priority, t.StoryPoints)
+			timeRangeText := fmt.Sprintf(" %s - %s", t.TimeWindow.Start.Format("15:04"), t.TimeWindow.End.Format("15:04"))
 
 			timeStyle := lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true)
 			titleStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg)
-			metaStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
 
 			if isSelected {
 				timeStyle = timeStyle.Foreground(lipgloss.Color("#ff8700"))
 				titleStyle = titleStyle.Foreground(lipgloss.Color("#ff8700")).Bold(true)
 				titleText = "👉 " + titleText
+			} else {
+				titleStyle = titleStyle.Foreground(pColor)
 			}
 
-			timeStyled := timeStyle.Render(timeText)
+			timeStyled := bullet + timeStyle.Render(timeRangeText)
 			titleStyled := titleStyle.Render("  " + titleText)
-			metaStyled := metaStyle.Render("  " + metaText)
+
+			pBadge := pStyle.Render(string(t.Priority))
+			spText := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(fmt.Sprintf("%d SP", t.StoryPoints))
+			metaStyled := fmt.Sprintf("  Priority: %s  •  %s", pBadge, spText)
 
 			inspectorLines = append(inspectorLines, timeStyled, titleStyled, metaStyled, "")
 		}

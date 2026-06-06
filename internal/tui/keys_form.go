@@ -161,17 +161,19 @@ func (m *Model) submitForm() {
 	}
 
 	newTask := model.Task{
-		UUID:        uuid.New().String(),
-		Title:       title,
-		Description: m.Form.DescInput.Value(),
-		Priority:    priorityVal,
-		StoryPoints: spVal,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		UUID:          uuid.New().String(),
+		WorkspaceUUID: m.ActiveWorkspaceUUID,
+		Title:         title,
+		Description:   m.Form.DescInput.Value(),
+		Priority:      priorityVal,
+		StoryPoints:   spVal,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	if isEdit {
 		newTask.UUID = existingTask.UUID
+		newTask.WorkspaceUUID = existingTask.WorkspaceUUID
 		newTask.CreatedAt = existingTask.CreatedAt
 		newTask.UpdatedAt = time.Now()
 		newTask.ExecutionMetrics = existingTask.ExecutionMetrics

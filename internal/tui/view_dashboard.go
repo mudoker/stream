@@ -161,7 +161,8 @@ func (m Model) renderDashboard(height int) string {
 			} else if t.LifecycleState == model.StateActive {
 				rowStr = lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render(rowStr)
 			} else {
-				rowStr = lipgloss.NewStyle().Foreground(m.Theme.Fg).Render(rowStr)
+				pColor := m.priorityColor(t.Priority)
+				rowStr = lipgloss.NewStyle().Foreground(pColor).Render(rowStr)
 			}
 
 			agendaRows = append(agendaRows, rowStr)

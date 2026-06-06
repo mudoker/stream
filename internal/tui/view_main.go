@@ -103,8 +103,7 @@ func (m Model) View() string {
 			workspaceContent = m.renderWeekView(appContentHeight - 2)
 		case AnalyticsView:
 			workspaceContent = m.renderAnalyticsView(appContentHeight - 2)
-		case SettingsView:
-			workspaceContent = m.renderSettingsView(appContentHeight - 2)
+
 		}
 
 		canvas = lipgloss.JoinHorizontal(lipgloss.Top,

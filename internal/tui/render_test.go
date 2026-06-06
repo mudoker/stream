@@ -86,14 +86,7 @@ func TestComputeTaskMetricsInfo(t *testing.T) {
 	}
 }
 
-func TestRenderSettingsCardExactHeight(t *testing.T) {
-	m := Model{Theme: NewTheme(), Layout: Layout{WorkspaceW: 120}}
-	card := m.renderSettingsCard("Google Calendar Sync", "  [:auth]  Authenticate GCal API\n  [:sync]  Force background sync", 50, 18)
-	lines := strings.Split(card, "\n")
-	if len(lines) != 18 {
-		t.Fatalf("Expected settings card height 18, got %d", len(lines))
-	}
-}
+
 
 func TestPartitionHeightsDistributesSmallSpace(t *testing.T) {
 	availH := 28 - 8

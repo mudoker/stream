@@ -18,7 +18,6 @@ const (
 	WeekView
 	DayView
 	AnalyticsView
-	SettingsView
 )
 
 type UIState string

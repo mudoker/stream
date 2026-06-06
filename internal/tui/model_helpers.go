@@ -88,7 +88,6 @@ func (m *Model) moveSidebarView(delta int) {
 		WeekView,
 		DayView,
 		AnalyticsView,
-		SettingsView,
 	}
 	currentIdx := -1
 	for i, v := range viewsOrder {

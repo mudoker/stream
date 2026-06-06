@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	rowsPerHour  = 6  // 10-minute slots per hour (6 rows/hour)
-	totalRows    = 144 // 24h * 6 rows
+	rowsPerHour  = 8  // 7.5-minute slots per hour (8 rows/hour)
+	totalRows    = 192 // 24h * 8 rows
 	gutterWidth  = 11 // " HH:MM ───┼" timestamp gutter
 )
 

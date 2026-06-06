@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"stream/internal/model"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestPartitionTask(t *testing.T) {
@@ -165,4 +167,50 @@ func TestZenTimerUpdateTaskDuration(t *testing.T) {
 		t.Errorf("expected ZenTimer to stop running")
 	}
 }
+
+func TestZenTimerAdjustTimeMultiplier(t *testing.T) {
+	task := model.Task{
+		UUID:        "test-task",
+		Title:       "Test Task",
+		StoryPoints: 1, // 45 minutes
+	}
+
+	m := &Model{
+		ZenTimer: NewZenTimer(task),
+	}
+
+	// 1. Initial State: TimeRemaining = 40m, TotalDuration = 40m (due to 5m Break block partition)
+	if m.ZenTimer.TimeRemaining != 40*time.Minute {
+		t.Fatalf("expected 40m initial focus block, got %v", m.ZenTimer.TimeRemaining)
+	}
+
+	// 2. Press "1" then "0" then "+" (should add 10 * 30s = 5 minutes)
+	m.handleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	m.handleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("0")})
+	if m.ZenPrefix != "10" {
+		t.Fatalf("expected ZenPrefix to be '10', got %q", m.ZenPrefix)
+	}
+
+	m.handleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("+")})
+	if m.ZenPrefix != "" {
+		t.Fatalf("expected ZenPrefix to be cleared after applying '+'")
+	}
+	if m.ZenTimer.TimeRemaining != 45*time.Minute {
+		t.Errorf("expected TimeRemaining to be 45m after adding 5m, got %v", m.ZenTimer.TimeRemaining)
+	}
+
+	// 3. Press "4" then "-" (should subtract 4 * 30s = 2 minutes)
+	m.handleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("4")})
+	m.handleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("-")})
+	if m.ZenTimer.TimeRemaining != 43*time.Minute {
+		t.Errorf("expected TimeRemaining to be 43m after subtracting 2m, got %v", m.ZenTimer.TimeRemaining)
+	}
+
+	// 4. Press "-" without prefix (should subtract 1 * 30s = 30 seconds)
+	m.handleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("-")})
+	if m.ZenTimer.TimeRemaining != 42*time.Minute+30*time.Second {
+		t.Errorf("expected TimeRemaining to be 42m30s after subtracting 30s, got %v", m.ZenTimer.TimeRemaining)
+	}
+}
+
 

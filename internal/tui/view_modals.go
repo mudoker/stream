@@ -629,23 +629,30 @@ func (m Model) renderHelpModal() string {
 	navHint := mutedStyle.Render("  j/k scroll  ctrl+d/u page  g/G top/btm  esc close")
 	out = append(out, navHint)
 
-	return m.Theme.ModalStyle.
-		Width(innerW + 4).
-		Render(m.prepareModalContent(strings.Join(out, "\n"), innerW))
+	// Render modal using the prepared inner width; avoid forcing an extra
+	// Width() here so lipgloss can compute the final string width correctly
+	// (forcing Width(innerW+4) caused off-by-one border positioning).
+	return m.Theme.ModalStyle.Render(m.prepareModalContent(strings.Join(out, "\n"), innerW))
 }
 
 func (m Model) prepareModalContent(content string, innerW int) string {
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
-		w := lipgloss.Width(line)
-		if strings.Contains(line, "▲ s t r e a m") {
-			w += 2
-		}
-		if strings.Contains(line, "💡") {
-			w += 1
-		}
+		cells := parseLineToCells(line)
+		w := len(cells)
 		if w < innerW {
-			lines[i] = line + strings.Repeat(" ", innerW-w)
+			for len(cells) < innerW {
+				cells = append(cells, Cell{Text: " "})
+			}
+			lines[i] = cellsToLine(cells)
+		} else if w > innerW {
+			if innerW > 0 && innerW < len(cells) && cells[innerW].IsContinuation {
+				cells[innerW-1] = Cell{Text: " "}
+			}
+			cells = cells[:innerW]
+			lines[i] = cellsToLine(cells)
+		} else {
+			lines[i] = cellsToLine(cells)
 		}
 	}
 	return strings.Join(lines, "\n")

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 func sliceAnsi(s string, start, end int) string {
@@ -37,14 +38,96 @@ func sliceAnsi(s string, start, end int) string {
 	return sb.String()
 }
 
+type Cell struct {
+	Text           string
+	Style          string
+	IsContinuation bool
+}
+
+func parseLineToCells(s string) []Cell {
+	var cells []Cell
+	var currentStyle strings.Builder
+	var runes = []rune(s)
+	var inEscape = false
+
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if r == '\x1b' {
+			inEscape = true
+			currentStyle.WriteRune(r)
+			continue
+		}
+		if inEscape {
+			currentStyle.WriteRune(r)
+			if r == 'm' {
+				inEscape = false
+			}
+			continue
+		}
+
+		w := runewidth.RuneWidth(r)
+		if w <= 0 {
+			if len(cells) > 0 {
+				idx := len(cells) - 1
+				for idx > 0 && cells[idx].IsContinuation {
+					idx--
+				}
+				cells[idx].Text += string(r)
+			}
+			continue
+		}
+
+		styleStr := currentStyle.String()
+		cells = append(cells, Cell{
+			Text:           string(r),
+			Style:          styleStr,
+			IsContinuation: false,
+		})
+		for k := 1; k < w; k++ {
+			cells = append(cells, Cell{
+				Text:           "",
+				Style:          styleStr,
+				IsContinuation: true,
+			})
+		}
+	}
+	return cells
+}
+
+func cellsToLine(cells []Cell) string {
+	var sb strings.Builder
+	var lastStyle string
+
+	for _, cell := range cells {
+		if cell.IsContinuation {
+			continue
+		}
+		if cell.Style != lastStyle {
+			if cell.Style == "" {
+				sb.WriteString("\x1b[0m")
+			} else {
+				sb.WriteString(cell.Style)
+			}
+			lastStyle = cell.Style
+		}
+		if cell.Text != "" {
+			sb.WriteString(cell.Text)
+		} else {
+			sb.WriteString(" ")
+		}
+	}
+	sb.WriteString("\x1b[0m")
+	return sb.String()
+}
+
 func overlayString(base string, overlay string, x int, y int, baseWidth int) string {
 	baseLines := strings.Split(base, "\n")
 	overlayLines := strings.Split(overlay, "\n")
 	overlayWidth := 0
 	for _, l := range overlayLines {
-		w := lipgloss.Width(l)
-		if w > overlayWidth {
-			overlayWidth = w
+		cells := parseLineToCells(l)
+		if len(cells) > overlayWidth {
+			overlayWidth = len(cells)
 		}
 	}
 
@@ -54,16 +137,34 @@ func overlayString(base string, overlay string, x int, y int, baseWidth int) str
 			break
 		}
 		bLine := baseLines[targetY]
+		baseCells := parseLineToCells(bLine)
+		overlayCells := parseLineToCells(oLine)
 
-		leftPart := sliceAnsi(bLine, 0, x)
-		rightPart := sliceAnsi(bLine, x+overlayWidth, baseWidth)
-
-		leftVisualLen := lipgloss.Width(leftPart)
-		if leftVisualLen < x {
-			leftPart += strings.Repeat(" ", x-leftVisualLen)
+		// Pad base line to baseWidth
+		for len(baseCells) < baseWidth {
+			baseCells = append(baseCells, Cell{Text: " "})
+		}
+		if len(baseCells) > baseWidth {
+			baseCells = baseCells[:baseWidth]
 		}
 
-		baseLines[targetY] = leftPart + oLine + rightPart
+		// Pad overlay line to overlayWidth
+		for len(overlayCells) < overlayWidth {
+			overlayCells = append(overlayCells, Cell{Text: " "})
+		}
+		if len(overlayCells) > overlayWidth {
+			overlayCells = overlayCells[:overlayWidth]
+		}
+
+		// Overwrite base line cells starting at x
+		for col := 0; col < overlayWidth; col++ {
+			targetX := x + col
+			if targetX >= 0 && targetX < baseWidth {
+				baseCells[targetX] = overlayCells[col]
+			}
+		}
+
+		baseLines[targetY] = cellsToLine(baseCells)
 	}
 	return strings.Join(baseLines, "\n")
 }

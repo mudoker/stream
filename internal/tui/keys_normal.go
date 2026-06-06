@@ -55,6 +55,11 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		return m, nil
+	case "6":
+		m.CurrentView = SettingsView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
+		return m, nil
 	case "tab":
 		m.cycleFocus()
 		return m, nil

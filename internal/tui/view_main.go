@@ -105,6 +105,8 @@ func (m Model) View() string {
 			workspaceContent = m.renderWeekView(appContentHeight)
 		case AnalyticsView:
 			workspaceContent = m.renderAnalyticsView(appContentHeight)
+		case SettingsView:
+			workspaceContent = m.renderSettingsView(appContentHeight)
 		}
 
 		canvas = lipgloss.JoinHorizontal(lipgloss.Top,
@@ -306,6 +308,7 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 		{"Week Lanes", "󰸶", WeekView},
 		{"Day Timeline", "󰸴", DayView},
 		{"Analytics", "󰄫", AnalyticsView},
+		{"Settings", "⚙️", SettingsView},
 	}
 
 	for _, item := range items {
@@ -456,8 +459,7 @@ func (m Model) renderArcSidebar(appContentHeight int) string {
 	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(memRow))
 
 	// Sticky Settings
-	settingsRow := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  ⚙️ Settings")
-	rows = append(rows, settingsRow, sep)
+	rows = append(rows, sep)
 
 	// Footer: mode badge + gcal + clock
 	syncColor := m.Theme.Muted

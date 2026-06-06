@@ -45,7 +45,7 @@ func (m Model) renderHourHeatmapPanel(w, h int) string {
 	aPct := float64(afternoonSecs) / float64(total) * 100
 	ePct := float64(eveningSecs) / float64(total) * 100
 
-	barMax := innerW - 25
+	barMax := innerW - 21
 	if barMax < 6 {
 		barMax = 6
 	}
@@ -66,17 +66,13 @@ func (m Model) renderHourHeatmapPanel(w, h int) string {
 	aLabel := lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Render("Afternoon (12-18):")
 	eLabel := lipgloss.NewStyle().Foreground(m.Theme.P1Color).Render("Evening (18-00):  ")
 
-	mPctStr := lipgloss.NewStyle().Foreground(m.Theme.Accent).Render(fmt.Sprintf("%2.0f%%", mPct))
-	aPctStr := lipgloss.NewStyle().Foreground(m.Theme.FocusPurple).Render(fmt.Sprintf("%2.0f%%", aPct))
-	ePctStr := lipgloss.NewStyle().Foreground(m.Theme.P1Color).Render(fmt.Sprintf("%2.0f%%", ePct))
-
 	var lines []string
 	lines = append(lines,
-		fmt.Sprintf("  %s %s  %s", mLabel, renderBar(mPct, m.Theme.Accent), mPctStr),
+		fmt.Sprintf("  %s %s", mLabel, renderBar(mPct, m.Theme.Accent)),
 		"",
-		fmt.Sprintf("  %s %s  %s", aLabel, renderBar(aPct, m.Theme.FocusPurple), aPctStr),
+		fmt.Sprintf("  %s %s", aLabel, renderBar(aPct, m.Theme.FocusPurple)),
 		"",
-		fmt.Sprintf("  %s %s  %s", eLabel, renderBar(ePct, m.Theme.P1Color), ePctStr),
+		fmt.Sprintf("  %s %s", eLabel, renderBar(ePct, m.Theme.P1Color)),
 	)
 
 	borderCol := m.Theme.Muted

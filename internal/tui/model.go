@@ -29,6 +29,7 @@ const (
 	ModeZen             UIState = "ZEN"    // Zen Mode Pomodoro Focus
 	ModeCommand         UIState = "COMMAND"
 	ModeForm            UIState = "WIZARD" // Task Creation Form Wizard
+	ModeTaskMove        UIState = "TASK_MOVE"
 	ModeWorkspaceForm   UIState = "WORKSPACE_WIZARD"
 	ModeWorkspacePicker UIState = "WS_PICKER"
 )
@@ -250,6 +251,10 @@ type Model struct {
 	DashboardFocusRow    int
 	AnalyticsFocusCol    int
 	AnalyticsFocusRow    int
+
+	// Task move lock state
+	TaskMovePrefix           string
+	TaskMoveOriginalTimeWindow model.TimeWindow
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {

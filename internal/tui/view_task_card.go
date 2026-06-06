@@ -44,10 +44,10 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 	borderColor := pColor
 	if isZenFocus {
 		borderColor = m.Theme.SuccessColor // High-contrast Green for Zen Focus
-	} else if hasCollision {
-		borderColor = lipgloss.Color("#ff0000") // Red for Overlap Warning
 	} else if isSelected {
 		borderColor = lipgloss.Color("#ff8700") // High-contrast Orange for selection
+	} else if hasCollision {
+		borderColor = lipgloss.Color("#ff0000") // Red for Overlap Warning
 	} else if isActive {
 		borderColor = m.Theme.Accent
 	}
@@ -75,9 +75,16 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 		timeStr = fmt.Sprintf("⏱ %02d:%02d:%02d remaining", h2, mi, s)
 	}
 
-	// If card is short (h < 4), use the left strip card
-	if h < 4 {
+	// If card is very short (h < 3), use the left strip card
+	if h < 3 {
 		return m.renderShortCard(task, w, h, pColor, isActive, isSelected, hasCollision, isZenFocus, timeStr)
+	}
+
+	if w < 3 {
+		w = 3
+	}
+	if h < 3 {
+		h = 3
 	}
 
 	// Determine padding based on height
@@ -132,36 +139,82 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 		metaStr = string(metaRunes[:contentW-1])
 	}
 
-	var lines []string
 	titleStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true)
 	if isZenFocus {
 		titleStyle = titleStyle.Foreground(m.Theme.SuccessColor)
-	} else if hasCollision {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff0000"))
 	} else if isSelected {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff8700"))
+	} else if hasCollision {
+		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff0000"))
 	}
 	titleLine := titleStyle.Render(titleStr)
 	metaLine := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(metaStr)
 
-	if h > 4 {
-		sepLen := contentW - 5
-		if sepLen < 1 {
-			sepLen = 1
-		}
-		sepLine := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(strings.Repeat("─", sepLen))
-		lines = append(lines, titleLine, sepLine, metaLine)
-	} else {
-		lines = append(lines, titleLine, metaLine)
+	innerWidth := contentW + (2 * paddingLeftRight)
+	if innerWidth < 1 {
+		innerWidth = 1
 	}
 
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(borderColor).
-		Padding(paddingTopBottom, paddingLeftRight).
-		Width(contentW).
-		Height(contentH).
-		Render(strings.Join(lines, "\n"))
+	contentAreaW := contentW
+	if contentAreaW < 1 {
+		contentAreaW = 1
+	}
+
+	var contentLines []string
+	if h == 3 {
+		contentLines = []string{titleLine}
+	} else if h == 4 {
+		contentLines = []string{titleLine, metaLine}
+	} else {
+		sepLine := strings.Repeat("─", contentAreaW)
+		contentLines = []string{titleLine, sepLine, metaLine}
+	}
+
+	heightContent := h - 2
+	if heightContent < 1 {
+		heightContent = 1
+	}
+
+	var bodyLines []string
+	for i := 0; i < paddingTopBottom; i++ {
+		bodyLines = append(bodyLines, strings.Repeat(" ", innerWidth))
+	}
+
+	for i, line := range contentLines {
+		if len(bodyLines) >= heightContent-paddingTopBottom {
+			break
+		}
+		visual := lipgloss.Width(line)
+		if visual > contentAreaW {
+			line = sliceAnsi(line, 0, contentAreaW)
+		} else if visual < contentAreaW {
+			line += strings.Repeat(" ", contentAreaW-visual)
+		}
+		if paddingLeftRight > 0 {
+			line = strings.Repeat(" ", paddingLeftRight) + line + strings.Repeat(" ", paddingLeftRight)
+		}
+		bodyLines = append(bodyLines, line)
+		if i == len(contentLines)-1 {
+			break
+		}
+	}
+
+	for len(bodyLines) < heightContent {
+		bodyLines = append(bodyLines, strings.Repeat(" ", innerWidth))
+	}
+
+	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
+	topLine := borderStyle.Render("╭") + borderStyle.Render(strings.Repeat("─", innerWidth)) + borderStyle.Render("╮")
+	bottomLine := borderStyle.Render("╰") + borderStyle.Render(strings.Repeat("─", innerWidth)) + borderStyle.Render("╯")
+
+	var cardLines []string
+	cardLines = append(cardLines, topLine)
+	for _, body := range bodyLines {
+		cardLines = append(cardLines, borderStyle.Render("│")+body+borderStyle.Render("│"))
+	}
+	cardLines = append(cardLines, bottomLine)
+
+	return strings.Join(cardLines, "\n")
 }
 
 // renderShortCard renders a compact card for h < 4 rows using a left strip bar.
@@ -169,10 +222,10 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 	stripColor := pColor
 	if isZenFocus {
 		stripColor = m.Theme.SuccessColor
-	} else if hasCollision {
-		stripColor = lipgloss.Color("#ff0000")
 	} else if isSelected {
 		stripColor = lipgloss.Color("#ff8700")
+	} else if hasCollision {
+		stripColor = lipgloss.Color("#ff0000")
 	} else if isActive {
 		stripColor = m.Theme.Accent
 	}
@@ -225,6 +278,10 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 	row := strip + textStyle.
 		Width(contentW).
 		Render(text)
+	rowW := lipgloss.Width(row)
+	if rowW < w {
+		row += strings.Repeat(" ", w-rowW)
+	}
 
 	if h <= 1 {
 		return row
@@ -242,10 +299,15 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		if len(metaRunes) > contentW {
 			meta = string(metaRunes[:contentW])
 		}
-		rows = append(rows, strip+lipgloss.NewStyle().
+		metaLine := strip + lipgloss.NewStyle().
 			Foreground(m.Theme.Muted).
 			Width(contentW).
-			Render(meta))
+			Render(meta)
+		metaW := lipgloss.Width(metaLine)
+		if metaW < w {
+			metaLine += strings.Repeat(" ", w-metaW)
+		}
+		rows = append(rows, metaLine)
 	}
 	if h >= 3 {
 		meta2 := fmt.Sprintf(" %d SP", task.StoryPoints)
@@ -253,10 +315,15 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		if len(meta2Runes) > contentW {
 			meta2 = string(meta2Runes[:contentW])
 		}
-		rows = append(rows, strip+lipgloss.NewStyle().
+		meta2Line := strip + lipgloss.NewStyle().
 			Foreground(m.Theme.Muted).
 			Width(contentW).
-			Render(meta2))
+			Render(meta2)
+		meta2W := lipgloss.Width(meta2Line)
+		if meta2W < w {
+			meta2Line += strings.Repeat(" ", w-meta2W)
+		}
+		rows = append(rows, meta2Line)
 	}
 	return strings.Join(rows, "\n")
 }

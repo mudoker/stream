@@ -169,6 +169,13 @@ func (m Model) renderDayTimeline(appContentHeight int) string {
 	for _, rc := range cols {
 		startRow := timeToRow(rc.Task.TimeWindow.Start)
 		endRow := timeToRow(rc.Task.TimeWindow.End)
+		
+		// If end time is exactly on a 15-minute boundary (minute % 15 == 0),
+		// add 1 to ensure the card extends to cover that full time slot
+		if rc.Task.TimeWindow.End.Minute()%15 == 0 && rc.Task.TimeWindow.End.Second() == 0 && rc.Task.TimeWindow.End.Nanosecond() == 0 {
+			endRow++
+		}
+		
 		if endRow > totalRows {
 			endRow = totalRows
 		}

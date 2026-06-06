@@ -123,14 +123,25 @@ func (m *Model) handleMonthNav(key string) {
 
 func (m *Model) handleWeekNav(key string) {
 	switch key {
-	case "h":
+	case "h", "left":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -1)
-	case "l":
+	case "l", "right":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, 1)
 	case "H":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -7)
 	case "L":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, 7)
+	case "j", "down":
+		maxScroll := m.getWeekViewMaxScroll()
+		m.ScrollOffset++
+		if m.ScrollOffset > maxScroll {
+			m.ScrollOffset = maxScroll
+		}
+	case "k", "up":
+		m.ScrollOffset--
+		if m.ScrollOffset < 0 {
+			m.ScrollOffset = 0
+		}
 	}
 }
 

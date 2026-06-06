@@ -49,23 +49,32 @@ func (m Model) renderWeekView(height int) string {
 		laneHeight = 10
 	}
 
+	availLaneH := laneHeight - 2
+	if availLaneH < 1 {
+		availLaneH = 1
+	}
+
+	allDaysLines, maxLinesCount := m.getWeekViewLines(colWidth)
+
+	maxScroll := maxLinesCount - availLaneH
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+
+	scrollOffset := m.ScrollOffset
+	if scrollOffset > maxScroll {
+		scrollOffset = maxScroll
+	}
+	if scrollOffset < 0 {
+		scrollOffset = 0
+	}
+
 	for i := 0; i < 7; i++ {
 		day := weekStart.AddDate(0, 0, i)
 		isToday := sameDay(day, today)
 		isSelected := sameDay(day, m.SelectedDay)
 
-		var dayTasks []model.Task
-		for _, t := range m.Tasks {
-			if t.SchedulingType == model.Anchored && sameDay(t.TimeWindow.Start, day) {
-				dayTasks = append(dayTasks, t)
-			}
-		}
-
-		colStyle := lipgloss.NewStyle().
-			Width(colWidth).
-			Height(laneHeight)
-
-		var dayContent []string
+		colStyle := lipgloss.NewStyle().Width(colWidth)
 
 		headerText := fmt.Sprintf("%s %02d", weekdayNames[i], day.Day())
 		if isToday {
@@ -80,13 +89,76 @@ func (m Model) renderWeekView(height int) string {
 		} else {
 			headerStyle = lipgloss.NewStyle().Foreground(m.Theme.Muted)
 		}
-		dayContent = append(dayContent, headerStyle.Render(headerText))
 
-		dayContent = append(dayContent, lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", colWidth)))
+		lines := allDaysLines[i]
+		var visibleLines []string
+		if scrollOffset < len(lines) {
+			visibleLines = lines[scrollOffset:]
+		}
 
+		if len(visibleLines) > availLaneH {
+			visibleLines = visibleLines[:availLaneH]
+		}
+		for len(visibleLines) < availLaneH {
+			visibleLines = append(visibleLines, "")
+		}
+
+		var columnRows []string
+		columnRows = append(columnRows, headerStyle.Render(headerText))
+		columnRows = append(columnRows, lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", colWidth)))
+		columnRows = append(columnRows, visibleLines...)
+
+		colRendered = append(colRendered, colStyle.Render(strings.Join(columnRows, "\n")))
+	}
+
+	var sepLines []string
+	for h := 0; h < laneHeight; h++ {
+		sepLines = append(sepLines, "│")
+	}
+	sepStr := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#45475a")).
+		Render(strings.Join(sepLines, "\n"))
+
+	var colsToJoin []string
+	for idx, col := range colRendered {
+		if idx > 0 {
+			colsToJoin = append(colsToJoin, sepStr)
+		}
+		colsToJoin = append(colsToJoin, col)
+	}
+
+	joinedLanes := lipgloss.JoinHorizontal(lipgloss.Top, colsToJoin...)
+
+	var out strings.Builder
+	out.WriteString(renderedTitle + "\n\n")
+	out.WriteString(joinedLanes)
+
+	return out.String()
+}
+
+func (m Model) getWeekViewLines(colWidth int) ([][]string, int) {
+	offset := int(m.SelectedDay.Weekday()) - 1
+	if offset < 0 {
+		offset = 6
+	}
+	weekStart := m.SelectedDay.AddDate(0, 0, -offset)
+
+	var allDaysLines [][]string
+	maxLinesCount := 0
+
+	for i := 0; i < 7; i++ {
+		day := weekStart.AddDate(0, 0, i)
+		var dayTasks []model.Task
+		for _, t := range m.Tasks {
+			if t.SchedulingType == model.Anchored && sameDay(t.TimeWindow.Start, day) {
+				dayTasks = append(dayTasks, t)
+			}
+		}
+
+		var cardsContent []string
 		resolved := ResolveOverlaps(dayTasks)
 		if len(resolved) == 0 {
-			dayContent = append(dayContent, "", lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  (No work)"))
+			cardsContent = append(cardsContent, "", lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  (No work)"))
 		} else {
 			for _, rc := range resolved {
 				timeText := fmt.Sprintf("%s-%s", rc.Task.TimeWindow.Start.Format("15:04"), rc.Task.TimeWindow.End.Format("15:04"))
@@ -122,36 +194,58 @@ func (m Model) renderWeekView(height int) string {
 					Width(cardW).
 					Render(cardContent)
 
-				dayContent = append(dayContent, "", cardStr)
+				cardLines := strings.Split(cardStr, "\n")
+				cardsContent = append(cardsContent, "") // empty line spacing
+				cardsContent = append(cardsContent, cardLines...)
 			}
 		}
 
-		colRendered = append(colRendered, colStyle.Render(strings.Join(dayContent, "\n")))
-	}
-
-	var sepLines []string
-	for h := 0; h < laneHeight; h++ {
-		sepLines = append(sepLines, "│")
-	}
-	sepStr := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#45475a")).
-		Render(strings.Join(sepLines, "\n"))
-
-	var colsToJoin []string
-	for idx, col := range colRendered {
-		if idx > 0 {
-			colsToJoin = append(colsToJoin, sepStr)
+		flatContent := strings.Join(cardsContent, "\n")
+		lines := strings.Split(flatContent, "\n")
+		allDaysLines = append(allDaysLines, lines)
+		if len(lines) > maxLinesCount {
+			maxLinesCount = len(lines)
 		}
-		colsToJoin = append(colsToJoin, col)
+	}
+	return allDaysLines, maxLinesCount
+}
+
+func (m *Model) getWeekViewMaxScroll() int {
+	cmdPaletteH := 0
+	if m.CurrentMode == ModeCommand {
+		cmdPaletteStr := m.renderCommandPalette()
+		cmdPaletteH = lipgloss.Height(cmdPaletteStr)
 	}
 
-	joinedLanes := lipgloss.JoinHorizontal(lipgloss.Top, colsToJoin...)
+	appContentHeight := m.Height - cmdPaletteH - 1
+	if appContentHeight < 10 {
+		appContentHeight = 10
+	}
 
-	var out strings.Builder
-	out.WriteString(renderedTitle + "\n\n")
-	out.WriteString(joinedLanes)
+	height := appContentHeight - 2
+	laneHeight := height - 4
+	if laneHeight < 10 {
+		laneHeight = 10
+	}
 
-	return out.String()
+	availLaneH := laneHeight - 2
+	if availLaneH < 1 {
+		availLaneH = 1
+	}
+
+	contentW := m.Layout.WorkspaceW - 4
+	colWidth := (contentW - 6) / 7
+	if colWidth < 12 {
+		colWidth = 12
+	}
+
+	_, maxLinesCount := m.getWeekViewLines(colWidth)
+
+	maxScroll := maxLinesCount - availLaneH
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	return maxScroll
 }
 
 func (m Model) getTaskCardColor(t model.Task) lipgloss.Color {

@@ -233,6 +233,9 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 			m.DB.UpdateTask(task)
 			m.refreshTasks()
 			m.Sync.TriggerSync()
+			if m.ZenTimer != nil && m.ZenTimer.Task.UUID == task.UUID {
+				m.ZenTimer = nil
+			}
 			m.StatusMsg = fmt.Sprintf("Task '%s' completed.", task.Title)
 		}
 

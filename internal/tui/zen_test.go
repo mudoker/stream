@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"stream/internal/db"
 	"stream/internal/model"
+	"stream/internal/sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -210,6 +212,65 @@ func TestZenTimerAdjustTimeMultiplier(t *testing.T) {
 	m.handleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("-")})
 	if m.ZenTimer.TimeRemaining != 42*time.Minute+30*time.Second {
 		t.Errorf("expected TimeRemaining to be 42m30s after subtracting 30s, got %v", m.ZenTimer.TimeRemaining)
+	}
+}
+
+func TestZenTimerStopAndResume(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := NewModel(database, syncEngine)
+	task := model.Task{
+		UUID:           "test-task-stop-resume",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		Title:          "Stop and Resume Task",
+		StoryPoints:    1, // 45 minutes
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	database.AddTask(task)
+	m.refreshTasks()
+
+	// 1. Enter Zen mode
+	m.startZenMode(task)
+	if m.ZenTimer == nil {
+		t.Fatal("expected ZenTimer to be created")
+	}
+	
+	// Simulate time passing (say 5 minutes elapsed)
+	m.ZenTimer.TimeRemaining = 40 * time.Minute
+	m.ZenTimer.TotalDuration = 45 * time.Minute
+
+	// 2. Press "q" to stop
+	m.handleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if m.CurrentMode != ModeNormal {
+		t.Errorf("expected mode to revert to Normal, got %v", m.CurrentMode)
+	}
+	if m.ZenTimer == nil {
+		t.Fatal("expected ZenTimer NOT to be nil after stopping")
+	}
+	if m.ZenTimer.Running {
+		t.Error("expected ZenTimer to be stopped (Running = false)")
+	}
+
+	// 3. Press "z" on the same task to resume
+	m.TodoShelfFocus = true
+	m.SelectedTaskUUID = "test-task-stop-resume"
+	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("z")})
+	mRes := res.(*Model)
+
+	if mRes.CurrentMode != ModeZen {
+		t.Errorf("expected mode to return to Zen, got %v", mRes.CurrentMode)
+	}
+	if mRes.ZenTimer.TimeRemaining != 40*time.Minute {
+		t.Errorf("expected TimeRemaining to be preserved at 40m, got %v", mRes.ZenTimer.TimeRemaining)
 	}
 }
 

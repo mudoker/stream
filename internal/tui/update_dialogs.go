@@ -35,6 +35,9 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
 				m.DetailOpen = false
 			}
+			if m.ZenTimer != nil && m.ZenTimer.Task.UUID == m.ConfirmTask.UUID {
+				m.ZenTimer = nil
+			}
 			m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", m.ConfirmTask.Title)
 			m.ConfirmOpen = false
 			return m, nil

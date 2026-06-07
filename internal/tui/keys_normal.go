@@ -244,6 +244,11 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			task.UpdatedAt = time.Now()
 			m.DB.UpdateTask(task)
 			m.refreshTasks()
+			if task.LifecycleState == model.StateCompleted {
+				if m.ZenTimer != nil && m.ZenTimer.Task.UUID == task.UUID {
+					m.ZenTimer = nil
+				}
+			}
 		}
 		return m, nil
 	case "d":
@@ -262,13 +267,28 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.StatusMsg = "Jumped to today."
 		return m, nil
 	case "z":
-		if m.ZenTimer != nil && m.ZenTimer.Running {
-			m.CurrentMode = ModeZen
-			m.StatusMsg = "Returned to active Zen focus session."
-			return m, nil
-		}
 		task, exists := m.getActiveTask()
 		if exists {
+			if m.ZenTimer != nil && m.ZenTimer.Task.UUID == task.UUID {
+				m.ZenTimer.Running = true
+				m.ZenTimer.IsPaused = false
+				task.LifecycleState = model.StateActive
+				if m.DB != nil {
+					m.DB.UpdateTask(task)
+					m.refreshTasks()
+				}
+				m.CurrentMode = ModeZen
+				m.StatusMsg = "Returned to active Zen focus session."
+				return m, nil
+			}
+			if m.ZenTimer != nil {
+				m.ZenTimer.RecordElapsedTimes()
+				t := m.ZenTimer.Task
+				t.LifecycleState = model.StateReady
+				if m.DB != nil {
+					m.DB.UpdateTask(t)
+				}
+			}
 			m.startZenMode(task)
 		} else {
 			m.StatusMsg = "No active task selected to start Zen Mode."

@@ -192,6 +192,7 @@ func (m Model) renderHelpModal() string {
 	body = append(body, formatKeyVal("?", "Toggle this help modal"))
 	body = append(body, formatKeyVal(":create <title>", "Create anchored task (9:00 AM)"))
 	body = append(body, formatKeyVal(":todo <title>", "Create floating backlog task"))
+	body = append(body, formatKeyVal(":habit <title>", "Create daily repeatable habit"))
 	body = append(body, formatKeyVal(":sync", "Force Google Calendar sync"))
 	body = append(body, formatKeyVal(":auth", "Authenticate Google Calendar"))
 	body = append(body, formatKeyVal(":review", "Open shutdown review"))

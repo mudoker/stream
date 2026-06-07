@@ -26,6 +26,7 @@ func (m *Model) getCommandList() []CommandEntry {
 		CommandEntry{"help", "Toggle command reference help overlay"},
 		CommandEntry{"create <title>", "Create anchored task starting 9:00 AM"},
 		CommandEntry{"todo <title>", "Create backlog floating task"},
+		CommandEntry{"habit <title>", "Create daily repeatable habit"},
 		CommandEntry{"ws-create", "Create workspace"},
 		CommandEntry{"ws-edit", "Edit active workspace settings"},
 		CommandEntry{"ws-delete", "Delete workspace"},

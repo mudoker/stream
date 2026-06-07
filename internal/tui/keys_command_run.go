@@ -61,9 +61,9 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 		m.HelpScrollOffset = 0
 		m.StatusMsg = "Help opened. Press Esc/? to exit."
 
-	case "create", "todo":
+	case "create", "todo", "habit":
 		if len(parts) < 2 {
-			m.StatusMsg = "Syntax: create <task title>"
+			m.StatusMsg = fmt.Sprintf("Syntax: %s <task title>", cmdName)
 			return m, nil
 		}
 		title := strings.Join(parts[1:], " ")
@@ -83,11 +83,18 @@ func (m *Model) runCommand(val string) (tea.Model, tea.Cmd) {
 			newTask.SchedulingType = model.Anchored
 			newTask.TimeWindow = model.TimeWindow{Start: start, End: end}
 			newTask.LifecycleState = model.StateScheduled
+		} else if cmdName == "habit" {
+			newTask.SchedulingType = model.Habit
+			newTask.StoryPoints = 0
 		}
 		m.DB.AddTask(newTask)
 		m.refreshTasks()
 		m.Sync.TriggerSync()
-		m.StatusMsg = fmt.Sprintf("Task '%s' created.", title)
+		if cmdName == "habit" {
+			m.StatusMsg = fmt.Sprintf("Habit '%s' created.", title)
+		} else {
+			m.StatusMsg = fmt.Sprintf("Task '%s' created.", title)
+		}
 
 	case "ws-switch":
 		if len(parts) < 2 {

@@ -115,7 +115,7 @@ func (m Model) renderZenMode() string {
 	col1W := 44
 	// Row 1
 	r1Part1 := triggerStyle.Render("[ space ]") + descStyle.Render("  Pause / Resume Focus Session")
-	r1Part2 := triggerStyle.Render("[ +/- ]") + descStyle.Render("  Adjust Clock (+/- 30s)")
+	r1Part2 := triggerStyle.Render("[  +/-  ]") + descStyle.Render("  Adjust Clock (+/- 30s)")
 	r1Pad := col1W - lipgloss.Width(r1Part1)
 	if r1Pad < 1 {
 		r1Pad = 1
@@ -133,7 +133,7 @@ func (m Model) renderZenMode() string {
 
 	// Row 3
 	r3Part1 := triggerStyle.Render("[   q   ]") + descStyle.Render("  Stop / Abort Focus Session")
-	r3Part2 := triggerStyle.Render("[ esc ]") + descStyle.Render("  Exit Focus Mode Workspace")
+	r3Part2 := triggerStyle.Render("[  esc  ]") + descStyle.Render("  Exit Focus Mode Workspace")
 	r3Pad := col1W - lipgloss.Width(r3Part1)
 	if r3Pad < 1 {
 		r3Pad = 1

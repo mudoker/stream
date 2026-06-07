@@ -84,30 +84,34 @@ func (m *Model) autoScrollToSelectedTask() {
 		return
 	}
 
-	tStart := selectedTask.TimeWindow.Start.Local().Hour()
-	tEnd := (selectedTask.TimeWindow.End.Local().Hour()*60 + selectedTask.TimeWindow.End.Local().Minute() + 59) / 60
+	// Always sync selected day to the task's start day to keep it visible on day transition
+	m.SelectedDay = selectedTask.TimeWindow.Start.Local()
+
+	taskStart := timeToRow(selectedTask.TimeWindow.Start)
+	durationMinutes := int(selectedTask.TimeWindow.End.Sub(selectedTask.TimeWindow.Start).Minutes())
+	h := (durationMinutes * rowsPerHour + 59) / 60
+	taskEnd := taskStart + h
+	if taskEnd > totalRows {
+		taskEnd = totalRows
+	}
 
 	appContentHeight := m.Height
 	visibleH := appContentHeight - 4
 	if visibleH < 8 {
 		visibleH = 8
 	}
-	visibleHours := visibleH / rowsPerHour
-	if visibleHours < 1 {
-		visibleHours = 1
-	}
 
-	startHour := m.TimelineHour - visibleHours/2
-	endHour := startHour + visibleHours
+	viewportStart := m.TimelineHour*rowsPerHour - visibleH/2
+	viewportEnd := viewportStart + visibleH
 
-	if tEnd-tStart >= visibleHours {
-		m.TimelineHour = tEnd - visibleHours/2
+	if taskEnd-taskStart >= visibleH {
+		m.TimelineHour = (taskStart + visibleH/2) / rowsPerHour
 	} else {
-		if tStart < startHour {
-			m.TimelineHour = tStart + visibleHours/2
-		}
-		if tEnd > endHour {
-			m.TimelineHour = tEnd - visibleHours/2
+		if taskStart < viewportStart {
+			m.TimelineHour = (taskStart + visibleH/2) / rowsPerHour
+		} else if taskEnd > viewportEnd {
+			target := taskEnd - (visibleH - visibleH/2)
+			m.TimelineHour = (target + rowsPerHour - 1) / rowsPerHour
 		}
 	}
 

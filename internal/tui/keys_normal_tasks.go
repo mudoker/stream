@@ -5,6 +5,13 @@ import (
 )
 
 func (m *Model) getActiveTask() (model.Task, bool) {
+	if m.CurrentMode == ModeTaskMove {
+		for _, t := range m.Tasks {
+			if t.UUID == m.SelectedTaskUUID {
+				return t, true
+			}
+		}
+	}
 	if m.CurrentView == DayView {
 		if m.TodoShelfFocus {
 			shelf := m.getTodoShelfTasks()

@@ -239,6 +239,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.StatusMsg = "Focus Session running in background. Press 'z' to return."
 			return m, nil
 		}
+		if m.CurrentMode == ModeTaskMove {
+			m.cancelTaskMove()
+			return m, nil
+		}
 		m.CurrentMode = ModeNormal
 		return m, nil
 	}

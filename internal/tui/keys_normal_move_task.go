@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"stream/internal/model"
@@ -24,6 +25,17 @@ func (m *Model) enterTaskMoveMode() {
 	m.CurrentMode = ModeTaskMove
 	m.TaskMovePrefix = ""
 	m.TaskMoveOriginalTimeWindow = task.TimeWindow
+
+	// Create a cloned placeholder version of the task
+	clone := task
+	clone.UUID = task.UUID + "_moving"
+
+	// Append the clone to m.Tasks so it renders
+	m.Tasks = append(m.Tasks, clone)
+
+	// Focus selection on the clone
+	m.SelectedTaskUUID = clone.UUID
+
 	m.StatusMsg = fmt.Sprintf("Locked '%s'. Use j/k or count+j/k to move in 15m steps. Enter to confirm, Esc to cancel.", task.Title)
 }
 
@@ -76,6 +88,7 @@ func (m *Model) applyTaskMove(direction int) {
 	task.TimeWindow.Start = task.TimeWindow.Start.Add(delta)
 	task.TimeWindow.End = task.TimeWindow.End.Add(delta)
 	m.updateTaskInMemory(task)
+	m.autoScrollToSelectedTask()
 	m.TaskMovePrefix = ""
 	moveDir := "down"
 	if direction < 0 {
@@ -85,34 +98,102 @@ func (m *Model) applyTaskMove(direction int) {
 }
 
 func (m *Model) confirmTaskMove() {
-	task, exists := m.getActiveTask()
-	if !exists {
-		m.StatusMsg = "No task selected to move."
+	var originalUUID string
+	if strings.HasSuffix(m.SelectedTaskUUID, "_moving") {
+		originalUUID = strings.TrimSuffix(m.SelectedTaskUUID, "_moving")
+	} else {
+		originalUUID = m.SelectedTaskUUID
+	}
+
+	var finalTimeWindow model.TimeWindow
+	cloneFound := false
+	for _, t := range m.Tasks {
+		if t.UUID == originalUUID+"_moving" {
+			finalTimeWindow = t.TimeWindow
+			cloneFound = true
+			break
+		}
+	}
+
+	// Unconditionally remove all moving placeholders from memory
+	var cleanTasks []model.Task
+	for _, t := range m.Tasks {
+		if !strings.HasSuffix(t.UUID, "_moving") {
+			cleanTasks = append(cleanTasks, t)
+		}
+	}
+	m.Tasks = cleanTasks
+
+	if !cloneFound {
 		m.CurrentMode = ModeNormal
 		return
 	}
-	if m.DB != nil {
-		m.DB.UpdateTask(task)
+
+	// Update original task's TimeWindow in memory
+	var originalTask model.Task
+	originalFound := false
+	for i, t := range m.Tasks {
+		if t.UUID == originalUUID {
+			m.Tasks[i].TimeWindow = finalTimeWindow
+			originalTask = m.Tasks[i]
+			originalFound = true
+			break
+		}
+	}
+
+	m.SelectedTaskUUID = originalUUID
+
+	if originalFound && m.DB != nil {
+		m.DB.UpdateTask(originalTask)
 		m.refreshTasks()
 	}
+
+	// Auto-scroll to the confirmed task to ensure it is visible
+	m.autoScrollToSelectedTask()
+
 	m.CurrentMode = ModeNormal
 	m.TaskMovePrefix = ""
-	m.StatusMsg = fmt.Sprintf("Task '%s' moved to %s.", task.Title, task.TimeWindow.Start.Format("15:04"))
+	m.StatusMsg = fmt.Sprintf("Task '%s' moved to %s.", originalTask.Title, originalTask.TimeWindow.Start.Format("15:04"))
 }
 
 func (m *Model) cancelTaskMove() {
-	if m.SelectedTaskUUID != "" {
+	var originalUUID string
+	if strings.HasSuffix(m.SelectedTaskUUID, "_moving") {
+		originalUUID = strings.TrimSuffix(m.SelectedTaskUUID, "_moving")
+	} else {
+		originalUUID = m.SelectedTaskUUID
+	}
+	m.SelectedTaskUUID = originalUUID
+
+	// Unconditionally remove all moving placeholders from memory
+	var cleanTasks []model.Task
+	for _, t := range m.Tasks {
+		if !strings.HasSuffix(t.UUID, "_moving") {
+			cleanTasks = append(cleanTasks, t)
+		}
+	}
+	m.Tasks = cleanTasks
+
+	// Restore original task's time window in memory
+	if originalUUID != "" {
 		for i, t := range m.Tasks {
-			if t.UUID == m.SelectedTaskUUID {
-				t.TimeWindow = m.TaskMoveOriginalTimeWindow
-				m.Tasks[i] = t
+			if t.UUID == originalUUID {
+				m.Tasks[i].TimeWindow = m.TaskMoveOriginalTimeWindow
 				break
 			}
 		}
 	}
+
+	// Restore selected day to the original start day
+	m.SelectedDay = m.TaskMoveOriginalTimeWindow.Start.Local()
+
 	if m.DB != nil {
 		m.refreshTasks()
 	}
+
+	// Auto-scroll back to the original task
+	m.autoScrollToSelectedTask()
+
 	m.CurrentMode = ModeNormal
 	m.TaskMovePrefix = ""
 	m.StatusMsg = "Task move canceled."

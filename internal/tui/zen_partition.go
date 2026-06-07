@@ -16,11 +16,12 @@ type Session struct {
 	Duration time.Duration
 }
 
-// PartitionTask segments remaining duration into optimal Focus and Break sessions
+// PartitionTask segments remaining focus duration into optimal Focus and Break sessions
 func PartitionTask(total time.Duration) []Session {
 	var sessions []Session
 	rem := total
 
+	// Default fallback for invalid or zero duration
 	if rem <= 0 {
 		return []Session{
 			{Type: FocusSession, Duration: 25 * time.Minute},
@@ -28,53 +29,57 @@ func PartitionTask(total time.Duration) []Session {
 		}
 	}
 
-	// 1. Exactly one 90-minute block allowance, but ONLY if we don't leave 
-	// an awkwardly small remainder (like 10 mins) that distorts the session.
-	// We only take the 90-min block if remaining time is exactly 110m, or >= 140m (110 + 30).
-	if rem == 110*time.Minute || rem >= 140*time.Minute {
+	// 1. Exactly one 90-minute Focus session allowed maximum
+	if rem >= 90*time.Minute {
 		sessions = append(sessions, Session{Type: FocusSession, Duration: 90 * time.Minute})
 		sessions = append(sessions, Session{Type: BreakSession, Duration: 20 * time.Minute})
-		rem -= 110 * time.Minute
+		rem -= 90 * time.Minute // Subtracting ONLY work time
 	}
 
-	// 2. Loop for standard 50-min and 25-min intervals
+	// 2. Process remaining focus time using 50-min and 25-min blocks
 	for rem > 0 {
-		if rem >= 60*time.Minute {
+		if rem >= 50*time.Minute {
 			sessions = append(sessions, Session{Type: FocusSession, Duration: 50 * time.Minute})
 			sessions = append(sessions, Session{Type: BreakSession, Duration: 10 * time.Minute})
-			rem -= 60 * time.Minute
-		} else if rem >= 30*time.Minute {
+			rem -= 50 * time.Minute
+		} else if rem >= 25*time.Minute {
 			sessions = append(sessions, Session{Type: FocusSession, Duration: 25 * time.Minute})
 			sessions = append(sessions, Session{Type: BreakSession, Duration: 5 * time.Minute})
-			rem -= 30 * time.Minute
+			rem -= 25 * time.Minute
 		} else {
-			// 3. Handle specific cleanups for tail end durations
-			if rem >= 25*time.Minute {
-				sessions = append(sessions, Session{Type: FocusSession, Duration: 25 * time.Minute})
-				rem -= 25 * time.Minute
-			} else {
-				// For small leftovers, try to append to a 25 or 50 min session, 
-				// but NEVER let a session exceed its structural caps.
+			// 3. Handle trailing leftover focus time (less than 25 minutes)
+			if len(sessions) > 0 {
+				// Distribute leftover focus time to an existing Focus session,
+				// ensuring we don't burst past our caps (90m, 50m).
 				appended := false
 				for i := len(sessions) - 1; i >= 0; i-- {
 					if sessions[i].Type == FocusSession {
-						// Don't let 50m go past 50m, or 25m go past 50m
-						if (sessions[i].Duration == 50*time.Minute) || 
-						   (sessions[i].Duration == 90*time.Minute) {
-							continue 
+						if sessions[i].Duration == 90*time.Minute || sessions[i].Duration == 50*time.Minute {
+							continue
 						}
-						sessions[i].Duration += rem
-						appended = true
-						break
+						// If adding it keeps it under or equal to a 50m cap, add it
+						if sessions[i].Duration+rem <= 50*time.Minute {
+							sessions[i].Duration += rem
+							appended = true
+							break
+						}
 					}
 				}
+				// If it couldn't be cleanly attached to a flexible session, make it its own small block
 				if !appended {
 					sessions = append(sessions, Session{Type: FocusSession, Duration: rem})
 				}
-				rem = 0
+			} else {
+				// If the total initial task time was less than 25 minutes to begin with
+				sessions = append(sessions, Session{Type: FocusSession, Duration: rem})
 			}
+			rem = 0 // All remaining work time accounted for
 		}
 	}
+
+	// Clean up trailing break check: If the last session is a break, 
+	// it's usually preferred, but if you don't want a break at the absolute end of a task, 
+	// you can optionally strip the final BreakSession here.
 
 	return sessions
 }

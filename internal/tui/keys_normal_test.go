@@ -48,7 +48,7 @@ func TestTaskMoveModeWorkflow(t *testing.T) {
 		t.Fatalf("expected original task start to remain unchanged (10:00), got %s", m.Tasks[0].TimeWindow.Start)
 	}
 
-	// The moving clone task should be at index 1 and moved to 10:30
+	// The moving clone task should be at index 1 and moved to 10:10
 	if len(m.Tasks) != 2 {
 		t.Fatalf("expected 2 tasks in memory during move, got %d", len(m.Tasks))
 	}
@@ -56,8 +56,8 @@ func TestTaskMoveModeWorkflow(t *testing.T) {
 	if clone.UUID != "task-1_moving" {
 		t.Fatalf("expected clone UUID to be task-1_moving, got %s", clone.UUID)
 	}
-	if !clone.TimeWindow.Start.Equal(start.Add(30 * time.Minute)) {
-		t.Fatalf("expected clone start to be 10:30, got %s", clone.TimeWindow.Start)
+	if !clone.TimeWindow.Start.Equal(start.Add(10 * time.Minute)) {
+		t.Fatalf("expected clone start to be 10:10, got %s", clone.TimeWindow.Start)
 	}
 
 	// Press Enter to confirm move
@@ -67,8 +67,8 @@ func TestTaskMoveModeWorkflow(t *testing.T) {
 	if len(m.Tasks) != 1 {
 		t.Fatalf("expected 1 task in memory after confirm, got %d", len(m.Tasks))
 	}
-	if !m.Tasks[0].TimeWindow.Start.Equal(start.Add(30 * time.Minute)) {
-		t.Fatalf("expected original task start to be updated to 10:30, got %s", m.Tasks[0].TimeWindow.Start)
+	if !m.Tasks[0].TimeWindow.Start.Equal(start.Add(10 * time.Minute)) {
+		t.Fatalf("expected original task start to be updated to 10:10, got %s", m.Tasks[0].TimeWindow.Start)
 	}
 }
 
@@ -211,9 +211,10 @@ func TestTaskMoveModeAutoScroll(t *testing.T) {
 	}
 
 	m.enterTaskMoveMode()
-	// Let's move the task up (negative direction) by 8 steps (2 hours)
+	// Let's move the task up (negative direction) by 24 steps (2 hours)
 	// Task start time will become 08:00
-	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("8")})
+	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("4")})
 	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
 
 	// Since task starts at 08:00 (row 64), it fits in the viewport of height 16.
@@ -225,8 +226,9 @@ func TestTaskMoveModeAutoScroll(t *testing.T) {
 	}
 
 	// Test day wrap-around/transition:
-	// Move task up by 40 steps (10 hours). Start will be 08:00 - 10h = 22:00 of June 5th.
-	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("4")})
+	// Move task up by 120 steps (10 hours). Start will be 08:00 - 10h = 22:00 of June 5th.
+	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
 	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("0")})
 	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
 

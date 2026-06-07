@@ -36,7 +36,7 @@ func (m *Model) enterTaskMoveMode() {
 	// Focus selection on the clone
 	m.SelectedTaskUUID = clone.UUID
 
-	m.StatusMsg = fmt.Sprintf("Locked '%s'. Use j/k or count+j/k to move in 15m steps. Enter to confirm, Esc to cancel.", task.Title)
+	m.StatusMsg = fmt.Sprintf("Locked '%s'. Use j/k or count+j/k to move in 5m steps. Enter to confirm, Esc to cancel.", task.Title)
 }
 
 func (m *Model) handleTaskMoveKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -84,7 +84,7 @@ func (m *Model) applyTaskMove(direction int) {
 		return
 	}
 
-	delta := time.Duration(steps*15) * time.Minute
+	delta := time.Duration(steps*5) * time.Minute
 	task.TimeWindow.Start = task.TimeWindow.Start.Add(delta)
 	task.TimeWindow.End = task.TimeWindow.End.Add(delta)
 	m.updateTaskInMemory(task)
@@ -94,7 +94,7 @@ func (m *Model) applyTaskMove(direction int) {
 	if direction < 0 {
 		moveDir = "up"
 	}
-	m.StatusMsg = fmt.Sprintf("Moved '%s' %d minutes %s. Enter to confirm, Esc to cancel.", task.Title, absInt(steps*15), moveDir)
+	m.StatusMsg = fmt.Sprintf("Moved '%s' %d minutes %s. Enter to confirm, Esc to cancel.", task.Title, absInt(steps*5), moveDir)
 }
 
 func (m *Model) confirmTaskMove() {

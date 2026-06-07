@@ -140,6 +140,18 @@ func (m Model) renderZenMode() string {
 	}
 	row3 := r3Part1 + strings.Repeat(" ", r3Pad) + r3Part2
 
+	maxW := lipgloss.Width(row1)
+	if w := lipgloss.Width(row2); w > maxW {
+		maxW = w
+	}
+	if w := lipgloss.Width(row3); w > maxW {
+		maxW = w
+	}
+
+	row1 = row1 + strings.Repeat(" ", maxW-lipgloss.Width(row1))
+	row2 = row2 + strings.Repeat(" ", maxW-lipgloss.Width(row2))
+	row3 = row3 + strings.Repeat(" ", maxW-lipgloss.Width(row3))
+
 	centeredRow1 := centerMultiLine(row1, m.Width)
 	centeredRow2 := centerMultiLine(row2, m.Width)
 	centeredRow3 := centerMultiLine(row3, m.Width)

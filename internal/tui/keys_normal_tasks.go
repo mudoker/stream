@@ -55,20 +55,26 @@ func (m *Model) getActiveTask() (model.Task, bool) {
 
 func (m *Model) getTodoShelfTasks() []model.Task {
 	var reminders []model.Task
+	var habits []model.Task
 	var backlog []model.Task
 	for _, t := range m.Tasks {
-		if t.LifecycleState == model.StateCompleted {
+		// Habits remain visible on the shelf even if marked Completed (checked off for today)
+		if t.LifecycleState == model.StateCompleted && t.SchedulingType != model.Habit {
 			continue
 		}
 		if t.SchedulingType == model.Reminder {
 			reminders = append(reminders, t)
+		} else if t.SchedulingType == model.Habit {
+			habits = append(habits, t)
 		} else if t.SchedulingType == model.Floating {
 			backlog = append(backlog, t)
 		}
 	}
 	sortReminders(reminders)
+	importSort(habits)
 	importSort(backlog)
-	return append(reminders, backlog...)
+	res := append(reminders, habits...)
+	return append(res, backlog...)
 }
 
 func sortReminders(tasks []model.Task) {

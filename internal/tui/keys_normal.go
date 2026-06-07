@@ -223,10 +223,27 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Complete Task
 		task, exists := m.getActiveTask()
 		if exists {
-			task.LifecycleState = model.StateCompleted
+			if task.SchedulingType == model.Habit {
+				isCompletedToday := task.LifecycleState == model.StateCompleted && sameDay(task.UpdatedAt, m.SelectedDay)
+				if isCompletedToday {
+					task.LifecycleState = model.StateBacklog
+					m.StatusMsg = fmt.Sprintf("Habit '%s' marked incomplete.", task.Title)
+				} else {
+					task.LifecycleState = model.StateCompleted
+					m.StatusMsg = fmt.Sprintf("Habit '%s' completed!", task.Title)
+				}
+			} else {
+				if task.LifecycleState == model.StateCompleted {
+					task.LifecycleState = model.StateBacklog
+					m.StatusMsg = fmt.Sprintf("Task '%s' marked incomplete.", task.Title)
+				} else {
+					task.LifecycleState = model.StateCompleted
+					m.StatusMsg = fmt.Sprintf("Task '%s' completed!", task.Title)
+				}
+			}
+			task.UpdatedAt = time.Now()
 			m.DB.UpdateTask(task)
 			m.refreshTasks()
-			m.StatusMsg = fmt.Sprintf("Task '%s' completed!", task.Title)
 		}
 		return m, nil
 	case "d":

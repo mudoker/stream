@@ -35,6 +35,9 @@ func (m Model) hasPriorityOverlapCollision(t model.Task) bool {
 // w and h are the card's outer dimensions (including borders).
 func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelected bool) string {
 	pColor := m.priorityColor(task.Priority)
+	if strings.HasSuffix(task.UUID, "_moving") {
+		pColor = m.Theme.Muted
+	}
 	now := time.Now()
 
 	hasCollision := m.hasPriorityOverlapCollision(task)
@@ -43,7 +46,9 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 	// Card border
 	borderColor := pColor
 	isCompleted := task.LifecycleState == model.StateCompleted
-	if isZenFocus {
+	if strings.HasSuffix(task.UUID, "_moving") {
+		borderColor = m.Theme.Muted
+	} else if isZenFocus {
 		borderColor = m.Theme.SuccessColor
 	} else if isSelected {
 		borderColor = lipgloss.Color("#ff8700")
@@ -116,6 +121,9 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 
 	// Truncate title using safe rune slicing
 	titleStr := sentenceCase(task.Title)
+	if strings.HasSuffix(task.UUID, "_moving") {
+		titleStr = "[Moving] " + titleStr
+	}
 	titleRunes := []rune(titleStr)
 	if len(titleRunes) > contentW-1 {
 		if contentW > 2 {
@@ -127,6 +135,9 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 
 	// Construct and scale metadata row to fit contentW-1
 	mutedStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
+	if strings.HasSuffix(task.UUID, "_moving") {
+		mutedStyle = mutedStyle.Faint(true)
+	}
 	spStrStyled := mutedStyle.Render(fmt.Sprintf("%d SP", task.StoryPoints))
 	timeStrStyled := mutedStyle.Render(timeStr)
 	bulletStyled := mutedStyle.Render("  •  ")
@@ -146,7 +157,9 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 	}
 
 	titleStyle := lipgloss.NewStyle().Foreground(m.Theme.Fg).Bold(true)
-	if isZenFocus {
+	if strings.HasSuffix(task.UUID, "_moving") {
+		titleStyle = lipgloss.NewStyle().Foreground(m.Theme.Muted).Italic(true).Faint(true)
+	} else if isZenFocus {
 		titleStyle = titleStyle.Foreground(m.Theme.SuccessColor)
 	} else if isSelected {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff8700"))
@@ -211,14 +224,31 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 		bodyLines = append(bodyLines, strings.Repeat(" ", innerWidth))
 	}
 
+	var topLeftChar, topRightChar, bottomLeftChar, bottomRightChar, horizChar, vertChar string
+	if strings.HasSuffix(task.UUID, "_moving") {
+		topLeftChar = "┌"
+		topRightChar = "┐"
+		bottomLeftChar = "└"
+		bottomRightChar = "┘"
+		horizChar = "╌"
+		vertChar = "┊"
+	} else {
+		topLeftChar = "╭"
+		topRightChar = "╮"
+		bottomLeftChar = "╰"
+		bottomRightChar = "╯"
+		horizChar = "─"
+		vertChar = "│"
+	}
+
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
-	topLine := borderStyle.Render("╭") + borderStyle.Render(strings.Repeat("─", innerWidth)) + borderStyle.Render("╮")
-	bottomLine := borderStyle.Render("╰") + borderStyle.Render(strings.Repeat("─", innerWidth)) + borderStyle.Render("╯")
+	topLine := borderStyle.Render(topLeftChar) + borderStyle.Render(strings.Repeat(horizChar, innerWidth)) + borderStyle.Render(topRightChar)
+	bottomLine := borderStyle.Render(bottomLeftChar) + borderStyle.Render(strings.Repeat(horizChar, innerWidth)) + borderStyle.Render(bottomRightChar)
 
 	var cardLines []string
 	cardLines = append(cardLines, topLine)
 	for _, body := range bodyLines {
-		cardLines = append(cardLines, borderStyle.Render("│")+body+borderStyle.Render("│"))
+		cardLines = append(cardLines, borderStyle.Render(vertChar)+body+borderStyle.Render(vertChar))
 	}
 	cardLines = append(cardLines, bottomLine)
 

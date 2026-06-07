@@ -13,7 +13,9 @@ import (
 func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color, isActive bool, isSelected bool, hasCollision bool, isZenFocus bool, timeStr string) string {
 	stripColor := pColor
 	isCompleted := task.LifecycleState == model.StateCompleted
-	if isZenFocus {
+	if strings.HasSuffix(task.UUID, "_moving") {
+		stripColor = m.Theme.Muted
+	} else if isZenFocus {
 		stripColor = m.Theme.SuccessColor
 	} else if isSelected {
 		stripColor = lipgloss.Color("#ff8700")
@@ -25,8 +27,14 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		stripColor = lipgloss.Color("#45475a") // dim border for completed
 	}
 
-	leftBorder := lipgloss.NewStyle().Foreground(stripColor).Render("│")
-	rightBorder := lipgloss.NewStyle().Foreground(stripColor).Render("│")
+	var vertChar string
+	if strings.HasSuffix(task.UUID, "_moving") {
+		vertChar = "┊"
+	} else {
+		vertChar = "│"
+	}
+	leftBorder := lipgloss.NewStyle().Foreground(stripColor).Render(vertChar)
+	rightBorder := lipgloss.NewStyle().Foreground(stripColor).Render(vertChar)
 
 	contentW := w - 2
 	if contentW < 1 {
@@ -34,6 +42,9 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 	}
 
 	titleStr := sentenceCase(task.Title)
+	if strings.HasSuffix(task.UUID, "_moving") {
+		titleStr = "[Moving] " + titleStr
+	}
 	if hasCollision {
 		titleStr = "⚠️ " + titleStr
 	}
@@ -49,7 +60,9 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 	text := " " + titleStr
 
 	var textStyle lipgloss.Style
-	if isZenFocus {
+	if strings.HasSuffix(task.UUID, "_moving") {
+		textStyle = lipgloss.NewStyle().Foreground(m.Theme.Muted).Italic(true).Faint(true)
+	} else if isZenFocus {
 		textStyle = lipgloss.NewStyle().Foreground(m.Theme.SuccessColor).Bold(true)
 	} else if isSelected {
 		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff8700")).Bold(true)
@@ -74,13 +87,22 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 	if h >= 2 {
 		pName := string(task.Priority)
 		var pBadge string
+		pColorToUse := pColor
+		if strings.HasSuffix(task.UUID, "_moving") {
+			pColorToUse = m.Theme.Muted
+		}
+
 		if hasCollision {
 			pBadge = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true).Render("⚠️ " + pName)
 		} else {
-			pBadge = lipgloss.NewStyle().Foreground(pColor).Bold(true).Render("▲ " + pName)
+			pBadge = lipgloss.NewStyle().Foreground(pColorToUse).Bold(true).Render("▲ " + pName)
 		}
 		
-		timeStyled := lipgloss.NewStyle().Foreground(m.Theme.Muted).Render(timeStr)
+		timeStyle := lipgloss.NewStyle().Foreground(m.Theme.Muted)
+		if strings.HasSuffix(task.UUID, "_moving") {
+			timeStyle = timeStyle.Faint(true)
+		}
+		timeStyled := timeStyle.Render(timeStr)
 		meta := " " + pBadge + "  " + timeStyled
 		
 		if lipgloss.Width(meta) > contentW {
@@ -104,8 +126,11 @@ func (m Model) renderShortCard(task model.Task, w, h int, pColor lipgloss.Color,
 		if len(meta2Runes) > contentW {
 			meta2 = string(meta2Runes[:contentW])
 		}
-		meta2Line := leftBorder + lipgloss.NewStyle().
-			Foreground(m.Theme.Muted).
+		meta2Style := lipgloss.NewStyle().Foreground(m.Theme.Muted)
+		if strings.HasSuffix(task.UUID, "_moving") {
+			meta2Style = meta2Style.Faint(true)
+		}
+		meta2Line := leftBorder + meta2Style.
 			Width(contentW).
 			Render(meta2) + rightBorder
 		rows = append(rows, meta2Line)

@@ -43,10 +43,13 @@ func (m Model) renderTodoShelf(appContentHeight int) string {
 
 	shelfTasks := m.getTodoShelfTasks()
 	var reminders []model.Task
+	var habits []model.Task
 	var backlog []model.Task
 	for _, t := range shelfTasks {
 		if t.SchedulingType == model.Reminder {
 			reminders = append(reminders, t)
+		} else if t.SchedulingType == model.Habit {
+			habits = append(habits, t)
 		} else {
 			backlog = append(backlog, t)
 		}
@@ -63,7 +66,18 @@ func (m Model) renderTodoShelf(appContentHeight int) string {
 		}
 	}
 
-	// 2. Backlog Section
+	// 2. Habits Section
+	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("🔁 HABITS"))
+	rows = append(rows, lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", innerW)))
+	if len(habits) == 0 {
+		rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  No habits"), "")
+	} else {
+		for _, t := range habits {
+			rows = append(rows, m.renderShelfTaskRow(t, innerW)...)
+		}
+	}
+
+	// 3. Backlog Section
 	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("☱ BACKLOG"))
 	rows = append(rows, lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", innerW)))
 	if len(backlog) == 0 {
@@ -108,7 +122,11 @@ func (m Model) renderShelfTaskRow(t model.Task, innerW int) []string {
 	isSelected := m.TodoShelfFocus && t.UUID == m.SelectedTaskUUID
 
 	chk := "[ ]"
-	if t.LifecycleState == model.StateCompleted {
+	isDone := t.LifecycleState == model.StateCompleted
+	if t.SchedulingType == model.Habit {
+		isDone = t.LifecycleState == model.StateCompleted && sameDay(t.UpdatedAt, m.SelectedDay)
+	}
+	if isDone {
 		chk = "[✓]"
 	}
 
@@ -130,6 +148,8 @@ func (m Model) renderShelfTaskRow(t model.Task, innerW int) []string {
 	indicator := ""
 	if t.SchedulingType == model.Reminder {
 		indicator = " ⏰"
+	} else if t.SchedulingType == model.Habit {
+		indicator = " 🔁"
 	}
 
 	titleLine := fmt.Sprintf("%s%s %s%s", prefix, chk, title, indicator)

@@ -145,3 +145,40 @@ func TestRenderTodoShelfSections(t *testing.T) {
 		t.Error("expected shelf rendering to contain backlog title 'Read book'")
 	}
 }
+
+func TestRenderTodoShelfHabits(t *testing.T) {
+	m := &Model{
+		Layout: Layout{
+			TodoW: 30,
+		},
+		Theme:       NewTheme(),
+		SelectedDay: time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local),
+		Tasks: []model.Task{
+			{
+				UUID:           "habit-1",
+				Title:          "Drink Water",
+				SchedulingType: model.Habit,
+				LifecycleState: model.StateCompleted,
+				UpdatedAt:      time.Date(2026, 6, 6, 10, 0, 0, 0, time.Local), // Completed today
+			},
+			{
+				UUID:           "habit-2",
+				Title:          "Stretch",
+				SchedulingType: model.Habit,
+				LifecycleState: model.StateCompleted,
+				UpdatedAt:      time.Date(2026, 6, 5, 10, 0, 0, 0, time.Local), // Completed yesterday
+			},
+		},
+	}
+
+	rendered := m.renderTodoShelf(20)
+	if !strings.Contains(rendered, "HABITS") {
+		t.Error("expected shelf rendering to contain 'HABITS'")
+	}
+	if !strings.Contains(rendered, "[✓] Drink water") {
+		t.Error("expected habit completed today to render as [✓] Drink water")
+	}
+	if !strings.Contains(rendered, "[ ] Stretch") {
+		t.Error("expected habit completed yesterday to render as [ ] Stretch")
+	}
+}

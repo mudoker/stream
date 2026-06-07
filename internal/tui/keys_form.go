@@ -151,7 +151,7 @@ func (m *Model) submitForm() {
 	var startTime time.Time
 	duration := 60
 
-	if taskType != 1 {
+	if taskType == 0 || taskType == 2 {
 		timeStr := m.Form.StartTimeInput.Value()
 
 		hour, min := ParseFlexibleTime(timeStr, 9, 0)

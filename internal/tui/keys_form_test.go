@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"stream/internal/db"
 	"stream/internal/model"
+	"stream/internal/sync"
 )
 
 func TestParseFlexibleTime(t *testing.T) {
@@ -107,5 +109,78 @@ func TestGetTodoShelfTasksIncludesReminders(t *testing.T) {
 	}
 	if shelf[0].UUID != "1" && shelf[0].UUID != "2" {
 		t.Fatalf("unexpected TODO shelf task UUID %s", shelf[0].UUID)
+	}
+}
+
+func TestHabitCreationFormSubmit(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := NewModel(database, syncEngine)
+	m.Form = NewTaskForm()
+	m.Form.TitleInput.SetValue("Drink Water")
+	m.Form.DescInput.SetValue("8 glasses a day")
+	m.Form.PriorityIdx = 2 // Medium
+	m.Form.SPIdx = 2       // 2 SP
+	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.TagsInput.SetValue("health, daily")
+
+	m.submitForm()
+
+	tasks := database.GetTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task in DB, got %d", len(tasks))
+	}
+
+	task := tasks[0]
+	if task.Title != "Drink Water" {
+		t.Errorf("expected title 'Drink Water', got %q", task.Title)
+	}
+	if task.Description != "8 glasses a day" {
+		t.Errorf("expected description '8 glasses a day', got %q", task.Description)
+	}
+	if task.SchedulingType != model.Habit {
+		t.Errorf("expected SchedulingType to be Habit, got %s", task.SchedulingType)
+	}
+	if len(task.Tags) != 2 || task.Tags[0] != "health" || task.Tags[1] != "daily" {
+		t.Errorf("unexpected tags: %v", task.Tags)
+	}
+}
+
+func TestHabitCommandPalette(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := NewModel(database, syncEngine)
+	m.runCommand("habit Read Books")
+
+	tasks := database.GetTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task in DB, got %d", len(tasks))
+	}
+
+	task := tasks[0]
+	if task.Title != "Read Books" {
+		t.Errorf("expected title 'Read Books', got %q", task.Title)
+	}
+	if task.SchedulingType != model.Habit {
+		t.Errorf("expected SchedulingType to be Habit, got %s", task.SchedulingType)
+	}
+	if task.StoryPoints != 0 {
+		t.Errorf("expected StoryPoints to be 0, got %d", task.StoryPoints)
 	}
 }

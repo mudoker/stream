@@ -20,6 +20,7 @@ const (
 	Floating  SchedulingType = "FLOATING"  // Todo Shelf/unscheduled
 	Reminder  SchedulingType = "REMINDER"  // Reminder with due time
 	Recurring SchedulingType = "RECURRING" // Recurring task template
+	Habit     SchedulingType = "HABIT"     // Habit repeatable daily
 )
 
 type LifecycleState string

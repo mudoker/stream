@@ -135,6 +135,9 @@ func (m *Model) confirmTaskMove() {
 	for i, t := range m.Tasks {
 		if t.UUID == originalUUID {
 			m.Tasks[i].TimeWindow = finalTimeWindow
+			if m.Tasks[i].LifecycleState == model.StateOverdue {
+				m.Tasks[i].LifecycleState = model.StateScheduled
+			}
 			originalTask = m.Tasks[i]
 			originalFound = true
 			break

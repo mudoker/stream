@@ -278,3 +278,35 @@ func TestTaskMoveModeCancelViaUpdate(t *testing.T) {
 	}
 }
 
+func TestRescheduleOverdueTaskClearsStatus(t *testing.T) {
+	start := time.Date(2026, 6, 6, 10, 0, 0, 0, time.UTC)
+	task := model.Task{
+		UUID:           "task-overdue-1",
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateOverdue,
+		TimeWindow: model.TimeWindow{
+			Start: start,
+			End:   start.Add(time.Hour),
+		},
+	}
+
+	m := &Model{
+		Tasks:            []model.Task{task},
+		SelectedTaskUUID: "task-overdue-1",
+	}
+
+	m.enterTaskMoveMode()
+	// Move the task
+	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	// Press Enter to confirm move
+	m.handleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if len(m.Tasks) != 1 {
+		t.Fatalf("expected 1 task in memory, got %d", len(m.Tasks))
+	}
+	updatedTask := m.Tasks[0]
+	if updatedTask.LifecycleState != model.StateScheduled {
+		t.Errorf("expected LifecycleState to clear to StateScheduled on reschedule, got %s", updatedTask.LifecycleState)
+	}
+}
+

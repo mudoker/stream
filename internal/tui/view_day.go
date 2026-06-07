@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	rowsPerHour  = 8  // 7.5-minute slots per hour (8 rows/hour)
-	totalRows    = 192 // 24h * 8 rows
-	gutterWidth  = 11 // " HH:MM ───┼" timestamp gutter
+	rowsPerHour = 8   // 7.5-minute slots per hour (8 rows/hour)
+	totalRows   = 192 // 24h * 8 rows
+	gutterWidth = 11  // " HH:MM ───┼" timestamp gutter
 )
 
 // renderDayTimeline renders the 24-hour timeline grid for the day view.
@@ -168,13 +168,18 @@ func (m Model) renderDayTimeline(appContentHeight int) string {
 	// Overlay tasks onto the columns
 	for _, rc := range cols {
 		startRow := timeToRow(rc.Task.TimeWindow.Start)
-		durationMinutes := int(rc.Task.TimeWindow.End.Sub(rc.Task.TimeWindow.Start).Minutes())
-		h := (durationMinutes * rowsPerHour + 59) / 60
+		endRow := timeToRow(rc.Task.TimeWindow.End)
+		
+		// To make the card border align exactly over the end milestone row,
+		// the height must cover the inclusive slice length from startRow up to and including endRow.
+		h := (endRow - startRow) + 1
+		
+		if h < 3 {
+			h = 3 // Minimum layout rows required to safely render a lipgloss boxed container
+		}
+
 		if startRow+h > totalRows {
 			h = totalRows - startRow
-		}
-		if h < 1 {
-			h = 1
 		}
 
 		colIndex := rc.ColIndex

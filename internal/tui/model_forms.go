@@ -12,7 +12,7 @@ type TaskForm struct {
 	Description    string
 	PriorityIdx    int // 0: P0, 1: P1, 2: P2, 3: P3
 	SPIdx          int // index in []int{1, 2, 3, 5, 8, 13}
-	TaskTypeIdx    int // 0: Anchored, 1: Floating, 2: Reminder
+	TaskTypeIdx    int // 0: Anchored, 1: Floating, 2: Reminder, 3: Habit
 	StartHour      int
 	StartMin       int
 	DurationMins   int

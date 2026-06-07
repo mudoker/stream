@@ -13,7 +13,7 @@ import (
 )
 
 var PriorityOptions = []string{"0 (Critical)", "1 (High)", "2 (Medium)", "3 (Low)"}
-var TaskTypeOptions = []string{"Anchored", "Floating", "Reminder"}
+var TaskTypeOptions = []string{"Anchored", "Floating", "Reminder", "Habit"}
 var SPOptions = []int{0, 1, 2, 3, 5, 8, 13}
 
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -114,7 +114,7 @@ func (m *Model) focusFormFields() {
 	case 1:
 		m.Form.DescInput.Focus()
 	case 5:
-		if m.Form.TaskTypeIdx != 1 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 2 {
 			m.Form.StartTimeInput.Focus()
 		}
 	case 6:
@@ -224,6 +224,14 @@ func (m *Model) submitForm() {
 		newTask.TimeWindow = model.TimeWindow{
 			Start: startTime,
 		}
+		if isEdit && existingTask.LifecycleState == model.StateCompleted {
+			newTask.LifecycleState = model.StateCompleted
+		} else {
+			newTask.LifecycleState = model.StateReady
+		}
+	} else if taskType == 3 {
+		newTask.SchedulingType = model.Habit
+		newTask.StoryPoints = 0
 		if isEdit && existingTask.LifecycleState == model.StateCompleted {
 			newTask.LifecycleState = model.StateCompleted
 		} else {

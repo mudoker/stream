@@ -17,31 +17,69 @@ type ZenTimer struct {
 }
 
 func NewZenTimer(t model.Task) *ZenTimer {
-	dur := time.Duration(t.StoryPoints) * 45 * time.Minute
+	originalDur := time.Duration(t.StoryPoints) * 45 * time.Minute
 	if t.SchedulingType == model.Anchored {
-		dur = t.TimeWindow.End.Sub(t.TimeWindow.Start)
+		originalDur = t.TimeWindow.End.Sub(t.TimeWindow.Start)
 	}
 
-	elapsed := time.Duration(t.ExecutionMetrics.ElapsedFocusSeconds) * time.Second
-	dur -= elapsed
-	if dur < 0 {
-		dur = 0
-	}
+	sessions := PartitionTask(originalDur)
 
-	sessions := PartitionTask(dur)
+	elapsedFocus := time.Duration(t.ExecutionMetrics.ElapsedFocusSeconds) * time.Second
+	elapsedBreak := time.Duration(t.ExecutionMetrics.ElapsedBreakSeconds) * time.Second
+
+	currentIdx := 0
 	var timeRemaining time.Duration
-	if len(sessions) > 0 {
-		timeRemaining = sessions[0].Duration
+	running := true
+
+	for i, sess := range sessions {
+		currentIdx = i
+		if sess.Type == FocusSession {
+			if elapsedFocus >= sess.Duration {
+				elapsedFocus -= sess.Duration
+				if i == len(sessions)-1 {
+					currentIdx = len(sessions)
+				}
+			} else {
+				timeRemaining = sess.Duration - elapsedFocus
+				elapsedFocus = 0
+				break
+			}
+		} else if sess.Type == BreakSession {
+			if elapsedBreak >= sess.Duration {
+				elapsedBreak -= sess.Duration
+				if i == len(sessions)-1 {
+					currentIdx = len(sessions)
+				}
+			} else {
+				timeRemaining = sess.Duration - elapsedBreak
+				elapsedBreak = 0
+				break
+			}
+		}
+	}
+
+	if currentIdx >= len(sessions) {
+		running = false
+		timeRemaining = 0
+		currentIdx = len(sessions) - 1
+		if currentIdx < 0 {
+			currentIdx = 0
+		}
+	}
+
+	totalDuration := timeRemaining
+	if currentIdx < len(sessions) && sessions[currentIdx].Duration > 0 {
+		totalDuration = sessions[currentIdx].Duration
 	}
 
 	return &ZenTimer{
 		Task:              t,
 		Sessions:          sessions,
-		CurrentSessionIdx: 0,
+		CurrentSessionIdx: currentIdx,
 		TimeRemaining:     timeRemaining,
-		TotalDuration:     timeRemaining,
+		TotalDuration:     totalDuration,
 		IsPaused:          false,
-		Running:           true,
+		Running:           running,
 	}
 }
 

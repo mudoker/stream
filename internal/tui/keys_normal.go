@@ -270,13 +270,6 @@ func (m *Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		task, exists := m.getActiveTask()
 		if exists {
 			if m.ZenTimer != nil && m.ZenTimer.Task.UUID == task.UUID {
-				m.ZenTimer.Running = true
-				m.ZenTimer.IsPaused = false
-				task.LifecycleState = model.StateActive
-				if m.DB != nil {
-					m.DB.UpdateTask(task)
-					m.refreshTasks()
-				}
 				m.CurrentMode = ModeZen
 				m.StatusMsg = "Returned to active Zen focus session."
 				return m, nil

@@ -85,9 +85,7 @@ func (m *Model) handleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.DB.UpdateTask(t)
 			m.refreshTasks()
 		}
-		m.ZenTimer.Running = false
-		m.ZenTimer.IsPaused = true
-		m.ZenTimer.Task = t
+		m.ZenTimer = nil
 		m.CurrentMode = ModeNormal
 		m.StatusMsg = "Timer STOPPED"
 	case "b":

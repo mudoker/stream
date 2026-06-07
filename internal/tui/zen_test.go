@@ -253,11 +253,17 @@ func TestZenTimerStopAndResume(t *testing.T) {
 	if m.CurrentMode != ModeNormal {
 		t.Errorf("expected mode to revert to Normal, got %v", m.CurrentMode)
 	}
-	if m.ZenTimer == nil {
-		t.Fatal("expected ZenTimer NOT to be nil after stopping")
+	if m.ZenTimer != nil {
+		t.Fatal("expected ZenTimer to be nil after stopping")
 	}
-	if m.ZenTimer.Running {
-		t.Error("expected ZenTimer to be stopped (Running = false)")
+
+	// Verify that the task in the database has the elapsed focus seconds recorded
+	tOpt, ok := database.GetTask("test-task-stop-resume")
+	if !ok {
+		t.Fatal("task not found in database")
+	}
+	if tOpt.ExecutionMetrics.ElapsedFocusSeconds != 300 {
+		t.Errorf("expected 300 seconds elapsed focus time, got %d", tOpt.ExecutionMetrics.ElapsedFocusSeconds)
 	}
 
 	// 3. Press "z" on the same task to resume
@@ -268,6 +274,9 @@ func TestZenTimerStopAndResume(t *testing.T) {
 
 	if mRes.CurrentMode != ModeZen {
 		t.Errorf("expected mode to return to Zen, got %v", mRes.CurrentMode)
+	}
+	if mRes.ZenTimer == nil {
+		t.Fatal("expected ZenTimer to be reconstructed, got nil")
 	}
 	if mRes.ZenTimer.TimeRemaining != 40*time.Minute {
 		t.Errorf("expected TimeRemaining to be preserved at 40m, got %v", mRes.ZenTimer.TimeRemaining)

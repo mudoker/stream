@@ -11,11 +11,15 @@ import (
 )
 
 func (m Model) hasPriorityOverlapCollision(t model.Task) bool {
+	if m.CurrentMode == ModeTaskMove || strings.HasSuffix(t.UUID, "_moving") {
+		return false
+	}
 	if t.SchedulingType != model.Anchored {
 		return false
 	}
+	taskUUID := movingTaskBaseUUID(t.UUID)
 	for _, t2 := range m.Tasks {
-		if t2.UUID == t.UUID || t2.SchedulingType != model.Anchored {
+		if movingTaskBaseUUID(t2.UUID) == taskUUID || t2.SchedulingType != model.Anchored {
 			continue
 		}
 		if !sameDay(t.TimeWindow.Start, t2.TimeWindow.Start) {
@@ -29,6 +33,10 @@ func (m Model) hasPriorityOverlapCollision(t model.Task) bool {
 		}
 	}
 	return false
+}
+
+func movingTaskBaseUUID(uuid string) string {
+	return strings.TrimSuffix(uuid, "_moving")
 }
 
 // renderTaskCard renders a complete multi-line Lipgloss task card block.
@@ -254,7 +262,6 @@ func (m Model) renderTaskCard(task model.Task, w, h int, isActive bool, isSelect
 
 	return strings.Join(cardLines, "\n")
 }
-
 
 // sentenceCase capitalises only the first letter of a string.
 func sentenceCase(s string) string {

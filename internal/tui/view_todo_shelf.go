@@ -181,12 +181,6 @@ func (m Model) renderShelfTaskRow(t model.Task, innerW int) []string {
 		prefix = "▶ "
 	}
 	indicator := ""
-	if t.SchedulingType == model.Reminder {
-		indicator = " ⏰"
-	} else if t.SchedulingType == model.Habit {
-		indicator = " 🔁"
-	}
-
 	titleLine := fmt.Sprintf("%s%s %s%s", prefix, chk, title, indicator)
 
 	var details []string

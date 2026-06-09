@@ -10,7 +10,7 @@ import (
 )
 
 // renderTodoShelf renders the backlog todo shelf column.
-// All item widths are explicitly bounded by m.Layout.TodoW to prevent line wrap.
+// It maps items into a single fluid array and uses a global scroll calculation.
 func (m Model) renderTodoShelf(appContentHeight int) string {
 	l := m.Layout
 	innerW := l.TodoW - 2 // account for padding
@@ -32,6 +32,9 @@ func (m Model) renderTodoShelf(appContentHeight int) string {
 
 	sep := lipgloss.NewStyle().Foreground(sepColor).
 		Render(strings.Repeat("─", innerW))
+
+	// Track line markers so we can dynamically snap scroll to our active selection
+	selectedLineIdx := -1
 
 	var rows []string
 	rows = append(rows,
@@ -55,62 +58,95 @@ func (m Model) renderTodoShelf(appContentHeight int) string {
 		}
 	}
 
-	// 1. Reminders Section
+	// ── 1. Reminders Section ─────────────────────────────────────────
 	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("⏰ REMINDERS"))
 	rows = append(rows, lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", innerW)))
 	if len(reminders) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  No reminders"), "")
 	} else {
 		for _, t := range reminders {
+			if m.TodoShelfFocus && t.UUID == m.SelectedTaskUUID {
+				selectedLineIdx = len(rows)
+			}
 			rows = append(rows, m.renderShelfTaskRow(t, innerW)...)
 		}
 	}
 
-	// 2. Habits Section
+	// ── 2. Habits Section ────────────────────────────────────────────
 	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("🔁 HABITS"))
 	rows = append(rows, lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", innerW)))
 	if len(habits) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  No habits"), "")
 	} else {
 		for _, t := range habits {
+			if m.TodoShelfFocus && t.UUID == m.SelectedTaskUUID {
+				selectedLineIdx = len(rows)
+			}
 			rows = append(rows, m.renderShelfTaskRow(t, innerW)...)
 		}
 	}
 
-	// 3. Backlog Section
+	// ── 3. Backlog Section ───────────────────────────────────────────
 	rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Accent).Bold(true).Render("☱ BACKLOG"))
 	rows = append(rows, lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", innerW)))
 	if len(backlog) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  No backlog tasks"), "")
 	} else {
 		for _, t := range backlog {
+			if m.TodoShelfFocus && t.UUID == m.SelectedTaskUUID {
+				selectedLineIdx = len(rows)
+			}
 			rows = append(rows, m.renderShelfTaskRow(t, innerW)...)
 		}
 	}
 
-	// Apply scroll offset
-	all := strings.Join(rows, "\n")
-	allLines := strings.Split(all, "\n")
+	// Flatten rows array down to raw line tokens
+	allLines := strings.Split(strings.Join(rows, "\n"), "\n")
+	maxVisible := appContentHeight - 2
+	if maxVisible < 4 {
+		maxVisible = 4
+	}
 
+	// ── Smart Auto-Scrolling Viewport Window Clamping ───────────────
 	offset := m.ShelfScrollOffset
-	if offset >= len(allLines) {
-		offset = len(allLines) - 1
+
+	// If a task row is actively selected, force viewport boundaries to wrap it cleanly
+	if selectedLineIdx != -1 {
+		// If selection is positioned above the current screen layout window view
+		if selectedLineIdx < offset {
+			offset = selectedLineIdx
+		}
+		// If selection dips below the bottom visible edge line bounds
+		if selectedLineIdx >= offset+(maxVisible-2) {
+			offset = selectedLineIdx - (maxVisible - 3)
+		}
+	}
+
+	// Safeguard scroll limits safely against structural text length
+	if offset > len(allLines)-maxVisible {
+		offset = len(allLines) - maxVisible
 	}
 	if offset < 0 {
 		offset = 0
 	}
 
-	maxVisible := appContentHeight - 2
+	// Slice visible items matching our clamped row calculations
 	var visible []string
 	if offset > 0 {
-		visible = append(visible,
-			lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  ▲ scroll up"))
+		visible = append(visible, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  ▲ scroll up"))
+	} else {
+		visible = append(visible, "") // Top edge aesthetic gap buffer
 	}
-	visible = append(visible, allLines[offset:]...)
-	if len(visible) > maxVisible {
-		visible = visible[:maxVisible-1]
-		visible = append(visible,
-			lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  ▼ scroll down"))
+
+	endSlice := offset + maxVisible
+	if endSlice > len(allLines) {
+		endSlice = len(allLines)
+	}
+
+	visible = append(visible, allLines[offset:endSlice]...)
+
+	if endSlice < len(allLines) {
+		visible = append(visible, lipgloss.NewStyle().Foreground(m.Theme.Muted).Render("  ▼ scroll down"))
 	}
 
 	return lipgloss.NewStyle().
@@ -131,7 +167,6 @@ func (m Model) renderShelfTaskRow(t model.Task, innerW int) []string {
 	}
 
 	title := sentenceCase(t.Title)
-	// Truncate title to fit innerW minus checkbox and indicator
 	maxTitleW := innerW - 7
 	if len([]rune(title)) > maxTitleW {
 		if maxTitleW > 2 {

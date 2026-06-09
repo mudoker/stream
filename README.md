@@ -1,8 +1,6 @@
-# stream - VIM-First TUI Calendar & Task Management Engine
+# stream - VIM-First TUI Task Management System 
 
 stream is a terminal-native calendar and productivity engine. It treats calendar events as executable tasks that move through a defined lifecycle.
-
-Its layout features a left-side vertical sidebar inspired by Arc, showing workspaces and docked focus widgets, with a right-side dashboard and timeline styled after Linear.
 
 ---
 

@@ -1,6 +1,9 @@
 package view
 
 import (
+	"fmt"
+	"strings"
+
 	"stream/internal/viewmodel"
 	"stream/internal/view/components"
 	"stream/internal/view/modals"
@@ -151,7 +154,56 @@ func (v *View) Render() string {
 	// Overlay mini-Zen timer if active
 	canvas = v.overlayMiniZen(canvas, m.Width)
 
-	// Command Palette overlaid at the bottom
+	// ── Status Bar ──────────────────────────────────────────────────
+	statusBarW := m.Width
+	modeStr := fmt.Sprintf(" %s ", m.CurrentMode)
+	modeStyle := lipgloss.NewStyle().Background(v.Theme.Accent).Foreground(lipgloss.Color("#1e1e2e")).Bold(true)
+
+	statusText := m.StatusMsg
+	if statusText == "" {
+		statusText = "Ready"
+	}
+	var statusStyle lipgloss.Style
+	if strings.HasPrefix(statusText, "Go to:") {
+		statusStyle = lipgloss.NewStyle().Foreground(v.Theme.Accent).Bold(true)
+	} else if strings.Contains(statusText, "error") || strings.Contains(statusText, "Error") || strings.Contains(statusText, "fail") {
+		statusStyle = lipgloss.NewStyle().Foreground(v.Theme.P0Color).Bold(true)
+	} else {
+		statusStyle = lipgloss.NewStyle().Foreground(v.Theme.Fg)
+	}
+	statusStr := statusStyle.Render("  " + statusText)
+
+	onlineStr := " ○ Local "
+	onlineColor := v.Theme.Muted
+	if m.Sync != nil && m.Sync.IsOnline() {
+		onlineStr = " ● GCal Sync "
+		onlineColor = v.Theme.SuccessColor
+	}
+	syncStr := lipgloss.NewStyle().Foreground(onlineColor).Bold(true).Render(onlineStr)
+
+	modeW := lipgloss.Width(modeStr)
+	syncW := lipgloss.Width(onlineStr)
+	msgW := statusBarW - modeW - syncW - 4
+	if msgW < 10 {
+		msgW = 10
+	}
+
+	statusRendered := statusStr
+	statusPlainW := lipgloss.Width(statusRendered)
+	if statusPlainW > msgW {
+		statusRendered = theme.SliceAnsi(statusRendered, 0, msgW)
+		statusPlainW = msgW
+	}
+
+	paddingW := statusBarW - modeW - syncW - statusPlainW
+	if paddingW < 0 {
+		paddingW = 0
+	}
+
+	statusBarStr := modeStyle.Render(modeStr) + statusRendered + strings.Repeat(" ", paddingW) + syncStr
+	canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, statusBarStr)
+
+	// Command Palette overlaid below status bar
 	if m.CurrentMode == viewmodel.ModeCommand {
 		canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, cmdPaletteStr)
 	}

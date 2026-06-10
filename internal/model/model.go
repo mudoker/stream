@@ -81,6 +81,7 @@ type Task struct {
 	UpdatedAt        time.Time        `json:"updated_at"`
 	Tags             []string         `json:"tags,omitempty"`
 	Notes            string           `json:"notes,omitempty"`
+	CompletedDates   []string         `json:"completed_dates,omitempty"`
 }
 
 // SortingWeight computes the priority execution weight: (Priority Value * 1000) + Story Points

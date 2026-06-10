@@ -3,13 +3,34 @@ package main
 import (
 	"fmt"
 	"os"
+	gosync "sync"
 
 	"stream/internal/db"
 	"stream/internal/sync"
-	"stream/internal/tui"
+	"stream/internal/view"
+	"stream/internal/viewmodel"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+type SafeProgram struct {
+	mu   gosync.RWMutex
+	prog *tea.Program
+}
+
+func (sp *SafeProgram) Set(p *tea.Program) {
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+	sp.prog = p
+}
+
+func (sp *SafeProgram) Send(msg tea.Msg) {
+	sp.mu.RLock()
+	defer sp.mu.RUnlock()
+	if sp.prog != nil {
+		sp.prog.Send(msg)
+	}
+}
 
 func main() {
 	// 1. Initialize local JSON DB
@@ -20,11 +41,9 @@ func main() {
 	}
 
 	// 2. Setup GCal sync engine with log streaming
-	var program *tea.Program
+	safeProg := &SafeProgram{}
 	logChan := func(msg string) {
-		if program != nil {
-			program.Send(tui.SyncLogMsg{Message: msg})
-		}
+		safeProg.Send(viewmodel.SyncLogMsg{Message: msg})
 	}
 
 	syncEngine, err := sync.NewSyncEngine(database, logChan)
@@ -38,8 +57,10 @@ func main() {
 	defer syncEngine.Stop()
 
 	// 4. Initialize and run TUI
-	model := tui.NewModel(database, syncEngine)
-	program = tea.NewProgram(model, tea.WithAltScreen())
+	vm := viewmodel.NewModel(database, syncEngine)
+	ui := view.NewView(&vm)
+	program := tea.NewProgram(ui, tea.WithAltScreen())
+	safeProg.Set(program)
 
 	if _, err := program.Run(); err != nil {
 		fmt.Printf("Error running TUI: %v\n", err)

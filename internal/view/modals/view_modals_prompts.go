@@ -1,0 +1,238 @@
+package modals
+
+import (
+	"fmt"
+	"strings"
+
+	"stream/internal/model"
+	"stream/internal/viewmodel"
+	"stream/internal/view/theme"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+func RenderPromptModal(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 50
+	var lines []string
+
+	var title string
+	if m.PromptTask.SchedulingType == model.Reminder {
+		title = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("🔔 TASK REMINDER")
+	} else {
+		title = lipgloss.NewStyle().Foreground(t.FocusPurple).Bold(true).Render("⏰ TIME TO START FOCUS SESSION")
+	}
+
+	lines = append(lines, title)
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+
+	// Task Title
+	lines = append(lines, "  "+lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(theme.SentenceCase(m.PromptTask.Title)))
+	lines = append(lines, "")
+
+	// Task Metadata: Priority and Story Points
+	pColor := t.PriorityColor(m.PromptTask.Priority)
+	pBadge := lipgloss.NewStyle().Foreground(pColor).Bold(true).Render(fmt.Sprintf("▲ %s", m.PromptTask.Priority))
+	spInfo := fmt.Sprintf("%d SP (%d mins)", m.PromptTask.StoryPoints, m.PromptTask.StoryPoints*45)
+	lines = append(lines, fmt.Sprintf("  Priority: %s   •   Est: %s", pBadge, spInfo))
+
+	// Scheduled time or due time
+	if m.PromptTask.SchedulingType == model.Anchored {
+		timeInfo := fmt.Sprintf("%s - %s", m.PromptTask.TimeWindow.Start.Format("15:04"), m.PromptTask.TimeWindow.End.Format("15:04"))
+		lines = append(lines, fmt.Sprintf("  Scheduled: %s", lipgloss.NewStyle().Foreground(t.Accent).Render(timeInfo)))
+	} else if m.PromptTask.SchedulingType == model.Reminder {
+		dueInfo := m.PromptTask.TimeWindow.Start.Format("15:04")
+		lines = append(lines, fmt.Sprintf("  Due Time:  %s", lipgloss.NewStyle().Foreground(t.Accent).Render(dueInfo)))
+	}
+
+	// Calculate and render rest time
+	restTime := viewmodel.CalculateTaskRestTime(m.PromptTask)
+	if restTime > 0 {
+		restInfo := fmt.Sprintf("+%d mins Rest", int(restTime.Minutes()))
+		lines = append(lines, fmt.Sprintf("  Rest:      %s", lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Render(restInfo)))
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+
+	// Action buttons
+	enterAction := "[Enter] Start Focus"
+	if m.PromptTask.SchedulingType == model.Reminder {
+		enterAction = "[Enter] Dismiss"
+	}
+
+	snoozeAction := lipgloss.NewStyle().Foreground(t.Muted).Render("[S] Snooze 5m")
+	dismissAction := lipgloss.NewStyle().Foreground(t.Muted).Render("[D/Esc] Dismiss")
+
+	lines = append(lines, fmt.Sprintf("  %s   %s   %s",
+		lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render(enterAction),
+		snoozeAction,
+		dismissAction,
+	))
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+}
+
+func RenderWarningModal(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 46
+	var lines []string
+
+	title := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("⚠️  VALIDATION ERROR")
+	lines = append(lines, title)
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+
+	wrappedMsg := theme.WrapText(m.WarningMsg, innerW-4)
+	for _, line := range strings.Split(wrappedMsg, "\n") {
+		lines = append(lines, "  "+line)
+	}
+	lines = append(lines, "")
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+
+	okBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter/Esc/Space] Close")
+	lines = append(lines, "  "+okBtn)
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+}
+
+func RenderReviewModal(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 46
+	var lines []string
+
+	title := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Shutdown Review")
+	lines = append(lines, title)
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+}
+
+func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 46
+	var lines []string
+
+	lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("Confirm Delete"))
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+	lines = append(lines, "  Are you sure you want to delete task")
+	lines = append(lines, fmt.Sprintf("  \"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)))
+	lines = append(lines, "")
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+
+	yesBtn := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("[Y] Yes, Delete")
+	noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Cancel")
+	lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+}
+
+func RenderAnchorPromptModal(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 46
+	var lines []string
+	lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Anchor Task to Timeline"))
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  Task:  %s", lipgloss.NewStyle().Bold(true).Render(theme.SentenceCase(m.AnchorPromptTask.Title))))
+	lines = append(lines, fmt.Sprintf("  Est:   %d SP (%d mins)", m.AnchorPromptTask.StoryPoints, m.AnchorPromptTask.StoryPoints*45))
+	lines = append(lines, "")
+
+	renderField := func(label string, view string, isActive bool) string {
+		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
+		if isActive {
+			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
+		}
+		return fmt.Sprintf("  %-16s %s", lblStyle.Render(label), view)
+	}
+
+	lines = append(lines, renderField("Start Time", m.AnchorTimeInput.View(), m.AnchorActiveField == 0))
+	lines = append(lines, renderField("Duration (min)", m.AnchorDurationInput.View(), m.AnchorActiveField == 1))
+
+	lines = append(lines, "")
+	lines = append(lines, ModalSep(innerW))
+	hint := lipgloss.NewStyle().Foreground(t.Muted).Render("Tab switch  Enter confirm  Esc cancel")
+	lines = append(lines, "  "+hint)
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+}
+
+func RenderLockScreen(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 44
+	var fields []string
+
+	title := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("🔒 STREAM SESSION LOCKED")
+	fields = append(fields, title)
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+	fields = append(fields, lipgloss.NewStyle().Foreground(t.Fg).Render("This terminal session is protected by a password."))
+	fields = append(fields, "")
+
+	inputStr := m.LockPasswordInput.View()
+	fields = append(fields, "  "+inputStr)
+	fields = append(fields, "")
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+
+	statusStr := "Press Enter to unlock"
+	statusColor := t.Muted
+	if strings.Contains(m.StatusMsg, "Incorrect") || strings.Contains(m.StatusMsg, "❌") {
+		statusStr = m.StatusMsg
+		statusColor = t.P0Color
+	}
+	fields = append(fields, lipgloss.NewStyle().Foreground(statusColor).Render(statusStr))
+
+	modalBox := t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
+
+	modalW := lipgloss.Width(modalBox)
+	modalH := lipgloss.Height(modalBox)
+	topPad := (m.Height - modalH) / 2
+	leftPad := (m.Width - modalW) / 2
+	if topPad < 0 {
+		topPad = 0
+	}
+	if leftPad < 0 {
+		leftPad = 0
+	}
+
+	var lines []string
+	for i := 0; i < topPad; i++ {
+		lines = append(lines, "")
+	}
+	modalLines := strings.Split(modalBox, "\n")
+	leftSpace := strings.Repeat(" ", leftPad)
+	for _, ml := range modalLines {
+		lines = append(lines, leftSpace+ml)
+	}
+	for len(lines) < m.Height {
+		lines = append(lines, "")
+	}
+
+	if len(lines) > m.Height {
+		lines = lines[:m.Height]
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func RenderSessionExpiryModal(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 46
+	var fields []string
+
+	title := lipgloss.NewStyle().Foreground(t.FocusPurple).Bold(true).Render("⚠️  SESSION EXPIRES IN 1 MINUTE")
+	fields = append(fields, title)
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+	fields = append(fields, lipgloss.NewStyle().Foreground(t.Fg).Render("Your session is about to expire."))
+	fields = append(fields, lipgloss.NewStyle().Foreground(t.Fg).Render("Would you like to extend your session?"))
+	fields = append(fields, "")
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+
+	yesBtn := lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render("[Y] Yes, Reset Timer")
+	noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Allow Lock")
+	fields = append(fields, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
+}

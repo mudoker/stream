@@ -218,3 +218,58 @@ func RenderProfileFormModal(m *viewmodel.Model, t theme.Theme) string {
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
 }
+
+func RenderSyncFormModal(m *viewmodel.Model, t theme.Theme) string {
+	f := m.SyncForm
+	const innerW = 58
+
+	var fields []string
+	title := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Google Calendar Sync Settings")
+	fields = append(fields, title)
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+
+	renderDropdown := func(num, label string, value string, index int) string {
+		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(num)
+		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
+		if f.ActiveField == index {
+			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
+			valStr := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(fmt.Sprintf("◀ %s ▶", value))
+			return fmt.Sprintf("  %s  %-22s %s", numStyle, lblStyle.Render(label), valStr)
+		}
+		valStr := lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  %s  ", value))
+		return fmt.Sprintf("  %s  %-22s %s", numStyle, lblStyle.Render(label), valStr)
+	}
+
+	renderField := func(num, label string, input string, index int) string {
+		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(num)
+		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
+		if f.ActiveField == index {
+			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
+		}
+		return fmt.Sprintf("  %s  %-22s %s", numStyle, lblStyle.Render(label), input)
+	}
+
+	modeVal := viewmodel.SyncModeOptions[f.ModeIdx]
+	fields = append(fields, renderDropdown("1", "Sync Mode", modeVal, 0))
+	fields = append(fields, renderField("2", "Auto-Sync Interval", f.IntervalInput.View()+" sec", 1))
+	fields = append(fields, "")
+	fields = append(fields, lipgloss.NewStyle().Foreground(t.Muted).Render("  Offline-first: sync failures never block the UI."))
+	fields = append(fields, "")
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+
+	submitFg := t.Muted
+	submitText := "  Submit  "
+	if f.ActiveField == 2 {
+		submitFg = t.SuccessColor
+		submitText = "[ Submit ]"
+	}
+	submitBtn := lipgloss.NewStyle().
+		Foreground(submitFg).
+		Bold(true).
+		Render(submitText)
+	fields = append(fields, "  "+submitBtn)
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
+}

@@ -36,6 +36,7 @@ func (m *Model) GetCommandList() []CommandEntry {
 		CommandEntry{"complete", "Mark selected task completed"},
 		CommandEntry{"delete", "Delete selected task permanently"},
 		CommandEntry{"sync", "Trigger calendar sync"},
+		CommandEntry{"sync-settings", "Configure GCal sync mode and interval (seconds)"},
 		CommandEntry{"auth", "Start Google Calendar authorization"},
 		CommandEntry{"stop", "Stop active focus timer session"},
 	)

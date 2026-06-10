@@ -396,7 +396,7 @@ func TestHabitCompletionFutureDayValidation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create database: %v", err)
 	}
-	syncEngine, err := sync.NewSyncEngine(database, nil)
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create sync engine: %v", err)
 	}

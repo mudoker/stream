@@ -4,8 +4,12 @@ import (
 	"strconv"
 	"time"
 
+	"stream/internal/model"
+
 	"github.com/charmbracelet/bubbles/textinput"
 )
+
+var SyncModeOptions = []string{"No Sync", "Push Only (Local → GCal)", "Two-Way Sync"}
 
 type TaskForm struct {
 	Title          string
@@ -137,5 +141,49 @@ func NewProfileForm(username string, timeoutMins int) ProfileForm {
 		UsernameInput:    u,
 		PasswordInput:    p,
 		LockTimeoutInput: t,
+	}
+}
+
+type SyncForm struct {
+	ModeIdx        int
+	IntervalSecs   int
+	ActiveField    int // 0: Mode, 1: Interval, 2: Submit
+	IntervalInput  textinput.Model
+}
+
+func NewSyncForm(settings model.UserSettings) SyncForm {
+	settings = settings.NormalizedGCalSync()
+
+	modeIdx := 2
+	switch settings.GCalSyncMode {
+	case model.GCalSyncNone:
+		modeIdx = 0
+	case model.GCalSyncPush:
+		modeIdx = 1
+	case model.GCalSyncTwoWay:
+		modeIdx = 2
+	}
+
+	interval := textinput.New()
+	interval.Placeholder = "5"
+	interval.SetValue(strconv.Itoa(settings.GCalSyncIntervalSeconds))
+	interval.Focus()
+
+	return SyncForm{
+		ModeIdx:       modeIdx,
+		IntervalSecs:  settings.GCalSyncIntervalSeconds,
+		ActiveField:   0,
+		IntervalInput: interval,
+	}
+}
+
+func (f SyncForm) ModeValue() model.GCalSyncMode {
+	switch f.ModeIdx {
+	case 0:
+		return model.GCalSyncNone
+	case 1:
+		return model.GCalSyncPush
+	default:
+		return model.GCalSyncTwoWay
 	}
 }

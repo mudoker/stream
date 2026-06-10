@@ -16,6 +16,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var ErrTaskNotFound = errors.New("task not found")
+
 type LedgerEntry struct {
 	ID        string     `json:"id"`
 	Op        string     `json:"op"` // "CREATE", "UPDATE", "DELETE"
@@ -145,9 +147,11 @@ func (db *JSONDB) load() error {
 
 	// Load User Settings
 	db.userSettings = model.UserSettings{
-		Username:           "Doan Huu Quoc",
-		PasswordHash:       "",
-		LockTimeoutMinutes: 5,
+		Username:                "Doan Huu Quoc",
+		PasswordHash:            "",
+		LockTimeoutMinutes:      5,
+		GCalSyncMode:            model.GCalSyncPush,
+		GCalSyncIntervalSeconds: 5,
 	}
 	if _, err := os.Stat(db.settingsPath); err == nil {
 		data, err := os.ReadFile(db.settingsPath)
@@ -160,7 +164,7 @@ func (db *JSONDB) load() error {
 				if s.LockTimeoutMinutes <= 0 {
 					s.LockTimeoutMinutes = 5
 				}
-				db.userSettings = s
+				db.userSettings = s.NormalizedGCalSync()
 			}
 		}
 	}
@@ -229,7 +233,7 @@ func (db *JSONDB) GetUserSettings() model.UserSettings {
 func (db *JSONDB) UpdateUserSettings(s model.UserSettings) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
-	db.userSettings = s
+	db.userSettings = s.NormalizedGCalSync()
 	return db.saveSettings()
 }
 
@@ -268,23 +272,46 @@ func (db *JSONDB) AddTask(t model.Task) error {
 		return err
 	}
 
-	// Record in ledger
-	db.ledger = append(db.ledger, LedgerEntry{
-		ID:        uuid.New().String(),
-		Op:        "CREATE",
-		TaskUUID:  t.UUID,
-		Task:      t,
-		Timestamp: now,
-	})
-	return db.saveLedger()
+	if model.IsGCalSyncable(t) {
+		return db.appendLedgerLocked("CREATE", t.UUID, t)
+	}
+	return nil
+}
+
+// AddTaskNoLedger persists a task without recording a sync ledger entry.
+func (db *JSONDB) AddTaskNoLedger(t model.Task) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if t.UUID == "" {
+		t.UUID = uuid.New().String()
+	}
+	now := time.Now()
+	t.CreatedAt = now
+	t.UpdatedAt = now
+
+	db.tasks[t.UUID] = t
+	return db.saveTasks()
 }
 
 func (db *JSONDB) UpdateTask(t model.Task) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
+	return db.updateTaskLocked(t, true)
+}
 
-	if _, exists := db.tasks[t.UUID]; !exists {
-		return errors.New("task not found")
+// UpdateTaskNoLedger persists task changes without appending to the sync ledger.
+// Used when replaying sync results to avoid duplicate ledger entries.
+func (db *JSONDB) UpdateTaskNoLedger(t model.Task) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	return db.updateTaskLocked(t, false)
+}
+
+func (db *JSONDB) updateTaskLocked(t model.Task, recordLedger bool) error {
+	prev, exists := db.tasks[t.UUID]
+	if !exists {
+		return ErrTaskNotFound
 	}
 	t.UpdatedAt = time.Now()
 	db.tasks[t.UUID] = t
@@ -292,15 +319,44 @@ func (db *JSONDB) UpdateTask(t model.Task) error {
 		return err
 	}
 
-	// Record in ledger
-	db.ledger = append(db.ledger, LedgerEntry{
-		ID:        uuid.New().String(),
-		Op:        "UPDATE",
-		TaskUUID:  t.UUID,
-		Task:      t,
-		Timestamp: t.UpdatedAt,
-	})
-	return db.saveLedger()
+	if !recordLedger {
+		return nil
+	}
+	return db.recordTaskChangeLocked(prev, t)
+}
+
+func calendarRelevantChange(prev, next model.Task) bool {
+	if prev.SchedulingType != next.SchedulingType {
+		return true
+	}
+	if !model.IsGCalSyncable(next) {
+		return false
+	}
+	return prev.Title != next.Title ||
+		prev.Description != next.Description ||
+		!prev.TimeWindow.Start.Equal(next.TimeWindow.Start) ||
+		!prev.TimeWindow.End.Equal(next.TimeWindow.End)
+}
+
+func (db *JSONDB) recordTaskChangeLocked(prev, next model.Task) error {
+	wasAnchored := model.IsGCalSyncable(prev)
+	isAnchored := model.IsGCalSyncable(next)
+
+	switch {
+	case isAnchored && calendarRelevantChange(prev, next):
+		return db.appendLedgerLocked("UPDATE", next.UUID, next)
+	case wasAnchored && !isAnchored:
+		return db.appendLedgerLocked("DELETE", prev.UUID, prev)
+	default:
+		return nil
+	}
+}
+
+func (db *JSONDB) TaskExists(taskUUID string) bool {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	_, exists := db.tasks[taskUUID]
+	return exists
 }
 
 func (db *JSONDB) DeleteTask(taskUUID string) error {
@@ -309,7 +365,7 @@ func (db *JSONDB) DeleteTask(taskUUID string) error {
 
 	task, exists := db.tasks[taskUUID]
 	if !exists {
-		return errors.New("task not found")
+		return ErrTaskNotFound
 	}
 
 	delete(db.tasks, taskUUID)
@@ -317,15 +373,10 @@ func (db *JSONDB) DeleteTask(taskUUID string) error {
 		return err
 	}
 
-	// Record in ledger
-	db.ledger = append(db.ledger, LedgerEntry{
-		ID:        uuid.New().String(),
-		Op:        "DELETE",
-		TaskUUID:  taskUUID,
-		Task:      task,
-		Timestamp: time.Now(),
-	})
-	return db.saveLedger()
+	if model.IsGCalSyncable(task) {
+		return db.appendLedgerLocked("DELETE", taskUUID, task)
+	}
+	return nil
 }
 
 // GetLedger returns a copy of the ledger entries
@@ -344,6 +395,33 @@ func (db *JSONDB) ClearLedger() error {
 	defer db.mu.Unlock()
 
 	db.ledger = []LedgerEntry{}
+	return db.saveLedger()
+}
+
+// RemoveLedgerEntry removes a single processed ledger entry by ID.
+func (db *JSONDB) RemoveLedgerEntry(entryID string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	filtered := db.ledger[:0]
+	for _, entry := range db.ledger {
+		if entry.ID != entryID {
+			filtered = append(filtered, entry)
+		}
+	}
+	db.ledger = filtered
+	return db.saveLedger()
+}
+
+// appendLedgerLocked records a ledger entry without acquiring the lock.
+func (db *JSONDB) appendLedgerLocked(op, taskUUID string, task model.Task) error {
+	db.ledger = append(db.ledger, LedgerEntry{
+		ID:        uuid.New().String(),
+		Op:        op,
+		TaskUUID:  taskUUID,
+		Task:      task,
+		Timestamp: time.Now(),
+	})
 	return db.saveLedger()
 }
 
@@ -415,9 +493,14 @@ func (db *JSONDB) DeleteWorkspace(wsUUID string) error {
 		return err
 	}
 
-	// Clean up tasks in deleted workspace
+	// Clean up tasks in deleted workspace and queue remote deletes
 	for u, t := range db.tasks {
 		if t.WorkspaceUUID == wsUUID {
+			if model.IsGCalSyncable(t) {
+				if err := db.appendLedgerLocked("DELETE", u, t); err != nil {
+					return err
+				}
+			}
 			delete(db.tasks, u)
 		}
 	}

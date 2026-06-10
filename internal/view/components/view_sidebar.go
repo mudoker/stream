@@ -352,6 +352,8 @@ func renderSidebarFooter(m *viewmodel.Model, t theme.Theme, innerW int, appConte
 		modeColor = t.Accent
 	case viewmodel.ModeWorkspacePicker:
 		modeColor = t.Accent
+	case viewmodel.ModeSyncForm:
+		modeColor = t.Accent
 	}
 	modeBadge := lipgloss.NewStyle().Foreground(modeColor).Bold(true).
 		Render(strings.ToLower(string(m.CurrentMode)))

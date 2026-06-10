@@ -33,6 +33,7 @@ const (
 	ModeWorkspaceForm   UIState = "WORKSPACE_WIZARD"
 	ModeWorkspacePicker UIState = "WS_PICKER"
 	ModeProfileForm     UIState = "PROFILE_WIZARD"
+	ModeSyncForm        UIState = "SYNC_SETTINGS"
 )
 
 type TickMsg struct {
@@ -42,6 +43,8 @@ type TickMsg struct {
 type SyncLogMsg struct {
 	Message string
 }
+
+type AuthCompleteMsg struct{}
 
 type Model struct {
 	DB           *db.JSONDB
@@ -119,6 +122,7 @@ type Model struct {
 	ZenPrefix                  string
 
 	ProfileForm                 ProfileForm
+	SyncForm                    SyncForm
 	IsLocked                    bool
 	LockPasswordInput           textinput.Model
 	SessionTimeRemainingSeconds int
@@ -141,6 +145,8 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		DB:                          database,
 		Sync:                        syncEngine,
 		Layout:                      ComputeLayout(120, 40),
+		Width:                       120,
+		Height:                      40,
 		CurrentView:                 DayView,
 		CurrentMode:                 ModeNormal,
 		SelectedDay:                 time.Now(),
@@ -151,6 +157,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		Form:                        NewTaskForm(),
 		WorkspaceForm:               NewWorkspaceForm(),
 		ProfileForm:                 NewProfileForm(settings.Username, settings.LockTimeoutMinutes),
+		SyncForm:                    NewSyncForm(settings.NormalizedGCalSync()),
 		IsLocked:                    false,
 		LockPasswordInput:           lockPass,
 		SessionTimeRemainingSeconds: settings.LockTimeoutMinutes * 60,

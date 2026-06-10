@@ -74,6 +74,34 @@ func RenderPromptModal(m *viewmodel.Model, t theme.Theme) string {
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
 }
 
+func RenderAuthNoticeModal(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 54
+	var lines []string
+
+	title := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("🔗 GOOGLE CALENDAR AUTH")
+	lines = append(lines, title)
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+	lines = append(lines, lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render("  Auth link copied to clipboard!"))
+	lines = append(lines, "")
+
+	wrappedMsg := theme.WrapText(m.AuthNoticeMsg, innerW-4)
+	for _, line := range strings.Split(wrappedMsg, "\n") {
+		lines = append(lines, "  "+line)
+	}
+	lines = append(lines, "")
+	lines = append(lines, lipgloss.NewStyle().Foreground(t.Fg).Render("  Complete sign-in in your browser."))
+	lines = append(lines, lipgloss.NewStyle().Foreground(t.Fg).Render("  The dialog closes automatically on success."))
+	lines = append(lines, "")
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+
+	closeBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc/Enter/Q] Close and return to normal mode")
+	lines = append(lines, "  "+closeBtn)
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+}
+
 func RenderWarningModal(m *viewmodel.Model, t theme.Theme) string {
 	const innerW = 46
 	var lines []string

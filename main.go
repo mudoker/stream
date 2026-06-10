@@ -46,7 +46,11 @@ func main() {
 		safeProg.Send(viewmodel.SyncLogMsg{Message: msg})
 	}
 
-	syncEngine, err := sync.NewSyncEngine(database, logChan)
+	authCompleteChan := func() {
+		safeProg.Send(viewmodel.AuthCompleteMsg{})
+	}
+
+	syncEngine, err := sync.NewSyncEngine(database, logChan, authCompleteChan)
 	if err != nil {
 		fmt.Printf("Error setting up sync engine: %v\n", err)
 		os.Exit(1)

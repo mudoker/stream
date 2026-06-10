@@ -254,16 +254,12 @@ func (m *Model) SubmitForm() {
 		m.IsEditing = false
 		m.EditingTaskUUID = ""
 		m.refreshTasks()
-		if m.Sync != nil {
-			m.Sync.TriggerSync()
-		}
+		m.triggerGCalPush(newTask)
 		m.StatusMsg = fmt.Sprintf("Task '%s' updated successfully.", title)
 	} else {
 		m.DB.AddTask(newTask)
 		m.refreshTasks()
-		if m.Sync != nil {
-			m.Sync.TriggerSync()
-		}
+		m.triggerGCalPush(newTask)
 		m.StatusMsg = fmt.Sprintf("Task '%s' created successfully.", title)
 	}
 }

@@ -194,6 +194,7 @@ func RenderHelpModal(m *viewmodel.Model, t theme.Theme) string {
 	body = append(body, formatKeyVal(":todo <title>", "Create floating backlog task"))
 	body = append(body, formatKeyVal(":habit <title>", "Create daily repeatable habit"))
 	body = append(body, formatKeyVal(":sync", "Force Google Calendar sync"))
+	body = append(body, formatKeyVal(":sync-settings", "Configure GCal sync mode & interval"))
 	body = append(body, formatKeyVal(":auth", "Authenticate Google Calendar"))
 	body = append(body, formatKeyVal(":review", "Open shutdown review"))
 	body = append(body, formatKeyVal(":stop", "Abort Zen focus session"))

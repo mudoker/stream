@@ -48,11 +48,6 @@ func (v *View) View() string {
 
 func (v *View) Render() string {
 	m := v.Model
-	if m.Width == 0 || m.Height == 0 {
-		m.Layout = viewmodel.ComputeLayout(120, 40)
-		m.Width = 120
-		m.Height = 40
-	}
 
 	if m.IsLocked {
 		return modals.RenderLockScreen(m, v.Theme)
@@ -211,7 +206,7 @@ func (v *View) Render() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.SessionExpiryPromptOpen {
+	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen {
 		var modalStr string
 		switch {
 		case m.WarningOpen:
@@ -232,6 +227,8 @@ func (v *View) Render() string {
 			modalStr = modals.RenderWorkspacePickerModal(m, v.Theme)
 		case m.CurrentMode == viewmodel.ModeProfileForm:
 			modalStr = modals.RenderProfileFormModal(m, v.Theme)
+		case m.CurrentMode == viewmodel.ModeSyncForm:
+			modalStr = modals.RenderSyncFormModal(m, v.Theme)
 		case m.PromptOpen:
 			modalStr = modals.RenderPromptModal(m, v.Theme)
 		case m.ReviewOpen:

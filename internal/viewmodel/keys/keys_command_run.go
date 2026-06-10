@@ -95,9 +95,7 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		}
 		m.DB.AddTask(newTask)
 		m.refreshTasks()
-		if m.Sync != nil {
-			m.Sync.TriggerSync()
-		}
+		m.triggerGCalPush(newTask)
 		if cmdName == "habit" {
 			m.StatusMsg = fmt.Sprintf("Habit '%s' created.", title)
 		} else {
@@ -240,9 +238,6 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			task.LifecycleState = model.StateCompleted
 			m.DB.UpdateTask(task)
 			m.refreshTasks()
-			if m.Sync != nil {
-				m.Sync.TriggerSync()
-			}
 			if m.ZenTimer != nil && m.ZenTimer.Task.UUID == task.UUID {
 				m.ZenTimer = nil
 			}
@@ -256,13 +251,22 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			m.ConfirmOpen = true
 		}
 
-	case "sync":
-		if m.Sync != nil {
-			m.Sync.TriggerSync()
-			m.StatusMsg = "Triggering Google Calendar sync..."
-		} else {
-			m.StatusMsg = "Sync engine is not initialized."
+	case "sync", "sync-settings", "gcal-settings":
+		if cmdName == "sync" {
+			if m.Sync != nil {
+				m.Sync.TriggerFullSync()
+				m.StatusMsg = "Triggering Google Calendar push + pull sync..."
+			} else {
+				m.StatusMsg = "Sync engine is not initialized."
+			}
+			return m, nil
 		}
+		settings := m.DB.GetUserSettings().NormalizedGCalSync()
+		m.SyncForm = NewSyncForm(settings)
+		m.SyncForm.ActiveField = 0
+		m.focusSyncFormFields()
+		m.CurrentMode = ModeSyncForm
+		m.StatusMsg = "Configure Google Calendar sync. Press Esc to cancel."
 
 	case "auth":
 		if m.Sync != nil {

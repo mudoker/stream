@@ -180,7 +180,7 @@ func (m *Model) HandleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.updateTaskInMemory(task)
 				}
 				if m.Sync != nil {
-					m.Sync.TriggerSync()
+					m.Sync.TriggerPushSync()
 				}
 				m.StatusMsg = fmt.Sprintf("Task '%s' de-anchored to backlog.", task.Title)
 			} else {

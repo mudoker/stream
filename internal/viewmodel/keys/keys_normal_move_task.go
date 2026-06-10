@@ -151,6 +151,7 @@ func (m *Model) confirmTaskMove() {
 	if originalFound && m.DB != nil {
 		m.DB.UpdateTask(originalTask)
 		m.refreshTasks()
+		m.triggerGCalPush(originalTask)
 	}
 
 	// Auto-scroll to the confirmed task to ensure it is visible

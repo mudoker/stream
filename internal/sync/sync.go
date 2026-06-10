@@ -11,12 +11,14 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"stream/internal/db"
 	"stream/internal/model"
 
+	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/calendar/v3"
@@ -24,38 +26,53 @@ import (
 	"google.golang.org/api/option"
 )
 
-type SyncEngine struct {
-	mu          sync.RWMutex
-	localDB     *db.JSONDB
-	oauthConfig *oauth2.Config
-	token       *oauth2.Token
-	srv         *calendar.Service
-	isOnline    bool
-	syncChan    chan struct{}
-	stopChan    chan struct{}
-	logCallback func(string)
+type syncRequest struct {
+	includePull bool
 }
 
-func NewSyncEngine(localDB *db.JSONDB, logCallback func(string)) (*SyncEngine, error) {
+type SyncEngine struct {
+	mu                   sync.RWMutex
+	localDB              *db.JSONDB
+	oauthConfig          *oauth2.Config
+	token                *oauth2.Token
+	srv                  *calendar.Service
+	isOnline             bool
+	syncChan             chan syncRequest
+	settingsChan         chan struct{}
+	stopChan             chan struct{}
+	logCallback          func(string)
+	authCompleteCallback func()
+	rateLimitedUntil     time.Time
+}
+
+func NewSyncEngine(localDB *db.JSONDB, logCallback func(string), authCompleteCallback func()) (*SyncEngine, error) {
 	engine := &SyncEngine{
-		localDB:     localDB,
-		syncChan:    make(chan struct{}, 1),
-		stopChan:    make(chan struct{}),
-		logCallback: logCallback,
+		localDB:              localDB,
+		syncChan:             make(chan syncRequest, 1),
+		settingsChan:         make(chan struct{}, 1),
+		stopChan:             make(chan struct{}),
+		logCallback:          logCallback,
+		authCompleteCallback: authCompleteCallback,
 	}
 
 	if logCallback == nil {
 		engine.logCallback = func(s string) {}
 	}
 
-	// Try loading client secrets and token
 	if err := engine.initOAuth(); err != nil {
-		engine.logCallback(fmt.Sprintf("GCal Sync disabled: %v", err))
+		engine.logCallback(fmt.Sprintf("GCal Sync: offline mode (%v)", err))
 	} else {
 		engine.logCallback("GCal Sync initialized.")
 	}
 
 	return engine, nil
+}
+
+func (s *SyncEngine) NotifySettingsChanged() {
+	select {
+	case s.settingsChan <- struct{}{}:
+	default:
+	}
 }
 
 func (s *SyncEngine) initOAuth() error {
@@ -75,7 +92,6 @@ func (s *SyncEngine) initOAuth() error {
 	}
 	s.oauthConfig = config
 
-	// Load existing token
 	tokenPath := filepath.Join(s.localDB.GetConfigDir(), "credentials.json")
 	if _, err := os.Stat(tokenPath); err == nil {
 		tokenData, err := os.ReadFile(tokenPath)
@@ -83,8 +99,8 @@ func (s *SyncEngine) initOAuth() error {
 			var tok oauth2.Token
 			if err := json.Unmarshal(tokenData, &tok); err == nil {
 				s.token = &tok
-				s.isOnline = true
 				if err := s.createService(); err == nil {
+					s.isOnline = true
 					return nil
 				}
 			}
@@ -108,17 +124,27 @@ func (s *SyncEngine) createService() error {
 	return nil
 }
 
+func (s *SyncEngine) getSyncMode() model.GCalSyncMode {
+	return s.localDB.GetUserSettings().NormalizedGCalSync().GCalSyncMode
+}
+
+func (s *SyncEngine) getSyncInterval() time.Duration {
+	secs := s.localDB.GetUserSettings().NormalizedGCalSync().GCalSyncIntervalSeconds
+	if secs <= 0 {
+		secs = 5
+	}
+	return time.Duration(secs) * time.Second
+}
+
 // StartAuthServer starts the local web server to intercept Google OAuth2 callback
 func (s *SyncEngine) StartAuthServer(port int) (string, error) {
 	if s.oauthConfig == nil {
 		return "", errors.New("no client_secrets.json loaded, cannot authorize")
 	}
 
-	// Adjust redirect URL dynamically
 	s.oauthConfig.RedirectURL = fmt.Sprintf("http://localhost:%d", port)
 	authURL := s.oauthConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline, oauth2.ApprovalForce)
 
-	// Write local redirect HTML file to config directory
 	htmlPath := filepath.Join(s.localDB.GetConfigDir(), "auth.html")
 	htmlContent := fmt.Sprintf(`<!DOCTYPE html>
 <html>
@@ -166,7 +192,6 @@ func (s *SyncEngine) StartAuthServer(port int) (string, error) {
 				return
 			}
 
-			// Save credentials
 			tokenPath := filepath.Join(s.localDB.GetConfigDir(), "credentials.json")
 			tokData, err := json.MarshalIndent(tok, "", "  ")
 			if err != nil {
@@ -192,18 +217,19 @@ func (s *SyncEngine) StartAuthServer(port int) (string, error) {
 			} else {
 				s.logCallback("OAuth Callback: Authorization successful.")
 				io.WriteString(w, "<h1>Authorization Successful!</h1><p>You can close this tab and return to the terminal.</p>")
+				if s.authCompleteCallback != nil {
+					s.authCompleteCallback()
+				}
 			}
 
-			// Delete local redirect HTML file
 			_ = os.Remove(filepath.Join(s.localDB.GetConfigDir(), "auth.html"))
 
-			// Shutdown server in background
 			go func() {
 				time.Sleep(1 * time.Second)
 				server.Shutdown(context.Background())
 			}()
 
-			s.TriggerSync()
+			s.TriggerPushSync()
 		})
 
 		server.Serve(listener)
@@ -212,27 +238,56 @@ func (s *SyncEngine) StartAuthServer(port int) (string, error) {
 	return authURL, nil
 }
 
-func (s *SyncEngine) TriggerSync() {
+func (s *SyncEngine) TriggerPushSync() {
+	s.enqueueSync(syncRequest{includePull: false})
+}
+
+func (s *SyncEngine) TriggerFullSync() {
+	s.enqueueSync(syncRequest{includePull: true})
+}
+
+func (s *SyncEngine) enqueueSync(req syncRequest) {
 	select {
-	case s.syncChan <- struct{}{}:
+	case s.syncChan <- req:
 	default:
+		select {
+		case <-s.syncChan:
+		default:
+		}
+		s.syncChan <- req
 	}
 }
 
 func (s *SyncEngine) StartDaemon() {
-	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
-		// Run initial sync
-		s.sync()
+		var ticker *time.Ticker
+		defer func() {
+			if ticker != nil {
+				ticker.Stop()
+			}
+		}()
+
+		resetTicker := func() {
+			interval := s.getSyncInterval()
+			if ticker == nil {
+				ticker = time.NewTicker(interval)
+			} else {
+				ticker.Reset(interval)
+			}
+		}
+
+		resetTicker()
+		s.sync(false)
 
 		for {
 			select {
 			case <-ticker.C:
-				s.sync()
-			case <-s.syncChan:
-				s.sync()
+				s.sync(false)
+			case req := <-s.syncChan:
+				s.sync(req.includePull)
+			case <-s.settingsChan:
+				resetTicker()
 			case <-s.stopChan:
-				ticker.Stop()
 				return
 			}
 		}
@@ -249,112 +304,246 @@ func (s *SyncEngine) IsOnline() bool {
 	return s.isOnline && s.srv != nil
 }
 
-func (s *SyncEngine) sync() {
+func (s *SyncEngine) ensureService() (*calendar.Service, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.srv == nil {
-		// Try re-initializing or checking if service can be spun up
-		if err := s.initOAuth(); err != nil {
-			s.isOnline = false
-			return
+	if s.srv != nil {
+		return s.srv, nil
+	}
+
+	if err := s.initOAuth(); err != nil {
+		s.isOnline = false
+		return nil, err
+	}
+	return s.srv, nil
+}
+
+func (s *SyncEngine) setOnline(online bool) {
+	s.mu.Lock()
+	s.isOnline = online
+	s.mu.Unlock()
+}
+
+func isRateLimitError(err error) bool {
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) {
+		if apiErr.Code == 429 {
+			return true
+		}
+		if apiErr.Code == 403 {
+			for _, e := range apiErr.Errors {
+				if e.Reason == "rateLimitExceeded" || e.Reason == "userRateLimitExceeded" {
+					return true
+				}
+			}
+			return strings.Contains(strings.ToLower(apiErr.Message), "rate limit")
 		}
 	}
+	return false
+}
 
-	s.logCallback("Sync Engine: Checking connection...")
-	// Validate connectivity with a quick API call
-	_, err := s.srv.Calendars.Get("primary").Do()
-	if err != nil {
-		s.isOnline = false
-		s.logCallback("Sync Engine: Offline. Running in local fallback mode.")
-		return
-	}
-	s.isOnline = true
-	s.logCallback("Sync Engine: Online. Replaying local transaction ledger...")
-
-	// 1. Replay Local Ledger
-	ledger := s.localDB.GetLedger()
-	if len(ledger) > 0 {
-		s.logCallback(fmt.Sprintf("Sync Engine: Replaying %d operations...", len(ledger)))
-		for _, entry := range ledger {
-			if err := s.replayEntry(entry); err != nil {
-				s.logCallback(fmt.Sprintf("Sync Ledger Error on %s (%s): %v", entry.Op, entry.TaskUUID, err))
-				// Stop replaying on first failure to maintain order, retry later
-				return
+func (s *SyncEngine) handleRateLimit(err error) {
+	backoff := 60 * time.Second
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) {
+		if retryAfter := apiErr.Header.Get("Retry-After"); retryAfter != "" {
+			if secs, convErr := strconv.Atoi(retryAfter); convErr == nil && secs > 0 {
+				backoff = time.Duration(secs) * time.Second
 			}
 		}
-		s.localDB.ClearLedger()
-		s.logCallback("Sync Engine: Local ledger replayed successfully.")
+	}
+	s.rateLimitedUntil = time.Now().Add(backoff)
+	s.logCallback(fmt.Sprintf("GCal rate limit hit. Retrying in %ds. Changes stay queued.", int(backoff.Seconds())))
+}
+
+func (s *SyncEngine) isRateLimited() bool {
+	return time.Now().Before(s.rateLimitedUntil)
+}
+
+func (s *SyncEngine) sync(includePull bool) {
+	if s.isRateLimited() {
+		return
 	}
 
-	// 2. Perform Delta Sync from Remote
-	s.logCallback("Sync Engine: Pulling remote delta updates...")
-	if err := s.pullRemoteUpdates(); err != nil {
-		s.logCallback(fmt.Sprintf("Sync Engine Pull Error: %v", err))
-	} else {
-		s.logCallback("Sync Engine: Delta sync complete.")
+	mode := s.getSyncMode()
+	if mode == model.GCalSyncNone && !includePull {
+		return
+	}
+
+	srv, err := s.ensureService()
+	if err != nil {
+		if includePull {
+			s.logCallback("GCal Sync: credentials unavailable, staying in local mode.")
+		}
+		return
+	}
+
+	if mode != model.GCalSyncNone {
+		s.logCallback("Sync Engine: Checking connection...")
+		_, err = srv.Calendars.Get("primary").Do()
+		if err != nil {
+			if isRateLimitError(err) {
+				s.handleRateLimit(err)
+				return
+			}
+			s.setOnline(false)
+			s.logCallback("Sync Engine: Offline. Anchored changes queued locally.")
+			return
+		}
+		s.setOnline(true)
+
+		s.logCallback("Sync Engine: Online. Replaying anchored task ledger...")
+		ledger := s.localDB.GetLedger()
+		if len(ledger) > 0 {
+			s.logCallback(fmt.Sprintf("Sync Engine: Replaying %d operations...", len(ledger)))
+			replayed := 0
+			for _, entry := range ledger {
+				err := s.replayEntry(srv, entry)
+				if err != nil {
+					if isRateLimitError(err) {
+						s.handleRateLimit(err)
+						return
+					}
+					if s.handleStaleLedgerEntry(srv, entry, err) {
+						_ = s.localDB.RemoveLedgerEntry(entry.ID)
+						replayed++
+						continue
+					}
+					if s.handleSkippableLedgerEntry(entry, err) {
+						_ = s.localDB.RemoveLedgerEntry(entry.ID)
+						replayed++
+						continue
+					}
+					s.logCallback(fmt.Sprintf("Sync Ledger Error on %s (%s): %v", entry.Op, entry.TaskUUID, err))
+					return
+				}
+				_ = s.localDB.RemoveLedgerEntry(entry.ID)
+				replayed++
+			}
+			if replayed > 0 {
+				s.logCallback(fmt.Sprintf("Sync Engine: Processed %d ledger operations.", replayed))
+			}
+		}
+	}
+
+	if includePull {
+		s.logCallback("Sync Engine: Pulling remote updates (manual sync)...")
+		if err := s.pullRemoteUpdates(srv); err != nil {
+			if isRateLimitError(err) {
+				s.handleRateLimit(err)
+				return
+			}
+			s.logCallback(fmt.Sprintf("Sync Engine Pull Error: %v", err))
+		} else {
+			s.logCallback("Sync Engine: Remote pull complete.")
+		}
 	}
 }
 
-func (s *SyncEngine) replayEntry(entry db.LedgerEntry) error {
+func (s *SyncEngine) replayEntry(srv *calendar.Service, entry db.LedgerEntry) error {
+	if entry.Op != "DELETE" && !model.IsGCalSyncable(entry.Task) {
+		return fmt.Errorf("non-anchored task")
+	}
+
 	switch entry.Op {
 	case "CREATE":
-		return s.createRemoteEvent(entry.Task)
+		if !s.localDB.TaskExists(entry.TaskUUID) {
+			return db.ErrTaskNotFound
+		}
+		return s.createRemoteEvent(srv, entry.Task)
 	case "UPDATE":
-		return s.updateRemoteEvent(entry.Task)
+		if !s.localDB.TaskExists(entry.TaskUUID) {
+			return db.ErrTaskNotFound
+		}
+		return s.updateRemoteEvent(srv, entry.Task)
 	case "DELETE":
-		return s.deleteRemoteEvent(entry.Task)
+		return s.deleteRemoteEvent(srv, entry.Task)
 	}
 	return nil
 }
 
-func (s *SyncEngine) createRemoteEvent(task model.Task) error {
+func (s *SyncEngine) handleSkippableLedgerEntry(entry db.LedgerEntry, err error) bool {
+	if err != nil && err.Error() == "non-anchored task" {
+		s.logCallback(fmt.Sprintf("Sync: skipping non-anchored ledger entry for %s.", entry.TaskUUID))
+		return true
+	}
+	return false
+}
+
+func (s *SyncEngine) handleStaleLedgerEntry(srv *calendar.Service, entry db.LedgerEntry, err error) bool {
+	if !errors.Is(err, db.ErrTaskNotFound) {
+		return false
+	}
+
+	switch entry.Op {
+	case "CREATE":
+		s.logCallback(fmt.Sprintf("Sync: skipping stale CREATE for deleted task %s.", entry.TaskUUID))
+		return true
+	case "UPDATE":
+		if entry.Task.GCalMetadata.EventID != "" {
+			s.logCallback(fmt.Sprintf("Sync: task %s deleted locally, removing remote event.", entry.TaskUUID))
+			if delErr := s.deleteRemoteEvent(srv, entry.Task); delErr != nil {
+				s.logCallback(fmt.Sprintf("Sync: remote cleanup failed for %s: %v", entry.TaskUUID, delErr))
+				return false
+			}
+			return true
+		}
+		s.logCallback(fmt.Sprintf("Sync: skipping stale UPDATE for deleted task %s.", entry.TaskUUID))
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *SyncEngine) createRemoteEvent(srv *calendar.Service, task model.Task) error {
+	if !model.IsGCalSyncable(task) {
+		return nil
+	}
 	event := s.taskToEvent(task)
-	res, err := s.srv.Events.Insert("primary", event).Do()
+	res, err := srv.Events.Insert("primary", event).Do()
 	if err != nil {
 		return err
 	}
 
-	// Update GCal metadata on local copy
 	task.GCalMetadata.EventID = res.Id
 	task.GCalMetadata.ETag = res.Etag
 	task.GCalMetadata.SequenceID = res.Sequence
 
-	// We temporarily unlock to update DB, but s.localDB has internal locks
-	return s.localDB.UpdateTask(task)
+	return s.localDB.UpdateTaskNoLedger(task)
 }
 
-func (s *SyncEngine) updateRemoteEvent(task model.Task) error {
+func (s *SyncEngine) updateRemoteEvent(srv *calendar.Service, task model.Task) error {
+	if !model.IsGCalSyncable(task) {
+		return nil
+	}
 	if task.GCalMetadata.EventID == "" {
-		// Try to create it if it didn't exist remotely
-		return s.createRemoteEvent(task)
+		return s.createRemoteEvent(srv, task)
 	}
 
 	event := s.taskToEvent(task)
-	res, err := s.srv.Events.Update("primary", task.GCalMetadata.EventID, event).Do()
+	res, err := srv.Events.Update("primary", task.GCalMetadata.EventID, event).Do()
 	if err != nil {
-		// If event deleted on server, recreate it
 		var apiErr *googleapi.Error
 		if errors.As(err, &apiErr) && apiErr.Code == 410 {
-			return s.createRemoteEvent(task)
+			return s.createRemoteEvent(srv, task)
 		}
 		return err
 	}
 
 	task.GCalMetadata.ETag = res.Etag
 	task.GCalMetadata.SequenceID = res.Sequence
-	return s.localDB.UpdateTask(task)
+	return s.localDB.UpdateTaskNoLedger(task)
 }
 
-func (s *SyncEngine) deleteRemoteEvent(task model.Task) error {
+func (s *SyncEngine) deleteRemoteEvent(srv *calendar.Service, task model.Task) error {
 	if task.GCalMetadata.EventID == "" {
 		return nil
 	}
-	err := s.srv.Events.Delete("primary", task.GCalMetadata.EventID).Do()
+	err := srv.Events.Delete("primary", task.GCalMetadata.EventID).Do()
 	if err != nil {
 		var apiErr *googleapi.Error
 		if errors.As(err, &apiErr) && apiErr.Code == 410 {
-			// Already deleted remotely
 			return nil
 		}
 		return err
@@ -375,31 +564,29 @@ func (s *SyncEngine) taskToEvent(task model.Task) *calendar.Event {
 				"scheduling_type": string(task.SchedulingType),
 			},
 		},
-	}
-
-	if task.SchedulingType == model.Anchored {
-		event.Start = &calendar.EventDateTime{
+		Start: &calendar.EventDateTime{
 			DateTime: task.TimeWindow.Start.Format(time.RFC3339),
 			TimeZone: "UTC",
-		}
-		event.End = &calendar.EventDateTime{
+		},
+		End: &calendar.EventDateTime{
 			DateTime: task.TimeWindow.End.Format(time.RFC3339),
 			TimeZone: "UTC",
-		}
-	} else {
-		// All day event or simple reminder event
-		today := time.Now().Format("2006-01-02")
-		event.Start = &calendar.EventDateTime{Date: today}
-		event.End = &calendar.EventDateTime{Date: today}
+		},
 	}
-
 	return event
 }
 
-func (s *SyncEngine) pullRemoteUpdates() error {
-	// Simple polling of recent updates (e.g. modified in the last 1 day or similar)
+func (s *SyncEngine) defaultWorkspaceUUID() string {
+	workspaces := s.localDB.GetWorkspaces()
+	if len(workspaces) > 0 {
+		return workspaces[0].UUID
+	}
+	return ""
+}
+
+func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 	timeMin := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
-	events, err := s.srv.Events.List("primary").TimeMin(timeMin).ShowDeleted(true).Do()
+	events, err := srv.Events.List("primary").TimeMin(timeMin).ShowDeleted(true).Do()
 	if err != nil {
 		return err
 	}
@@ -412,11 +599,12 @@ func (s *SyncEngine) pullRemoteUpdates() error {
 		}
 	}
 
+	defaultWS := s.defaultWorkspaceUUID()
+
 	for _, item := range events.Items {
 		if item.Status == "cancelled" {
-			// Remote deletion
-			if local, exists := localByGCalID[item.Id]; exists {
-				s.localDB.DeleteTask(local.UUID)
+			if local, exists := localByGCalID[item.Id]; exists && model.IsGCalSyncable(local) {
+				_ = s.localDB.DeleteTask(local.UUID)
 			}
 			continue
 		}
@@ -448,14 +636,16 @@ func (s *SyncEngine) pullRemoteUpdates() error {
 		start, _ := time.Parse(time.RFC3339, item.Start.DateTime)
 		end, _ := time.Parse(time.RFC3339, item.End.DateTime)
 		if start.IsZero() && item.Start.Date != "" {
-			// All day event, parse date
 			start, _ = time.Parse("2006-01-02", item.Start.Date)
 			end = start.Add(24 * time.Hour)
 		}
 
+		if schedVal != model.Anchored || start.IsZero() {
+			continue
+		}
+
 		localTask, exists := localByGCalID[item.Id]
 		if exists {
-			// Check sequence or etag
 			if item.Sequence > localTask.GCalMetadata.SequenceID || item.Etag != localTask.GCalMetadata.ETag {
 				localTask.Title = item.Summary
 				localTask.Description = item.Description
@@ -468,12 +658,15 @@ func (s *SyncEngine) pullRemoteUpdates() error {
 				localTask.GCalMetadata.ETag = item.Etag
 				localTask.GCalMetadata.SequenceID = item.Sequence
 
-				s.localDB.UpdateTask(localTask)
+				_ = s.localDB.UpdateTaskNoLedger(localTask)
 			}
 		} else {
-			// External event created on remote calendar
+			if uuidVal == "" {
+				uuidVal = uuid.New().String()
+			}
 			newTask := model.Task{
 				UUID:           uuidVal,
+				WorkspaceUUID:  defaultWS,
 				Title:          item.Summary,
 				Description:    item.Description,
 				Priority:       priorityVal,
@@ -490,7 +683,7 @@ func (s *SyncEngine) pullRemoteUpdates() error {
 					SequenceID: item.Sequence,
 				},
 			}
-			s.localDB.AddTask(newTask)
+			_ = s.localDB.AddTaskNoLedger(newTask)
 		}
 	}
 

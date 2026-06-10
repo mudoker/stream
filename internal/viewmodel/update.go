@@ -135,8 +135,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.SyncLogs) > 5 {
 			m.SyncLogs = m.SyncLogs[1:]
 		}
-		m.StatusMsg = msg.Message
+		if !m.AuthNoticeOpen {
+			m.StatusMsg = msg.Message
+		}
 		m.LastSyncTime = time.Now()
+		m.refreshTasks()
+		return m, nil
+
+	case AuthCompleteMsg:
+		m.AuthNoticeOpen = false
+		m.AuthNoticeMsg = ""
+		m.StatusMsg = "Google Calendar authorization successful."
 		m.refreshTasks()
 		return m, nil
 

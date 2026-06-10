@@ -102,8 +102,37 @@ func (t *Task) SortingWeight() int {
 	return pVal + t.StoryPoints
 }
 
+type GCalSyncMode string
+
+const (
+	GCalSyncNone   GCalSyncMode = "none"
+	GCalSyncPush   GCalSyncMode = "push" // one-way: local → Google Calendar
+	GCalSyncTwoWay GCalSyncMode = "two-way"
+)
+
 type UserSettings struct {
-	Username           string `json:"username"`
-	PasswordHash       string `json:"password_hash"`
-	LockTimeoutMinutes int    `json:"lock_timeout_minutes"`
+	Username                 string       `json:"username"`
+	PasswordHash             string       `json:"password_hash"`
+	LockTimeoutMinutes       int          `json:"lock_timeout_minutes"`
+	GCalSyncMode             GCalSyncMode `json:"gcal_sync_mode,omitempty"`
+	GCalSyncIntervalSeconds  int          `json:"gcal_sync_interval_seconds,omitempty"`
+	GCalSyncIntervalMinutes  int          `json:"gcal_sync_interval_minutes,omitempty"` // legacy, migrated on load
+}
+
+func IsGCalSyncable(task Task) bool {
+	return task.SchedulingType == Anchored
+}
+
+func (s UserSettings) NormalizedGCalSync() UserSettings {
+	if s.GCalSyncMode == "" {
+		s.GCalSyncMode = GCalSyncPush
+	}
+	if s.GCalSyncIntervalSeconds <= 0 {
+		if s.GCalSyncIntervalMinutes > 0 {
+			s.GCalSyncIntervalSeconds = s.GCalSyncIntervalMinutes * 60
+		} else {
+			s.GCalSyncIntervalSeconds = 5
+		}
+	}
+	return s
 }

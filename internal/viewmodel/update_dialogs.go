@@ -52,9 +52,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "y", "Y":
 			m.DB.DeleteTask(m.ConfirmTask.UUID)
 			m.refreshTasks()
-			if m.Sync != nil {
-				m.Sync.TriggerSync()
-			}
+			m.triggerGCalPushIfAnchored(m.ConfirmTask)
 			if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
 				m.DetailOpen = false
 			}
@@ -143,9 +141,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.updateTaskInMemory(t)
 			}
-			if m.Sync != nil {
-				m.Sync.TriggerSync()
-			}
+			m.triggerGCalPush(t)
 
 			m.StatusMsg = fmt.Sprintf("Task '%s' anchored to %s.", t.Title, startTime.Format("15:04"))
 			m.AnchorPromptOpen = false
@@ -286,6 +282,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleWorkspaceFormKeys(msg)
 	case ModeProfileForm:
 		return m.handleProfileFormKeys(msg)
+	case ModeSyncForm:
+		return m.handleSyncFormKeys(msg)
 	case ModeWorkspacePicker:
 		return m.handleWorkspacePickerKeys(msg)
 	case ModeNormal:

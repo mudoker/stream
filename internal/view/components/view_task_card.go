@@ -205,6 +205,9 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 		bodyLines = append(bodyLines, strings.Repeat(" ", innerWidth))
 	}
 
+	restDur := viewmodel.CalculateTaskRestTime(task)
+	hasRest := restDur > 0 && task.SchedulingType == model.Anchored
+
 	var topLeftChar, topRightChar, bottomLeftChar, bottomRightChar, horizChar, vertChar string
 	if strings.HasSuffix(task.UUID, "_moving") {
 		topLeftChar = "┌"
@@ -213,6 +216,10 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 		bottomRightChar = "┘"
 		horizChar = "╌"
 		vertChar = "┊"
+		if hasRest {
+			bottomLeftChar = "├"
+			bottomRightChar = "┤"
+		}
 	} else {
 		topLeftChar = "╭"
 		topRightChar = "╮"
@@ -220,11 +227,20 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 		bottomRightChar = "╯"
 		horizChar = "─"
 		vertChar = "│"
+		if hasRest {
+			bottomLeftChar = "├"
+			bottomRightChar = "┤"
+		}
 	}
 
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
 	topLine := borderStyle.Render(topLeftChar) + borderStyle.Render(strings.Repeat(horizChar, innerWidth)) + borderStyle.Render(topRightChar)
-	bottomLine := borderStyle.Render(bottomLeftChar) + borderStyle.Render(strings.Repeat(horizChar, innerWidth)) + borderStyle.Render(bottomRightChar)
+	
+	bottomHorizChar := horizChar
+	if hasRest {
+		bottomHorizChar = "╌"
+	}
+	bottomLine := borderStyle.Render(bottomLeftChar) + borderStyle.Render(strings.Repeat(bottomHorizChar, innerWidth)) + borderStyle.Render(bottomRightChar)
 
 	var cardLines []string
 	cardLines = append(cardLines, topLine)

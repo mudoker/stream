@@ -211,7 +211,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		restDur := viewmodel.CalculateTaskRestTime(rc.Task)
 		restRows := durationToRows(restDur)
 		if restRows > 0 {
-			restStr := RenderRestBlock(t, colW, restRows, int(restDur.Minutes()))
+			restEndTime := rc.Task.TimeWindow.End.Add(restDur)
+			restStr := RenderRestBlock(t, colW, restRows, int(restDur.Minutes()), restEndTime)
 			restLines := strings.Split(restStr, "\n")
 			for i, line := range restLines {
 				r := startRow + h + i
@@ -240,7 +241,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	}
 
 	// ── Seamless Viewport Looping Slicing ────────────────────────────
-	visibleH := appContentHeight
+	visibleH := appContentHeight - 3
 	if visibleH < 8 {
 		visibleH = 8
 	}
@@ -260,12 +261,18 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 	}
 
+	if startR < 0 {
+		startR = 0
+	}
+	if startR > viewmodel.TotalRows-visibleH {
+		startR = viewmodel.TotalRows - visibleH
+	}
+
 	var visible []string
 	visible = append(visible, headerLine, sep, "")
 
 	for i := 0; i < visibleH; i++ {
-		rowIndex := startR + i
-		r := (rowIndex%viewmodel.TotalRows + viewmodel.TotalRows) % viewmodel.TotalRows
+		r := startR + i
 		visible = append(visible, allRows[r])
 	}
 
@@ -297,7 +304,7 @@ func embedTextInLine(leftBorder, rightBorder, fillChar, text string, width int, 
 	return borderStyle.Render(leftBorder) + content + borderStyle.Render(rightBorder)
 }
 
-func RenderRestBlock(t theme.Theme, w, h int, restMins int) string {
+func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time) string {
 	if w < 3 {
 		w = 3
 	}
@@ -309,35 +316,27 @@ func RenderRestBlock(t theme.Theme, w, h int, restMins int) string {
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
 	textStyle := lipgloss.NewStyle().Foreground(borderColor).Italic(true)
 
-	topLeft := "┌"
-	topRight := "┐"
 	bottomLeft := "└"
 	bottomRight := "┘"
 	horizChar := "╌"
 	vertChar := "┊"
 
-	restText := fmt.Sprintf("󰔛 Rest %dm", restMins)
+	restEndTimeStr := endTime.Format("15:04")
+	restText := fmt.Sprintf("󰔛 Rest %dm (%s)", restMins, restEndTimeStr)
 
 	var lines []string
 
 	if h == 1 {
-		// For h = 1, show text in one line with side borders: ┊╌ Rest 15m ╌┊
-		line := embedTextInLine(vertChar, vertChar, horizChar, restText, w, borderStyle, textStyle)
+		// For h = 1, show text in one line with bottom border: └╌ Rest 15m (10:15) ╌┘
+		line := embedTextInLine(bottomLeft, bottomRight, horizChar, restText, w, borderStyle, textStyle)
 		lines = append(lines, line)
-	} else if h == 2 {
-		// For h = 2, embed text in the top line, and render bottom line normally
-		topLine := embedTextInLine(topLeft, topRight, horizChar, restText, w, borderStyle, textStyle)
-		bottomLine := borderStyle.Render(bottomLeft + strings.Repeat(horizChar, w-2) + bottomRight)
-		lines = append(lines, topLine)
-		lines = append(lines, bottomLine)
 	} else {
-		// For h > 2, render top line normally, put text in center row, and bottom line normally
-		topLine := borderStyle.Render(topLeft + strings.Repeat(horizChar, w-2) + topRight)
+		// For h >= 2, we have no top border line since it merges with the task's joint bottom border.
+		// Render vertical side borders and bottom border.
 		bottomLine := borderStyle.Render(bottomLeft + strings.Repeat(horizChar, w-2) + bottomRight)
-		lines = append(lines, topLine)
 
-		centerRow := (h - 2) / 2
-		for i := 0; i < h-2; i++ {
+		centerRow := (h - 1) / 2
+		for i := 0; i < h-1; i++ {
 			var line string
 			if i == centerRow {
 				line = embedTextInLine(vertChar, vertChar, " ", restText, w, borderStyle, textStyle)

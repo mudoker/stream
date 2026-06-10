@@ -95,6 +95,9 @@ func (s *SyncEngine) initOAuth() error {
 }
 
 func (s *SyncEngine) createService() error {
+	if s.oauthConfig == nil {
+		return errors.New("oauthConfig is nil")
+	}
 	ctx := context.Background()
 	client := s.oauthConfig.Client(ctx, s.token)
 	srv, err := calendar.NewService(ctx, option.WithHTTPClient(client))
@@ -130,29 +133,51 @@ func (s *SyncEngine) StartAuthServer(port int) (string, error) {
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			code := r.URL.Query().Get("code")
 			if code == "" {
+				s.logCallback("OAuth Callback: Missing authorization code.")
 				io.WriteString(w, "Error: Missing authorization code.")
+				return
+			}
+
+			if s.oauthConfig == nil {
+				s.logCallback("OAuth Callback: Config is nil.")
+				io.WriteString(w, "Error: OAuth configuration is nil.")
 				return
 			}
 
 			tok, err := s.oauthConfig.Exchange(context.Background(), code)
 			if err != nil {
+				s.logCallback(fmt.Sprintf("OAuth Callback Exchange Error: %v", err))
 				io.WriteString(w, fmt.Sprintf("Exchange Token Error: %v", err))
+				return
+			}
+
+			// Save credentials
+			tokenPath := filepath.Join(s.localDB.GetConfigDir(), "credentials.json")
+			tokData, err := json.MarshalIndent(tok, "", "  ")
+			if err != nil {
+				s.logCallback(fmt.Sprintf("OAuth Callback formatting Error: %v", err))
+				io.WriteString(w, fmt.Sprintf("Error formatting token: %v", err))
+				return
+			}
+			if err := os.WriteFile(tokenPath, tokData, 0600); err != nil {
+				s.logCallback(fmt.Sprintf("OAuth Callback save Error: %v", err))
+				io.WriteString(w, fmt.Sprintf("Error saving credentials to %s: %v", tokenPath, err))
 				return
 			}
 
 			s.mu.Lock()
 			s.token = tok
 			s.isOnline = true
+			err = s.createService()
 			s.mu.Unlock()
 
-			// Save credentials
-			tokenPath := filepath.Join(s.localDB.GetConfigDir(), "credentials.json")
-			tokData, _ := json.MarshalIndent(tok, "", "  ")
-			os.WriteFile(tokenPath, tokData, 0600)
-
-			s.createService()
-
-			io.WriteString(w, "<h1>Authorization Successful!</h1><p>You can close this tab and return to the terminal.</p>")
+			if err != nil {
+				s.logCallback(fmt.Sprintf("OAuth Callback service creation failed: %v", err))
+				io.WriteString(w, fmt.Sprintf("<h1>Authorization Success, but API client error</h1><p>%v</p>", err))
+			} else {
+				s.logCallback("OAuth Callback: Authorization successful.")
+				io.WriteString(w, "<h1>Authorization Successful!</h1><p>You can close this tab and return to the terminal.</p>")
+			}
 
 			// Shutdown server in background
 			go func() {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"stream/internal/viewmodel"
 	"stream/internal/view/theme"
+	"stream/internal/viewmodel"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -48,16 +48,13 @@ func RenderCommandPalette(m *viewmodel.Model, t theme.Theme) string {
 	totalEntries := len(filteredGeneric) + len(filteredWS)
 
 	selIdx := m.CommandSelectedIndex
-	if selIdx < 0 {
-		selIdx = 0
-	}
 	if totalEntries > 0 && selIdx >= totalEntries {
 		selIdx = totalEntries - 1
 	}
 
 	nameW := 26
 	renderRow := func(globalIdx int, c viewmodel.CommandEntry) string {
-		isSelected := globalIdx == selIdx
+		isSelected := selIdx >= 0 && globalIdx == selIdx
 		if isSelected {
 			indicator := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("┃")
 			keyword := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).

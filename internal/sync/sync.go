@@ -118,6 +118,21 @@ func (s *SyncEngine) StartAuthServer(port int) (string, error) {
 	s.oauthConfig.RedirectURL = fmt.Sprintf("http://localhost:%d", port)
 	authURL := s.oauthConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline, oauth2.ApprovalForce)
 
+	// Write local redirect HTML file to config directory
+	htmlPath := filepath.Join(s.localDB.GetConfigDir(), "auth.html")
+	htmlContent := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="refresh" content="0; url=%s">
+    <title>Stream Authentication Redirect</title>
+</head>
+<body>
+    <p>Redirecting to Google OAuth... If it does not redirect automatically, <a href="%s">click here</a>.</p>
+    <script>window.location.href = "%s";</script>
+</body>
+</html>`, authURL, authURL, authURL)
+	_ = os.WriteFile(htmlPath, []byte(htmlContent), 0644)
+
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
 	if err != nil {
 		return "", fmt.Errorf("failed to bind to port %d: %w", port, err)
@@ -178,6 +193,9 @@ func (s *SyncEngine) StartAuthServer(port int) (string, error) {
 				s.logCallback("OAuth Callback: Authorization successful.")
 				io.WriteString(w, "<h1>Authorization Successful!</h1><p>You can close this tab and return to the terminal.</p>")
 			}
+
+			// Delete local redirect HTML file
+			_ = os.Remove(filepath.Join(s.localDB.GetConfigDir(), "auth.html"))
 
 			// Shutdown server in background
 			go func() {

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"stream/internal/viewmodel"
 	"stream/internal/view/components"
 	"stream/internal/view/modals"
 	"stream/internal/view/pages"
 	"stream/internal/view/theme"
+	"stream/internal/viewmodel"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -49,7 +49,9 @@ func (v *View) View() string {
 func (v *View) Render() string {
 	m := v.Model
 	if m.Width == 0 || m.Height == 0 {
-		return "Initializing workspace..."
+		m.Layout = viewmodel.ComputeLayout(120, 40)
+		m.Width = 120
+		m.Height = 40
 	}
 
 	if m.IsLocked {
@@ -85,8 +87,8 @@ func (v *View) Render() string {
 	}
 	sidebarStyle := lipgloss.NewStyle().
 		Width(l.SidebarW).
-		Height(appContentHeight - 2).
-		MaxHeight(appContentHeight - 2).
+		Height(appContentHeight-2).
+		MaxHeight(appContentHeight-2).
 		BorderRight(true).
 		BorderStyle(lipgloss.Border{Right: "│"}).
 		BorderForeground(sidebarBorderCol).
@@ -95,8 +97,8 @@ func (v *View) Render() string {
 	// ── Workspace (non-day views use the full workspace width) ────────
 	workspaceStyle := lipgloss.NewStyle().
 		Width(l.WorkspaceW).
-		Height(appContentHeight - 2).
-		MaxHeight(appContentHeight - 2).
+		Height(appContentHeight-2).
+		MaxHeight(appContentHeight-2).
 		Padding(1, 2)
 
 	// ── Day View: three-column layout ────────────────────────────────
@@ -209,11 +211,13 @@ func (v *View) Render() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.WarningOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.SessionExpiryPromptOpen {
+	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.SessionExpiryPromptOpen {
 		var modalStr string
 		switch {
 		case m.WarningOpen:
 			modalStr = modals.RenderWarningModal(m, v.Theme)
+		case m.AuthNoticeOpen:
+			modalStr = modals.RenderAuthNoticeModal(m, v.Theme)
 		case m.SessionExpiryPromptOpen:
 			modalStr = modals.RenderSessionExpiryModal(m, v.Theme)
 		case m.ConfirmOpen:

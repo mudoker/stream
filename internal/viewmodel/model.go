@@ -91,6 +91,9 @@ type Model struct {
 	WarningOpen bool
 	WarningMsg  string
 
+	AuthNoticeOpen bool
+	AuthNoticeMsg  string
+
 	IsEditing       bool
 	EditingTaskUUID string
 
@@ -152,6 +155,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		LockPasswordInput:           lockPass,
 		SessionTimeRemainingSeconds: settings.LockTimeoutMinutes * 60,
 		SessionExpiryPromptOpen:     false,
+		AuthNoticeOpen:              false,
 	}
 
 	m.refreshWorkspaces()

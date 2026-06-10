@@ -21,6 +21,17 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.AuthNoticeOpen {
+		switch msg.String() {
+		case "esc", "enter", "q":
+			m.AuthNoticeOpen = false
+			m.AuthNoticeMsg = ""
+			m.StatusMsg = "Returned to normal mode."
+			return m, nil
+		}
+		return m, nil
+	}
+
 	if m.SessionExpiryPromptOpen {
 		switch msg.String() {
 		case "y", "Y", "enter":

@@ -2,11 +2,13 @@ package viewmodel
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"stream/internal/model"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/google/uuid"
 )
@@ -268,7 +270,11 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			if err != nil {
 				m.StatusMsg = fmt.Sprintf("Auth server error: %v", err)
 			} else {
-				m.StatusMsg = "Go to: " + url
+				_ = clipboard.WriteAll(url)
+				htmlPath := filepath.Join(m.DB.GetConfigDir(), "auth.html")
+				m.AuthNoticeOpen = true
+				m.AuthNoticeMsg = fmt.Sprintf("Link copied! Or open: %s", htmlPath)
+				m.StatusMsg = "Google Calendar auth link ready. Press Esc to close."
 			}
 		} else {
 			m.StatusMsg = "Sync engine is not initialized."

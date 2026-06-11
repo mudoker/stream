@@ -127,4 +127,41 @@ func TestUtilsRowAndOverlaps(t *testing.T) {
 	if !collision {
 		t.Errorf("expected priority collision with self/others at same time")
 	}
+
+	// 6. absInt
+	if absInt(-5) != 5 || absInt(5) != 5 {
+		t.Errorf("absInt failed")
+	}
+
+	// 7. getEffectiveEnd
+	shortTask := model.Task{
+		TimeWindow: model.TimeWindow{
+			Start: dayStart,
+			End:   dayStart.Add(15 * time.Minute),
+		},
+	}
+	effEnd := getEffectiveEnd(shortTask)
+	if effEnd.Sub(dayStart) != 1*time.Hour {
+		t.Errorf("expected 1 hour minimum effective end for short task, got %v", effEnd.Sub(dayStart))
+	}
+
+	longTask := model.Task{
+		TimeWindow: model.TimeWindow{
+			Start: dayStart,
+			End:   dayStart.Add(2 * time.Hour),
+		},
+	}
+	if getEffectiveEnd(longTask) != longTask.TimeWindow.End {
+		t.Errorf("expected getEffectiveEnd to preserve long task end time")
+	}
+
+	// 8. ParseFlexibleTime
+	h1, m1 := ParseFlexibleTime("14:45", 9, 0)
+	if h1 != 14 || m1 != 45 {
+		t.Errorf("expected 14:45, got %02d:%02d", h1, m1)
+	}
+	h2, m2 := ParseFlexibleTime("invalid", 9, 0)
+	if h2 != 9 || m2 != 0 {
+		t.Errorf("expected fallback 9:00, got %02d:%02d", h2, m2)
+	}
 }

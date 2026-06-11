@@ -171,11 +171,13 @@ func (m *Model) handleDayNav(key string) {
 		if !m.TodoShelfFocus {
 			m.TimelineHour = (m.TimelineHour + 1) % 24
 			m.selectFirstTaskInCurrentHour()
+			m.AutoScrollToSelectedTask()
 		}
 	case "K":
 		if !m.TodoShelfFocus {
 			m.TimelineHour = (m.TimelineHour - 1 + 24) % 24
 			m.selectFirstTaskInCurrentHour()
+			m.AutoScrollToSelectedTask()
 		}
 	case "H":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -1)

@@ -475,6 +475,8 @@ func TestDayViewTimelineScrollingAndFallback(t *testing.T) {
 		Tasks:            []model.Task{task1, task2},
 		SelectedTaskUUID: "task-1",
 		Height:           20,
+		CurrentView:      viewmodel.DayView,
+		CurrentMode:      viewmodel.ModeNormal,
 		TimelineHour:     8,
 		SelectedDay:      time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local),
 	}
@@ -501,5 +503,17 @@ func TestDayViewTimelineScrollingAndFallback(t *testing.T) {
 	m.NavigateVertical(1)
 	if m.SelectedTaskUUID != "task-1" {
 		t.Fatalf("expected fallback selection to select task closest to 8 (task-1), got %s", m.SelectedTaskUUID)
+	}
+
+	// 3. Test J / K navigation scrolling
+	m.SelectedTaskUUID = ""
+	m.TimelineHour = 7
+	m.TodoShelfFocus = false
+	m.SidebarFocus = false
+
+	resModelRaw, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+	m3 := resModelRaw.(*viewmodel.Model)
+	if m3.SelectedTaskUUID != "task-1" {
+		t.Fatalf("expected selection to be task-1 on J press, got %s", m3.SelectedTaskUUID)
 	}
 }

@@ -92,19 +92,36 @@ func (m *Model) AutoScrollToSelectedTask() {
 	taskStart := TimeToRow(selectedTask.TimeWindow.Start)
 	durationMinutes := int(selectedTask.TimeWindow.End.Sub(selectedTask.TimeWindow.Start).Minutes())
 	h := (durationMinutes*RowsPerHour + 59) / 60
-	taskEnd := taskStart + h
+	
+	restDur := CalculateTaskRestTime(selectedTask)
+	restMins := int(restDur.Minutes())
+	restRows := 0
+	if restMins > 0 {
+		restRows = (restMins*RowsPerHour + 59) / 60
+	}
+
+	taskEnd := taskStart + h + restRows
 	if taskEnd > TotalRows {
 		taskEnd = TotalRows
 	}
 
 	appContentHeight := m.Height
-	visibleH := appContentHeight - 4
+	visibleH := appContentHeight - 3 // Match RenderDayTimeline exactly
 	if visibleH < 8 {
 		visibleH = 8
 	}
 
-	viewportStart := m.TimelineHour*RowsPerHour - visibleH/2
-	viewportEnd := viewportStart + visibleH
+	// Calculate exact clamped viewport boundaries matching RenderDayTimeline
+	centerRow := m.TimelineHour * RowsPerHour
+	startR := centerRow - visibleH/2
+	if startR < 0 {
+		startR = 0
+	}
+	if startR > TotalRows-visibleH {
+		startR = TotalRows - visibleH
+	}
+	viewportStart := startR
+	viewportEnd := startR + visibleH
 
 	if taskEnd-taskStart >= visibleH {
 		m.TimelineHour = (taskStart + visibleH/2) / RowsPerHour

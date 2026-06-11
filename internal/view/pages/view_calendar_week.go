@@ -194,12 +194,31 @@ func getWeekViewLines(m *viewmodel.Model, t theme.Theme, colWidth int) ([][]stri
 
 				cardContent := timeLine + "\n" + titleLine
 
-				cardStr := lipgloss.NewStyle().
-					Border(lipgloss.RoundedBorder()).
-					BorderForeground(blockColor).
-					Padding(1, 1).
-					Width(cardW).
-					Render(cardContent)
+				dur := rc.Task.TimeWindow.End.Sub(rc.Task.TimeWindow.Start)
+				durMins := int(dur.Minutes())
+				outerH := (durMins * 6) / 60
+				if outerH < 4 {
+					outerH = 4
+				}
+
+				var cardStr string
+				if outerH >= 6 {
+					cardStr = lipgloss.NewStyle().
+						Border(lipgloss.RoundedBorder()).
+						BorderForeground(blockColor).
+						Padding(1, 1).
+						Width(cardW).
+						Height(outerH - 4).
+						Render(cardContent)
+				} else {
+					cardStr = lipgloss.NewStyle().
+						Border(lipgloss.RoundedBorder()).
+						BorderForeground(blockColor).
+						Padding(0, 1).
+						Width(cardW).
+						Height(outerH - 2).
+						Render(cardContent)
+				}
 
 				cardLines := strings.Split(cardStr, "\n")
 				cardsContent = append(cardsContent, "") // empty line spacing

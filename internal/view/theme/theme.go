@@ -52,7 +52,7 @@ func NewTheme() Theme {
 	fg := lipgloss.Color("#cdd6f4")
 	muted := lipgloss.Color("#6c7086")
 	accent := lipgloss.Color("#89b4fa")
-	focusPurple := lipgloss.Color("#b4befe")
+	focusPurple := lipgloss.Color("#bd93f9")
 
 	p0 := lipgloss.Color("#f38ba8")
 	p1 := lipgloss.Color("#fab387")

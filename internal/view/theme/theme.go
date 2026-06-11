@@ -305,7 +305,9 @@ func WrapText(s string, limit int) string {
 	var currentLine string
 	for _, word := range words {
 		if len(currentLine)+len(word)+1 > limit {
-			res = append(res, currentLine)
+			if len(currentLine) > 0 {
+				res = append(res, currentLine)
+			}
 			currentLine = word
 		} else {
 			if len(currentLine) > 0 {

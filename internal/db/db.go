@@ -130,6 +130,14 @@ func (db *JSONDB) load() error {
 			if t.WorkspaceUUID == "" {
 				t.WorkspaceUUID = defaultWSUUID
 			}
+			// Remove/skip stale tasks that are invalid or not showed on screen (except completed ones)
+			if t.Title == "" || (t.LifecycleState != model.StateCompleted &&
+				t.SchedulingType != model.Anchored &&
+				t.SchedulingType != model.Floating &&
+				t.SchedulingType != model.Reminder &&
+				t.SchedulingType != model.Habit) {
+				continue
+			}
 			db.tasks[t.UUID] = t
 		}
 	}

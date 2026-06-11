@@ -1,4 +1,5 @@
 # stream - VIM-First TUI Task Management System 
+<img width="130" height="27" alt="image" src="https://github.com/user-attachments/assets/85cea850-c20b-43a7-af97-dbcd47b224a5" />
 
 stream is a terminal-native calendar and productivity engine. It treats calendar events as executable tasks that move through a defined lifecycle.
 

@@ -82,8 +82,9 @@ type Model struct {
 	IsEditingWorkspace   bool
 	EditingWorkspaceUUID string
 
-	PromptOpen bool
-	PromptTask model.Task
+	PromptOpen        bool
+	PromptTask        model.Task
+	PromptSelectedIdx int
 
 	ReviewOpen           bool
 	ReviewTasksCompleted int

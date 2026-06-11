@@ -234,32 +234,58 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if m.PromptOpen {
 		switch msg.String() {
-		case "enter":
-			if m.PromptTask.SchedulingType == model.Reminder {
-				m.PromptOpen = false
-				m.StatusMsg = fmt.Sprintf("Reminder '%s' dismissed.", m.PromptTask.Title)
-				return m, nil
-			}
-			m.StartZenMode(m.PromptTask)
-			m.PromptOpen = false
+		case "left", "up", "shift+tab":
+			m.PromptSelectedIdx = (m.PromptSelectedIdx - 1 + 3) % 3
 			return m, nil
-		case "s":
-			m.PromptTask.TimeWindow.Start = m.PromptTask.TimeWindow.Start.Add(5 * time.Minute)
-			if m.PromptTask.SchedulingType != model.Reminder {
-				m.PromptTask.TimeWindow.End = m.PromptTask.TimeWindow.End.Add(5 * time.Minute)
-			}
-			m.DB.UpdateTask(m.PromptTask)
-			m.refreshTasks()
-			m.PromptOpen = false
-			m.StatusMsg = "Task start snoozed by 5m."
+		case "right", "down", "tab":
+			m.PromptSelectedIdx = (m.PromptSelectedIdx + 1) % 3
 			return m, nil
-		case "d", "esc":
+		case "s", "S":
+			m.PromptSelectedIdx = 1
+			return m, nil
+		case "d", "D":
+			m.PromptSelectedIdx = 2
+			return m, nil
+		case "f", "F":
+			m.PromptSelectedIdx = 0
+			return m, nil
+		case "esc":
+			// Escape immediately cancels/dismisses the prompt
 			m.PromptTask.LifecycleState = model.StateReady
 			m.DB.UpdateTask(m.PromptTask)
 			m.refreshTasks()
 			m.PromptOpen = false
 			m.StatusMsg = "Task prompt dismissed."
 			return m, nil
+		case "enter":
+			switch m.PromptSelectedIdx {
+			case 0: // Start Focus (or Dismiss if Reminder)
+				if m.PromptTask.SchedulingType == model.Reminder {
+					m.PromptOpen = false
+					m.StatusMsg = fmt.Sprintf("Reminder '%s' dismissed.", m.PromptTask.Title)
+					return m, nil
+				}
+				m.StartZenMode(m.PromptTask)
+				m.PromptOpen = false
+				return m, nil
+			case 1: // Snooze 5m
+				m.PromptTask.TimeWindow.Start = m.PromptTask.TimeWindow.Start.Add(5 * time.Minute)
+				if m.PromptTask.SchedulingType != model.Reminder {
+					m.PromptTask.TimeWindow.End = m.PromptTask.TimeWindow.End.Add(5 * time.Minute)
+				}
+				m.DB.UpdateTask(m.PromptTask)
+				m.refreshTasks()
+				m.PromptOpen = false
+				m.StatusMsg = "Task start snoozed by 5m."
+				return m, nil
+			case 2: // Dismiss
+				m.PromptTask.LifecycleState = model.StateReady
+				m.DB.UpdateTask(m.PromptTask)
+				m.refreshTasks()
+				m.PromptOpen = false
+				m.StatusMsg = "Task prompt dismissed."
+				return m, nil
+			}
 		}
 		return m, nil
 	}

@@ -110,6 +110,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					t.TimeWindow.Start.Hour() == now.Hour() && t.TimeWindow.Start.Minute() == now.Minute() {
 
 					m.PromptTask = t
+					m.PromptSelectedIdx = 0
 					m.PromptOpen = true
 					break
 				}
@@ -120,6 +121,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						due := t.TimeWindow.Start
 						if !due.Before(now.Add(-5*time.Minute)) && due.Before(now.Add(1*time.Minute)) && m.PromptTask.UUID != t.UUID {
 							m.PromptTask = t
+							m.PromptSelectedIdx = 0
 							m.PromptOpen = true
 							break
 						}

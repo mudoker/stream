@@ -57,16 +57,33 @@ func RenderPromptModal(m *viewmodel.Model, t theme.Theme) string {
 	lines = append(lines, "")
 
 	// Action buttons
-	enterAction := "[Enter] Start Focus"
+	enterActionText := "[Enter] Start Focus"
 	if m.PromptTask.SchedulingType == model.Reminder {
-		enterAction = "[Enter] Dismiss"
+		enterActionText = "[Enter] Dismiss"
 	}
 
-	snoozeAction := lipgloss.NewStyle().Foreground(t.Muted).Render("[S] Snooze 5m")
-	dismissAction := lipgloss.NewStyle().Foreground(t.Muted).Render("[D/Esc] Dismiss")
+	var enterAction, snoozeAction, dismissAction string
+
+	if m.PromptSelectedIdx == 0 {
+		enterAction = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render("▶ " + enterActionText + " ◀")
+	} else {
+		enterAction = lipgloss.NewStyle().Foreground(t.Fg).Render("  " + enterActionText + "  ")
+	}
+
+	if m.PromptSelectedIdx == 1 {
+		snoozeAction = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▶ [S] Snooze 5m ◀")
+	} else {
+		snoozeAction = lipgloss.NewStyle().Foreground(t.Muted).Render("  [S] Snooze 5m  ")
+	}
+
+	if m.PromptSelectedIdx == 2 {
+		dismissAction = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▶ [D/Esc] Dismiss ◀")
+	} else {
+		dismissAction = lipgloss.NewStyle().Foreground(t.Muted).Render("  [D/Esc] Dismiss  ")
+	}
 
 	lines = append(lines, fmt.Sprintf("  %s   %s   %s",
-		lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render(enterAction),
+		enterAction,
 		snoozeAction,
 		dismissAction,
 	))

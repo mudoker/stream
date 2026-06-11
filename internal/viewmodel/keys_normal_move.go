@@ -46,6 +46,7 @@ func (m *Model) selectDefaultTaskForSelectedDay() {
 	if len(dayTasks) > 0 {
 		m.SelectedTaskUUID = dayTasks[0].UUID
 		m.TimelineHour = dayTasks[0].TimeWindow.Start.Hour()
+		m.AutoScrollToSelectedTask()
 	} else {
 		m.SelectedTaskUUID = ""
 	}
@@ -65,9 +66,10 @@ func (m *Model) selectFirstTaskInCurrentHour() {
 			return
 		}
 	}
+	m.SelectedTaskUUID = ""
 }
 
-func (m *Model) autoScrollToSelectedTask() {
+func (m *Model) AutoScrollToSelectedTask() {
 	if m.SelectedTaskUUID == "" {
 		return
 	}
@@ -144,7 +146,17 @@ func (m *Model) NavigateVertical(dir int) {
 		}
 	}
 	if !found {
-		m.SelectedTaskUUID = dayTasks[0].UUID
+		targetRow := m.TimelineHour * RowsPerHour
+		bestIdx := 0
+		minDist := 1_000_000
+		for i, r := range rects {
+			dist := absInt(r.Top - targetRow)
+			if dist < minDist {
+				minDist = dist
+				bestIdx = i
+			}
+		}
+		m.SelectedTaskUUID = rects[bestIdx].Task.UUID
 		return
 	}
 
@@ -208,7 +220,17 @@ func (m *Model) NavigateHorizontal(dir int) {
 		}
 	}
 	if !found {
-		m.SelectedTaskUUID = dayTasks[0].UUID
+		targetRow := m.TimelineHour * RowsPerHour
+		bestIdx := 0
+		minDist := 1_000_000
+		for i, r := range rects {
+			dist := absInt(r.Top - targetRow)
+			if dist < minDist {
+				minDist = dist
+				bestIdx = i
+			}
+		}
+		m.SelectedTaskUUID = rects[bestIdx].Task.UUID
 		return
 	}
 

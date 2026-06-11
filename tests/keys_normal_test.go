@@ -449,3 +449,57 @@ func TestHabitCompletionFutureDayValidation(t *testing.T) {
 		t.Errorf("expected WarningOpen to be false after dismissing warning, got true")
 	}
 }
+
+func TestDayViewTimelineScrollingAndFallback(t *testing.T) {
+	start1 := time.Date(2026, 6, 6, 8, 0, 0, 0, time.Local)
+	task1 := model.Task{
+		UUID:           "task-1",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: start1,
+			End:   start1.Add(time.Hour),
+		},
+	}
+
+	start2 := time.Date(2026, 6, 6, 18, 0, 0, 0, time.Local)
+	task2 := model.Task{
+		UUID:           "task-2",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: start2,
+			End:   start2.Add(time.Hour),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{task1, task2},
+		SelectedTaskUUID: "task-1",
+		Height:           20,
+		TimelineHour:     8,
+		SelectedDay:      time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local),
+	}
+
+	m.NavigateVertical(1)
+	if m.SelectedTaskUUID != "task-2" {
+		t.Fatalf("expected selection to move to task-2, got %s", m.SelectedTaskUUID)
+	}
+	m.AutoScrollToSelectedTask()
+
+	if m.TimelineHour == 8 {
+		t.Fatalf("expected TimelineHour to scroll down from 8, but it remained 8")
+	}
+
+	m.SelectedTaskUUID = ""
+	m.TimelineHour = 18
+	m.NavigateVertical(1)
+	if m.SelectedTaskUUID != "task-2" {
+		t.Fatalf("expected fallback selection to select task closest to 18 (task-2), got %s", m.SelectedTaskUUID)
+	}
+
+	m.SelectedTaskUUID = ""
+	m.TimelineHour = 8
+	m.NavigateVertical(1)
+	if m.SelectedTaskUUID != "task-1" {
+		t.Fatalf("expected fallback selection to select task closest to 8 (task-1), got %s", m.SelectedTaskUUID)
+	}
+}

@@ -146,24 +146,26 @@ func (m *Model) handleDayNav(key string) {
 	case "h":
 		if !m.TodoShelfFocus {
 			m.NavigateHorizontal(-1)
+			m.AutoScrollToSelectedTask()
 		}
 	case "l":
 		if !m.TodoShelfFocus {
 			m.NavigateHorizontal(1)
+			m.AutoScrollToSelectedTask()
 		}
 	case "j":
 		if m.TodoShelfFocus {
 			m.MoveTaskSelection(1)
 		} else {
 			m.NavigateVertical(1)
-			m.autoScrollToSelectedTask()
+			m.AutoScrollToSelectedTask()
 		}
 	case "k":
 		if m.TodoShelfFocus {
 			m.MoveTaskSelection(-1)
 		} else {
 			m.NavigateVertical(-1)
-			m.autoScrollToSelectedTask()
+			m.AutoScrollToSelectedTask()
 		}
 	case "J":
 		if !m.TodoShelfFocus {
@@ -178,8 +180,10 @@ func (m *Model) handleDayNav(key string) {
 	case "H":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -1)
 		m.selectDefaultTaskForSelectedDay()
+		m.AutoScrollToSelectedTask()
 	case "L":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, 1)
 		m.selectDefaultTaskForSelectedDay()
+		m.AutoScrollToSelectedTask()
 	}
 }

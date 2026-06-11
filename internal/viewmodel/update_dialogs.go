@@ -187,6 +187,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.updateTaskInMemory(t)
 			}
+			m.SelectedTaskUUID = t.UUID
+			m.AutoScrollToSelectedTask()
 			m.triggerGCalPush(t)
 
 			m.StatusMsg = fmt.Sprintf("Task '%s' anchored to %s.", t.Title, startTime.Format("15:04"))

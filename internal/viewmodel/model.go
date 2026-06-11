@@ -61,10 +61,11 @@ type Model struct {
 	SyncLogs     []string
 	ViewFunc     func(*Model) string
 
-	SelectedTaskUUID string
-	TodoShelfFocus   bool
-	SidebarFocus     bool
-	TimelineHour     int
+	SelectedTaskUUID     string
+	PrevSelectedTaskUUID string
+	TodoShelfFocus       bool
+	SidebarFocus         bool
+	TimelineHour         int
 
 	CommandInput textinput.Model
 

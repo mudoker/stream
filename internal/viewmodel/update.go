@@ -11,6 +11,7 @@ import (
 )
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.PrevSelectedTaskUUID = m.SelectedTaskUUID
 	var cmds []tea.Cmd
 
 	if m.IsLocked {

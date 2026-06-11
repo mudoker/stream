@@ -113,7 +113,7 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 	offset := m.ShelfScrollOffset
 
 	// If a task row is actively selected, force viewport boundaries to wrap it cleanly
-	if selectedLineIdx != -1 {
+	if selectedLineIdx != -1 && m.SelectedTaskUUID != m.PrevSelectedTaskUUID {
 		// If selection is positioned above the current screen layout view
 		if selectedLineIdx < offset {
 			offset = selectedLineIdx
@@ -122,6 +122,7 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 		if selectedLineIdx >= offset+(maxVisible-2) {
 			offset = selectedLineIdx - (maxVisible - 3)
 		}
+		m.ShelfScrollOffset = offset
 	}
 
 	// Safeguard scroll limits safely against structural text length

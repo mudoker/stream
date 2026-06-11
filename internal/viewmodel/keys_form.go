@@ -276,11 +276,15 @@ func (m *Model) SubmitForm() {
 		m.IsEditing = false
 		m.EditingTaskUUID = ""
 		m.refreshTasks()
+		m.SelectedTaskUUID = newTask.UUID
+		m.AutoScrollToSelectedTask()
 		m.triggerGCalPush(newTask)
 		m.StatusMsg = fmt.Sprintf("Task '%s' updated successfully.", title)
 	} else {
 		m.DB.AddTask(newTask)
 		m.refreshTasks()
+		m.SelectedTaskUUID = newTask.UUID
+		m.AutoScrollToSelectedTask()
 		m.triggerGCalPush(newTask)
 		m.StatusMsg = fmt.Sprintf("Task '%s' created successfully.", title)
 	}

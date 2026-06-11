@@ -250,7 +250,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	startR := centerRow - visibleH/2
 
 	// ── Smart Focus Tracking Adjustment Mechanism ───────────────────
-	if selectedStartRow != -1 {
+	if selectedStartRow != -1 && (m.SelectedTaskUUID != m.PrevSelectedTaskUUID || m.CurrentMode == viewmodel.ModeTaskMove) {
 		endR := startR + visibleH
 
 		if selectedStartRow < startR {
@@ -258,6 +258,15 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 		if selectedEndRow > endR {
 			startR = selectedEndRow - visibleH
+		}
+
+		// Sync back to m.TimelineHour so manual scroll starts from this adjusted position
+		m.TimelineHour = (startR + visibleH/2) / viewmodel.RowsPerHour
+		if m.TimelineHour < 0 {
+			m.TimelineHour = 0
+		}
+		if m.TimelineHour > 23 {
+			m.TimelineHour = 23
 		}
 	}
 

@@ -90,7 +90,7 @@ func (m *Model) applyTaskMove(direction int) {
 	task.TimeWindow.Start = task.TimeWindow.Start.Add(delta)
 	task.TimeWindow.End = task.TimeWindow.End.Add(delta)
 	m.updateTaskInMemory(task)
-	m.autoScrollToSelectedTask()
+	m.AutoScrollToSelectedTask()
 	m.TaskMovePrefix = ""
 	moveDir := "down"
 	if direction < 0 {
@@ -155,7 +155,7 @@ func (m *Model) confirmTaskMove() {
 	}
 
 	// Auto-scroll to the confirmed task to ensure it is visible
-	m.autoScrollToSelectedTask()
+	m.AutoScrollToSelectedTask()
 
 	m.CurrentMode = ModeNormal
 	m.TaskMovePrefix = ""
@@ -198,7 +198,7 @@ func (m *Model) cancelTaskMove() {
 	}
 
 	// Auto-scroll back to the original task
-	m.autoScrollToSelectedTask()
+	m.AutoScrollToSelectedTask()
 
 	m.CurrentMode = ModeNormal
 	m.TaskMovePrefix = ""

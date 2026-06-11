@@ -59,10 +59,10 @@ func TestManualSyncCommandsExecution(t *testing.T) {
 		t.Errorf("expected push command message, got %q", m.StatusMsg)
 	}
 
-	// Test :sync command routing
+	// Test :sync command routing (should now be unknown since they are separate manual commands)
 	_, _ = m.RunCommand("sync")
-	if m.StatusMsg != "Starting manual sync (pull + push)..." {
-		t.Errorf("expected sync command message, got %q", m.StatusMsg)
+	if m.StatusMsg != "Unknown command: sync" {
+		t.Errorf("expected unknown command message for sync, got %q", m.StatusMsg)
 	}
 }
 

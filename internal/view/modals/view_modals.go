@@ -99,7 +99,9 @@ func RenderDetailPanel(m *viewmodel.Model, t theme.Theme, height int) string {
 	sb.WriteString(strings.Repeat("─", 32) + "\n\n")
 
 	sb.WriteString(fmt.Sprintf("Priority      %s\n", task.Priority))
-	sb.WriteString(fmt.Sprintf("Story Points  %d\n", task.StoryPoints))
+	if task.SchedulingType != model.Reminder {
+		sb.WriteString(fmt.Sprintf("Story Points  %d\n", task.StoryPoints))
+	}
 	sb.WriteString(fmt.Sprintf("Lifecycle     %s\n", task.LifecycleState))
 	sb.WriteString(fmt.Sprintf("Schedule      %s\n\n", task.SchedulingType))
 
@@ -153,7 +155,11 @@ func RenderDetailModal(m *viewmodel.Model, t theme.Theme) string {
 
 	pColor := t.PriorityColor(task.Priority)
 	pBadge := lipgloss.NewStyle().Foreground(pColor).Bold(true).Render(fmt.Sprintf("▲ %s", task.Priority))
-	sb.WriteString(fmt.Sprintf("  %s  •  %d SP  •  %s\n", pBadge, task.StoryPoints, task.LifecycleState))
+	if task.SchedulingType == model.Reminder {
+		sb.WriteString(fmt.Sprintf("  %s  •  %s\n", pBadge, task.LifecycleState))
+	} else {
+		sb.WriteString(fmt.Sprintf("  %s  •  %d SP  •  %s\n", pBadge, task.StoryPoints, task.LifecycleState))
+	}
 	sb.WriteString(fmt.Sprintf("  Schedule: %s\n", task.SchedulingType))
 
 	if task.SchedulingType == model.Anchored {

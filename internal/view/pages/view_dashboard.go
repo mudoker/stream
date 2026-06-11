@@ -212,6 +212,12 @@ func renderAgendaPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 			var timeStr string
 			if task.SchedulingType == model.Anchored {
 				timeStr = task.TimeWindow.Start.Format("15:04")
+			} else if task.SchedulingType == model.Reminder {
+				if task.TimeWindow.Start.Second() == 1 {
+					timeStr = "REM"
+				} else {
+					timeStr = fmt.Sprintf("REM %s", task.TimeWindow.Start.Format("15:04"))
+				}
 			} else {
 				timeStr = "FLOAT"
 			}
@@ -222,10 +228,18 @@ func renderAgendaPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 			if isDetailed {
 				pBadge := fmt.Sprintf("[%s]", string(task.Priority))
 				spBadge := fmt.Sprintf("%dSP", task.StoryPoints)
+				if task.SchedulingType == model.Reminder {
+					spBadge = ""
+				}
 				stateStr := string(task.LifecycleState)
 
 				leftSide := fmt.Sprintf("%s %-5s %s", chk, timeStr, title)
-				rightSide := fmt.Sprintf("%s %s %s", pBadge, spBadge, stateStr)
+				var rightSide string
+				if spBadge != "" {
+					rightSide = fmt.Sprintf("%s %s %s", pBadge, spBadge, stateStr)
+				} else {
+					rightSide = fmt.Sprintf("%s %s", pBadge, stateStr)
+				}
 
 				leftW := lipgloss.Width(leftSide)
 				rightW := lipgloss.Width(rightSide)

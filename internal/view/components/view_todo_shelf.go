@@ -221,10 +221,16 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 
 	var details []string
 	details = append(details, string(task.Priority))
-	details = append(details, fmt.Sprintf("%d SP", task.StoryPoints))
+	if task.SchedulingType != model.Reminder {
+		details = append(details, fmt.Sprintf("%d SP", task.StoryPoints))
+	}
 	if task.SchedulingType == model.Reminder {
 		remDays := formatRemainingDays(task.TimeWindow.Start)
-		details = append(details, fmt.Sprintf("due %s (%s)", task.TimeWindow.Start.Format("15:04"), remDays))
+		if task.TimeWindow.Start.Second() == 1 {
+			details = append(details, fmt.Sprintf("due (%s)", remDays))
+		} else {
+			details = append(details, fmt.Sprintf("due %s (%s)", task.TimeWindow.Start.Format("15:04"), remDays))
+		}
 	}
 	if len(task.Tags) > 0 {
 		details = append(details, strings.Join(task.Tags, ", "))

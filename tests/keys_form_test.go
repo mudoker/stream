@@ -183,3 +183,79 @@ func TestHabitCommandPalette(t *testing.T) {
 		t.Errorf("expected StoryPoints to be 0, got %d", task.StoryPoints)
 	}
 }
+
+func TestReminderCreationFormSubmit(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+
+	// 1. Submit Reminder with empty due time (should have Second() == 1)
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TitleInput.SetValue("Call Mom")
+	m.Form.DescInput.SetValue("Weekly call")
+	m.Form.PriorityIdx = 1 // High
+	m.Form.SPIdx = 3       // 3 SP
+	m.Form.TaskTypeIdx = 2 // Reminder
+	m.Form.StartTimeInput.SetValue("") // empty due time
+	m.Form.DueDateInput.SetValue("2026-06-12")
+
+	m.SubmitForm()
+
+	tasks := database.GetTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task in DB, got %d", len(tasks))
+	}
+
+	task := tasks[0]
+	if task.Title != "Call Mom" {
+		t.Errorf("expected title 'Call Mom', got %q", task.Title)
+	}
+	if task.SchedulingType != model.Reminder {
+		t.Errorf("expected SchedulingType to be Reminder, got %s", task.SchedulingType)
+	}
+	if task.StoryPoints != 0 {
+		t.Errorf("expected StoryPoints for reminder to be forced to 0, got %d", task.StoryPoints)
+	}
+	if task.TimeWindow.Start.Second() != 1 {
+		t.Errorf("expected empty due time to have second sentinel == 1, got %d", task.TimeWindow.Start.Second())
+	}
+
+	// 2. Submit Reminder with specific due time (should have Second() == 0)
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TitleInput.SetValue("Doctor Appointment")
+	m.Form.DescInput.SetValue("Checkup")
+	m.Form.PriorityIdx = 0 // Critical
+	m.Form.SPIdx = 4       // 5 SP
+	m.Form.TaskTypeIdx = 2 // Reminder
+	m.Form.StartTimeInput.SetValue("14:30")
+	m.Form.DueDateInput.SetValue("2026-06-15")
+
+	m.SubmitForm()
+
+	tasks = database.GetTasks()
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks in DB, got %d", len(tasks))
+	}
+
+	task2 := tasks[1]
+	if task2.Title != "Doctor Appointment" {
+		t.Errorf("expected title 'Doctor Appointment', got %q", task2.Title)
+	}
+	if task2.TimeWindow.Start.Second() != 0 {
+		t.Errorf("expected due time 14:30 to have second == 0, got %d", task2.TimeWindow.Start.Second())
+	}
+	if task2.TimeWindow.Start.Hour() != 14 || task2.TimeWindow.Start.Minute() != 30 {
+		t.Errorf("expected due time 14:30, got %02d:%02d", task2.TimeWindow.Start.Hour(), task2.TimeWindow.Start.Minute())
+	}
+	if task2.StoryPoints != 0 {
+		t.Errorf("expected StoryPoints to be forced to 0, got %d", task2.StoryPoints)
+	}
+}

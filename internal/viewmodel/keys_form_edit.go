@@ -40,7 +40,11 @@ func (m *Model) startEditMode(task model.Task) {
 		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
 	} else if task.SchedulingType == model.Reminder {
 		m.Form.TaskTypeIdx = 2
-		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
+		if task.TimeWindow.Start.Second() == 1 {
+			m.Form.StartTimeInput.SetValue("")
+		} else {
+			m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
+		}
 		m.Form.DueDateInput.SetValue(task.TimeWindow.Start.Format("2006-01-02"))
 		m.Form.DurationInput.SetValue("60")
 	} else if task.SchedulingType == model.Habit {

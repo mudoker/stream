@@ -175,16 +175,22 @@ func (m *Model) SubmitForm() {
 		}
 	} else if taskType == 2 {
 		dateStr := m.Form.DueDateInput.Value()
-		timeStr := m.Form.StartTimeInput.Value()
+		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
 
 		dueDay, err := time.Parse("2006-01-02", strings.TrimSpace(dateStr))
 		if err != nil {
 			dueDay = m.SelectedDay
 		}
 
-		hour, min := ParseFlexibleTime(timeStr, 9, 0)
+		var hour, min, sec int
+		if timeStr == "" {
+			hour, min, sec = 9, 0, 1
+		} else {
+			hour, min = ParseFlexibleTime(timeStr, 9, 0)
+			sec = 0
+		}
 		now := time.Now()
-		startTime = time.Date(dueDay.Year(), dueDay.Month(), dueDay.Day(), hour, min, 0, 0, now.Location())
+		startTime = time.Date(dueDay.Year(), dueDay.Month(), dueDay.Day(), hour, min, sec, 0, now.Location())
 	}
 
 	var isEdit = m.IsEditing

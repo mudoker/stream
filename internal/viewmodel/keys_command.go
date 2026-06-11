@@ -37,7 +37,6 @@ func (m *Model) GetCommandList() []CommandEntry {
 		CommandEntry{"delete", "Delete selected task permanently"},
 		CommandEntry{"pull", "Pull anchored tasks from Google Calendar"},
 		CommandEntry{"push", "Push local anchored tasks to Google Calendar"},
-		CommandEntry{"sync", "Manually sync tasks (pull + push)"},
 		CommandEntry{"sync-settings", "Configure GCal sync mode and interval (seconds)"},
 		CommandEntry{"auth", "Start Google Calendar authorization"},
 		CommandEntry{"stop", "Stop active focus timer session"},

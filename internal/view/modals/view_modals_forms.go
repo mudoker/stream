@@ -2,6 +2,7 @@ package modals
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"stream/internal/viewmodel"
@@ -49,21 +50,30 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	spValStr := fmt.Sprintf("%d", viewmodel.SPOptions[f.SPIdx])
 	typeValStr := viewmodel.TaskTypeOptions[f.TaskTypeIdx]
 
-	fields = append(fields, renderField("1", "Title", f.TitleInput.View(), 0))
-	fields = append(fields, renderField("2", "Description", f.DescInput.View(), 1))
-	fields = append(fields, renderDropdown("3", "Priority", priorityValStr, 2))
-	fields = append(fields, renderDropdown("4", "Story Points", spValStr, 3))
-	fields = append(fields, renderDropdown("5", "Type", typeValStr, 4))
+	fieldNum := 1
+	nextFieldNum := func() string {
+		num := strconv.Itoa(fieldNum)
+		fieldNum++
+		return num
+	}
+
+	fields = append(fields, renderField(nextFieldNum(), "Title", f.TitleInput.View(), 0))
+	fields = append(fields, renderField(nextFieldNum(), "Description", f.DescInput.View(), 1))
+	fields = append(fields, renderDropdown(nextFieldNum(), "Priority", priorityValStr, 2))
+	if f.TaskTypeIdx != 2 {
+		fields = append(fields, renderDropdown(nextFieldNum(), "Story Points", spValStr, 3))
+	}
+	fields = append(fields, renderDropdown(nextFieldNum(), "Type", typeValStr, 4))
 	if f.TaskTypeIdx == 0 {
-		fields = append(fields, renderField("6", "Start Time", f.StartTimeInput.View(), 5))
-		fields = append(fields, renderField("7", "Duration (min)", f.DurationInput.View(), 6))
-		fields = append(fields, renderField("8", "Tags (csv)", f.TagsInput.View(), 7))
+		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
+		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
+		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 7))
 	} else if f.TaskTypeIdx == 2 {
-		fields = append(fields, renderField("6", "Due Date", f.DueDateInput.View(), 5))
-		fields = append(fields, renderField("7", "Due Time", f.StartTimeInput.View(), 6))
-		fields = append(fields, renderField("8", "Tags (csv)", f.TagsInput.View(), 7))
+		fields = append(fields, renderField(nextFieldNum(), "Due Date", f.DueDateInput.View(), 5))
+		fields = append(fields, renderField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), 6))
+		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 7))
 	} else {
-		fields = append(fields, renderField("6", "Tags (csv)", f.TagsInput.View(), 7))
+		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 7))
 	}
 	fields = append(fields, "")
 	fields = append(fields, ModalSep(innerW))

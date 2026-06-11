@@ -75,7 +75,7 @@ func (f TaskForm) VisibleFields() []int {
 	case 0: // Anchored
 		return []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
 	case 2: // Reminder
-		return []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
+		return []int{0, 1, 2, 4, 5, 6, 7, 8}
 	default: // Floating
 		return []int{0, 1, 2, 3, 4, 7, 8}
 	}

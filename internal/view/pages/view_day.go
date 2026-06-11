@@ -328,9 +328,9 @@ func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time, i
 	if isFocused {
 		borderColor = t.FocusPurple
 	} else if isCompleted {
-		borderColor = lipgloss.Color("#4c644f") // Soft dark forest green border
+		borderColor = lipgloss.Color("#5b8e5d") // Medium forest green border for completed rest block
 	} else {
-		borderColor = t.Muted
+		borderColor = lipgloss.Color("#94e2d5") // Soothing pastel teal for active/pending rest block
 	}
 
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
@@ -340,7 +340,7 @@ func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time, i
 	} else if isCompleted {
 		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Italic(true) // Softer sage green text
 	} else {
-		textStyle = lipgloss.NewStyle().Foreground(borderColor).Italic(true)
+		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#94e2d5")).Italic(true)
 	}
 
 	bottomLeft := "└"

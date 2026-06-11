@@ -21,14 +21,33 @@ func SortReminders(tasks []model.Task) {
 	}
 }
 
-func ImportSort(tasks []model.Task) {
-	for i := 0; i < len(tasks); i++ {
-		for j := i + 1; j < len(tasks); j++ {
-			if tasks[j].SortingWeight() > tasks[i].SortingWeight() {
-				tasks[i], tasks[j] = tasks[j], tasks[i]
-			}
-		}
+func getPriorityVal(p model.Priority) int {
+	switch p {
+	case model.P0:
+		return 4
+	case model.P1:
+		return 3
+	case model.P2:
+		return 2
+	case model.P3:
+		return 1
+	default:
+		return 0
 	}
+}
+
+func ImportSort(tasks []model.Task) {
+	sort.SliceStable(tasks, func(i, j int) bool {
+		pI := getPriorityVal(tasks[i].Priority)
+		pJ := getPriorityVal(tasks[j].Priority)
+		if pI != pJ {
+			return pI > pJ
+		}
+		if tasks[i].CreatedAt.Equal(tasks[j].CreatedAt) {
+			return tasks[i].UUID < tasks[j].UUID
+		}
+		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
+	})
 }
 
 func GetDayTasks(allTasks []model.Task, day time.Time) []model.Task {

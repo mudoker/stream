@@ -46,7 +46,7 @@ func RenderArcSidebar(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	var rows []string
 
 	brand := "▲ s t r e a m"
-	ver := "v0.4.2"
+	ver := "v1.0.0"
 	brandLine := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(brand)
 	verLine := lipgloss.NewStyle().Foreground(t.Muted).Render(ver)
 	rows = append(rows, brandLine, verLine, sep)

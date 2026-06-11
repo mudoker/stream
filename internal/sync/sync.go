@@ -260,37 +260,7 @@ func (s *SyncEngine) enqueueSync(req syncRequest) {
 
 func (s *SyncEngine) StartDaemon() {
 	go func() {
-		var ticker *time.Ticker
-		defer func() {
-			if ticker != nil {
-				ticker.Stop()
-			}
-		}()
-
-		resetTicker := func() {
-			interval := s.getSyncInterval()
-			if ticker == nil {
-				ticker = time.NewTicker(interval)
-			} else {
-				ticker.Reset(interval)
-			}
-		}
-
-		resetTicker()
-		s.sync(false)
-
-		for {
-			select {
-			case <-ticker.C:
-				s.sync(false)
-			case req := <-s.syncChan:
-				s.sync(req.includePull)
-			case <-s.settingsChan:
-				resetTicker()
-			case <-s.stopChan:
-				return
-			}
-		}
+		<-s.stopChan
 	}()
 }
 
@@ -585,7 +555,7 @@ func (s *SyncEngine) defaultWorkspaceUUID() string {
 }
 
 func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
-	timeMin := time.Now().Add(-24 * time.Hour).Format(time.RFC3339)
+	timeMin := time.Now().AddDate(0, 0, -30).Format(time.RFC3339)
 	events, err := srv.Events.List("primary").TimeMin(timeMin).ShowDeleted(true).Do()
 	if err != nil {
 		return err
@@ -593,9 +563,14 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 
 	localTasks := s.localDB.GetTasks()
 	localByGCalID := make(map[string]model.Task)
+	localByTitleTime := make(map[string]model.Task)
 	for _, t := range localTasks {
 		if t.GCalMetadata.EventID != "" {
 			localByGCalID[t.GCalMetadata.EventID] = t
+		}
+		if model.IsGCalSyncable(t) {
+			key := fmt.Sprintf("%s|%s|%s", strings.ToLower(t.Title), t.TimeWindow.Start.UTC().Format(time.RFC3339), t.TimeWindow.End.UTC().Format(time.RFC3339))
+			localByTitleTime[key] = t
 		}
 	}
 
@@ -633,11 +608,18 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 			}
 		}
 
-		start, _ := time.Parse(time.RFC3339, item.Start.DateTime)
-		end, _ := time.Parse(time.RFC3339, item.End.DateTime)
-		if start.IsZero() && item.Start.Date != "" {
-			start, _ = time.Parse("2006-01-02", item.Start.Date)
-			end = start.Add(24 * time.Hour)
+		var start, end time.Time
+		if item.Start != nil {
+			start, _ = time.Parse(time.RFC3339, item.Start.DateTime)
+			if start.IsZero() && item.Start.Date != "" {
+				start, _ = time.Parse("2006-01-02", item.Start.Date)
+			}
+		}
+		if item.End != nil {
+			end, _ = time.Parse(time.RFC3339, item.End.DateTime)
+			if end.IsZero() && item.Start != nil && item.Start.Date != "" {
+				end = start.Add(24 * time.Hour)
+			}
 		}
 
 		if schedVal != model.Anchored || start.IsZero() {
@@ -645,21 +627,29 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 		}
 
 		localTask, exists := localByGCalID[item.Id]
-		if exists {
-			if item.Sequence > localTask.GCalMetadata.SequenceID || item.Etag != localTask.GCalMetadata.ETag {
-				localTask.Title = item.Summary
-				localTask.Description = item.Description
-				localTask.TimeWindow.Start = start
-				localTask.TimeWindow.End = end
-				localTask.Priority = priorityVal
-				localTask.StoryPoints = spVal
-				localTask.LifecycleState = stateVal
-				localTask.SchedulingType = schedVal
-				localTask.GCalMetadata.ETag = item.Etag
-				localTask.GCalMetadata.SequenceID = item.Sequence
-
-				_ = s.localDB.UpdateTaskNoLedger(localTask)
+		if !exists {
+			key := fmt.Sprintf("%s|%s|%s", strings.ToLower(item.Summary), start.UTC().Format(time.RFC3339), end.UTC().Format(time.RFC3339))
+			if t, ok := localByTitleTime[key]; ok {
+				localTask = t
+				exists = true
 			}
+		}
+
+		if exists {
+			// GCal is source of truth, override local
+			localTask.Title = item.Summary
+			localTask.Description = item.Description
+			localTask.TimeWindow.Start = start
+			localTask.TimeWindow.End = end
+			localTask.Priority = priorityVal
+			localTask.StoryPoints = spVal
+			localTask.LifecycleState = stateVal
+			localTask.SchedulingType = schedVal
+			localTask.GCalMetadata.EventID = item.Id
+			localTask.GCalMetadata.ETag = item.Etag
+			localTask.GCalMetadata.SequenceID = item.Sequence
+
+			_ = s.localDB.UpdateTaskNoLedger(localTask)
 		} else {
 			if uuidVal == "" {
 				uuidVal = uuid.New().String()
@@ -688,4 +678,126 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 	}
 
 	return nil
+}
+
+func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
+	// 1. Process deletions from the ledger first to remove deleted local tasks from GCal
+	ledger := s.localDB.GetLedger()
+	for _, entry := range ledger {
+		if entry.Op == "DELETE" {
+			if entry.Task.GCalMetadata.EventID != "" {
+				s.logCallback(fmt.Sprintf("Sync: Deleting GCal event '%s'...", entry.Task.Title))
+				_ = s.deleteRemoteEvent(srv, entry.Task)
+			}
+		}
+		_ = s.localDB.RemoveLedgerEntry(entry.ID)
+	}
+
+	// 2. Fetch GCal events to avoid duplicates
+	timeMin := time.Now().AddDate(0, 0, -30).Format(time.RFC3339)
+	events, err := srv.Events.List("primary").TimeMin(timeMin).ShowDeleted(true).Do()
+	if err != nil {
+		return err
+	}
+
+	gcalByEventID := make(map[string]*calendar.Event)
+	gcalByTitleTime := make(map[string]*calendar.Event)
+	for _, item := range events.Items {
+		if item.Status == "cancelled" {
+			continue
+		}
+		gcalByEventID[item.Id] = item
+		var start, end time.Time
+		if item.Start != nil {
+			start, _ = time.Parse(time.RFC3339, item.Start.DateTime)
+		}
+		if item.End != nil {
+			end, _ = time.Parse(time.RFC3339, item.End.DateTime)
+		}
+		if !start.IsZero() && !end.IsZero() {
+			key := fmt.Sprintf("%s|%s|%s", strings.ToLower(item.Summary), start.UTC().Format(time.RFC3339), end.UTC().Format(time.RFC3339))
+			gcalByTitleTime[key] = item
+		}
+	}
+
+	// 3. Scan local database for ANCHORED tasks and push
+	localTasks := s.localDB.GetTasks()
+	for _, t := range localTasks {
+		if !model.IsGCalSyncable(t) {
+			continue
+		}
+
+		var matchedEvent *calendar.Event
+		if t.GCalMetadata.EventID != "" {
+			matchedEvent = gcalByEventID[t.GCalMetadata.EventID]
+		}
+		if matchedEvent == nil {
+			// Try title+time matching
+			key := fmt.Sprintf("%s|%s|%s", strings.ToLower(t.Title), t.TimeWindow.Start.UTC().Format(time.RFC3339), t.TimeWindow.End.UTC().Format(time.RFC3339))
+			matchedEvent = gcalByTitleTime[key]
+		}
+
+		if matchedEvent != nil {
+			// Exists on GCal: Update it (local is source of truth)
+			t.GCalMetadata.EventID = matchedEvent.Id
+			if err := s.updateRemoteEvent(srv, t); err != nil {
+				s.logCallback(fmt.Sprintf("Sync: Failed to update GCal event '%s': %v", t.Title, err))
+			}
+		} else {
+			// Does not exist on GCal: Create it
+			if err := s.createRemoteEvent(srv, t); err != nil {
+				s.logCallback(fmt.Sprintf("Sync: Failed to create GCal event '%s': %v", t.Title, err))
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *SyncEngine) ManualPull() {
+	if s.isRateLimited() {
+		s.logCallback("GCal Sync: Rate limited. Please wait.")
+		return
+	}
+
+	srv, err := s.ensureService()
+	if err != nil {
+		s.logCallback(fmt.Sprintf("GCal Sync Error: %v", err))
+		return
+	}
+
+	s.logCallback("GCal Sync: Pulling remote updates...")
+	if err := s.pullRemoteUpdates(srv); err != nil {
+		if isRateLimitError(err) {
+			s.handleRateLimit(err)
+			return
+		}
+		s.logCallback(fmt.Sprintf("GCal Sync: Pull failed: %v", err))
+	} else {
+		s.logCallback("GCal Sync: Pull complete.")
+	}
+}
+
+func (s *SyncEngine) ManualPush() {
+	if s.isRateLimited() {
+		s.logCallback("GCal Sync: Rate limited. Please wait.")
+		return
+	}
+
+	srv, err := s.ensureService()
+	if err != nil {
+		s.logCallback(fmt.Sprintf("GCal Sync Error: %v", err))
+		return
+	}
+
+	s.logCallback("GCal Sync: Pushing local updates...")
+	if err := s.pushLocalUpdates(srv); err != nil {
+		if isRateLimitError(err) {
+			s.handleRateLimit(err)
+			return
+		}
+		s.logCallback(fmt.Sprintf("GCal Sync: Push failed: %v", err))
+	} else {
+		s.logCallback("GCal Sync: Push complete.")
+	}
 }

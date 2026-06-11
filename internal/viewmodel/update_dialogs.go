@@ -11,9 +11,55 @@ import (
 )
 
 func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "esc" {
+		m.WarningOpen = false
+		m.WarningMsg = ""
+
+		m.AuthNoticeOpen = false
+		m.AuthNoticeMsg = ""
+
+		m.SessionExpiryPromptOpen = false
+
+		m.ConfirmOpen = false
+
+		m.HelpOpen = false
+		m.HelpScrollOffset = 0
+
+		m.AnchorPromptOpen = false
+
+		if m.PromptOpen {
+			if m.PromptTask.SchedulingType != model.Reminder {
+				m.PromptTask.LifecycleState = model.StateReady
+				if m.DB != nil {
+					m.DB.UpdateTask(m.PromptTask)
+					m.refreshTasks()
+				}
+			}
+			m.PromptOpen = false
+		}
+
+		m.ReviewOpen = false
+		m.DetailOpen = false
+
+		m.StatusMsg = ""
+
+		if m.CurrentMode == ModeTaskMove {
+			m.cancelTaskMove()
+			return m, nil
+		}
+		if m.CurrentMode == ModeZen {
+			m.CurrentMode = ModeNormal
+			m.StatusMsg = "Focus Session running in background. Press 'z' to return."
+			return m, nil
+		}
+
+		m.CurrentMode = ModeNormal
+		return m, nil
+	}
+
 	if m.WarningOpen {
 		switch msg.String() {
-		case "esc", "enter", "q", "space":
+		case "enter", "q", "space":
 			m.WarningOpen = false
 			m.WarningMsg = ""
 			return m, nil
@@ -248,28 +294,6 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.DetailOpen = false
 			return m, nil
 		}
-		return m, nil
-	}
-
-	if msg.String() == "esc" {
-		if m.DetailOpen {
-			m.DetailOpen = false
-			return m, nil
-		}
-		if m.CurrentMode == ModeZen {
-			m.CurrentMode = ModeNormal
-			m.StatusMsg = "Focus Session running in background. Press 'z' to return."
-			return m, nil
-		}
-		if m.CurrentMode == ModeTaskMove {
-			m.cancelTaskMove()
-			return m, nil
-		}
-		if m.CurrentMode == ModeNormal {
-			m.StatusMsg = ""
-			return m, nil
-		}
-		m.CurrentMode = ModeNormal
 		return m, nil
 	}
 

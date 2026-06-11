@@ -26,6 +26,7 @@ type TaskForm struct {
 	StartTimeInput textinput.Model
 	DurationInput  textinput.Model
 	TagsInput      textinput.Model
+	DueDateInput   textinput.Model
 }
 
 func NewTaskForm() TaskForm {
@@ -48,6 +49,10 @@ func NewTaskForm() TaskForm {
 	tags := textinput.New()
 	tags.Placeholder = "engineering, refactor, admin"
 
+	dd := textinput.New()
+	dd.Placeholder = now.Format("2006-01-02")
+	dd.SetValue(now.Format("2006-01-02"))
+
 	return TaskForm{
 		PriorityIdx:    2,
 		SPIdx:          2,
@@ -61,6 +66,7 @@ func NewTaskForm() TaskForm {
 		StartTimeInput: st,
 		DurationInput:  dur,
 		TagsInput:      tags,
+		DueDateInput:   dd,
 	}
 }
 
@@ -69,7 +75,7 @@ func (f TaskForm) VisibleFields() []int {
 	case 0: // Anchored
 		return []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
 	case 2: // Reminder
-		return []int{0, 1, 2, 3, 4, 5, 7, 8}
+		return []int{0, 1, 2, 3, 4, 5, 6, 7, 8}
 	default: // Floating
 		return []int{0, 1, 2, 3, 4, 7, 8}
 	}

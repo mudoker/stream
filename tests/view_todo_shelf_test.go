@@ -182,3 +182,48 @@ func TestRenderTodoShelfHabits(t *testing.T) {
 		t.Error("expected habit completed yesterday to render as [ ] Stretch")
 	}
 }
+
+func TestReminderRemainingDays(t *testing.T) {
+	th := theme.NewTheme()
+	now := time.Now()
+	
+	m := &viewmodel.Model{
+		Layout: viewmodel.Layout{
+			TodoW: 45,
+		},
+		Tasks: []model.Task{
+			{
+				UUID:           "rem-today",
+				Title:          "Call doctor",
+				SchedulingType: model.Reminder,
+				LifecycleState: model.StateReady,
+				TimeWindow:     model.TimeWindow{Start: now},
+			},
+			{
+				UUID:           "rem-future",
+				Title:          "Submit tax",
+				SchedulingType: model.Reminder,
+				LifecycleState: model.StateReady,
+				TimeWindow:     model.TimeWindow{Start: now.Add(48 * time.Hour)},
+			},
+			{
+				UUID:           "rem-past",
+				Title:          "Pay bills",
+				SchedulingType: model.Reminder,
+				LifecycleState: model.StateReady,
+				TimeWindow:     model.TimeWindow{Start: now.Add(-24 * time.Hour)},
+			},
+		},
+	}
+
+	rendered := components.RenderTodoShelf(m, th, 30)
+	if !strings.Contains(rendered, "due today") {
+		t.Error("expected rendering to contain 'due today'")
+	}
+	if !strings.Contains(rendered, "2 days remaining") {
+		t.Error("expected rendering to contain '2 days remaining'")
+	}
+	if !strings.Contains(rendered, "overdue by 1 day") {
+		t.Error("expected rendering to contain 'overdue by 1 day'")
+	}
+}

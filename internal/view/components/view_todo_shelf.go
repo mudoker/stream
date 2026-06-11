@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"stream/internal/model"
 	"stream/internal/viewmodel"
@@ -195,7 +196,8 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 	var details []string
 	details = append(details, fmt.Sprintf("%d SP", task.StoryPoints))
 	if task.SchedulingType == model.Reminder {
-		details = append(details, fmt.Sprintf("due %s", task.TimeWindow.Start.Format("15:04")))
+		remDays := formatRemainingDays(task.TimeWindow.Start)
+		details = append(details, fmt.Sprintf("due %s (%s)", task.TimeWindow.Start.Format("15:04"), remDays))
 	}
 	if len(task.Tags) > 0 {
 		details = append(details, strings.Join(task.Tags, ", "))
@@ -242,4 +244,31 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 
 	itemRows = append(itemRows, "")
 	return itemRows
+}
+
+func formatRemainingDays(due time.Time) string {
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	dueDay := time.Date(due.Year(), due.Month(), due.Day(), 0, 0, 0, 0, due.Location())
+	
+	dueLocal := dueDay.In(today.Location())
+	duration := dueLocal.Sub(today)
+	var days int
+	if duration >= 0 {
+		days = int((duration.Hours() + 12) / 24)
+	} else {
+		days = int((duration.Hours() - 12) / 24)
+	}
+
+	if days == 0 {
+		return "due today"
+	} else if days == 1 {
+		return "1 day remaining"
+	} else if days > 1 {
+		return fmt.Sprintf("%d days remaining", days)
+	} else if days == -1 {
+		return "overdue by 1 day"
+	} else {
+		return fmt.Sprintf("overdue by %d days", -days)
+	}
 }

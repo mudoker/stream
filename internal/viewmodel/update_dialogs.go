@@ -265,6 +265,10 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cancelTaskMove()
 			return m, nil
 		}
+		if m.CurrentMode == ModeNormal {
+			m.StatusMsg = ""
+			return m, nil
+		}
 		m.CurrentMode = ModeNormal
 		return m, nil
 	}

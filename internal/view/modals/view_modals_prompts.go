@@ -141,18 +141,34 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 	const innerW = 46
 	var lines []string
 
-	lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("Confirm Delete"))
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
-	lines = append(lines, "  Are you sure you want to delete task")
-	lines = append(lines, fmt.Sprintf("  \"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)))
-	lines = append(lines, "")
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
+	if m.ConfirmActionType == "complete_reminder" {
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Complete Reminder"))
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+		lines = append(lines, "  Are you sure you want to complete")
+		lines = append(lines, "  and remove this reminder task")
+		lines = append(lines, fmt.Sprintf("  \"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)))
+		lines = append(lines, "")
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
 
-	yesBtn := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("[Y] Yes, Delete")
-	noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Cancel")
-	lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+		yesBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Y] Yes, Complete")
+		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Cancel")
+		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+	} else {
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("Confirm Delete"))
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+		lines = append(lines, "  Are you sure you want to delete task")
+		lines = append(lines, fmt.Sprintf("  \"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)))
+		lines = append(lines, "")
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+
+		yesBtn := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("[Y] Yes, Delete")
+		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Cancel")
+		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+	}
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
 }

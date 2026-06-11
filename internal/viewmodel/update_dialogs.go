@@ -96,21 +96,43 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.ConfirmOpen {
 		switch msg.String() {
 		case "y", "Y":
-			m.DB.DeleteTask(m.ConfirmTask.UUID)
-			m.refreshTasks()
-			m.triggerGCalPushIfAnchored(m.ConfirmTask)
-			if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-				m.DetailOpen = false
+			if m.ConfirmActionType == "complete_reminder" {
+				m.ConfirmTask.LifecycleState = model.StateCompleted
+				m.ConfirmTask.UpdatedAt = time.Now()
+				m.DB.UpdateTask(m.ConfirmTask)
+				m.refreshTasks()
+				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
+					m.DetailOpen = false
+				}
+				m.StatusMsg = fmt.Sprintf("Reminder '%s' completed!", m.ConfirmTask.Title)
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				return m, nil
+			} else {
+				m.DB.DeleteTask(m.ConfirmTask.UUID)
+				m.refreshTasks()
+				m.triggerGCalPushIfAnchored(m.ConfirmTask)
+				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
+					m.DetailOpen = false
+				}
+				if m.ZenTimer != nil && m.ZenTimer.Task.UUID == m.ConfirmTask.UUID {
+					m.ZenTimer = nil
+				}
+				m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", m.ConfirmTask.Title)
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				return m, nil
 			}
-			if m.ZenTimer != nil && m.ZenTimer.Task.UUID == m.ConfirmTask.UUID {
-				m.ZenTimer = nil
-			}
-			m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", m.ConfirmTask.Title)
-			m.ConfirmOpen = false
-			return m, nil
 		case "n", "N", "esc", "enter":
-			m.ConfirmOpen = false
-			m.StatusMsg = "Deletion canceled."
+			if m.ConfirmActionType == "complete_reminder" {
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.StatusMsg = "Completion canceled."
+			} else {
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.StatusMsg = "Deletion canceled."
+			}
 			return m, nil
 		}
 		return m, nil
@@ -281,15 +303,27 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.DetailOpen = false
 			return m, nil
 		case "x":
-			m.DetailTask.LifecycleState = model.StateCompleted
+			if m.DetailTask.SchedulingType == model.Reminder && m.DetailTask.LifecycleState != model.StateCompleted {
+				m.ConfirmTask = m.DetailTask
+				m.ConfirmOpen = true
+				m.ConfirmActionType = "complete_reminder"
+				return m, nil
+			}
+			if m.DetailTask.LifecycleState == model.StateCompleted {
+				m.DetailTask.LifecycleState = model.StateBacklog
+				m.StatusMsg = fmt.Sprintf("Task '%s' marked incomplete.", m.DetailTask.Title)
+			} else {
+				m.DetailTask.LifecycleState = model.StateCompleted
+				m.StatusMsg = fmt.Sprintf("Task '%s' completed!", m.DetailTask.Title)
+			}
 			m.DB.UpdateTask(m.DetailTask)
 			m.refreshTasks()
 			m.DetailOpen = false
-			m.StatusMsg = fmt.Sprintf("Task '%s' completed!", m.DetailTask.Title)
 			return m, nil
 		case "d":
 			m.ConfirmTask = m.DetailTask
 			m.ConfirmOpen = true
+			m.ConfirmActionType = "delete"
 			return m, nil
 		case "e":
 			m.startEditMode(m.DetailTask)

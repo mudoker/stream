@@ -249,9 +249,10 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		if exists {
 			m.ConfirmTask = task
 			m.ConfirmOpen = true
+			m.ConfirmActionType = "delete"
 		}
 
-	case "pull", "push", "sync", "sync-settings", "gcal-settings":
+	case "pull", "push", "sync-settings", "gcal-settings":
 		if cmdName == "pull" {
 			if m.Sync != nil {
 				m.StatusMsg = "Pulling tasks from Google Calendar..."
@@ -267,18 +268,6 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			if m.Sync != nil {
 				m.StatusMsg = "Pushing tasks to Google Calendar..."
 				go func() {
-					m.Sync.ManualPush()
-				}()
-			} else {
-				m.StatusMsg = "Sync engine is not initialized."
-			}
-			return m, nil
-		}
-		if cmdName == "sync" {
-			if m.Sync != nil {
-				m.StatusMsg = "Starting manual sync (pull + push)..."
-				go func() {
-					m.Sync.ManualPull()
 					m.Sync.ManualPush()
 				}()
 			} else {

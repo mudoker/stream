@@ -60,9 +60,16 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 		}
 	}
 
+	subtleSep := lipgloss.NewStyle().Foreground(t.Muted).Render(strings.Repeat("─", innerW))
+
 	// ── 1. Reminders Section ─────────────────────────────────────────
-	rows = append(rows, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("⏰ REMINDERS"))
-	rows = append(rows, lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", innerW)))
+	remindersHeader := lipgloss.NewStyle().
+		Background(t.SelectedBg).
+		Foreground(t.Accent).
+		Bold(true).
+		Padding(0, 1).
+		Render(fmt.Sprintf("⏰ REMINDERS (%d)", len(reminders)))
+	rows = append(rows, remindersHeader, subtleSep)
 	if len(reminders) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render("  No reminders"), "")
 	} else {
@@ -75,8 +82,13 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 	}
 
 	// ── 2. Habits Section ────────────────────────────────────────────
-	rows = append(rows, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("🔁 HABITS"))
-	rows = append(rows, lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", innerW)))
+	habitsHeader := lipgloss.NewStyle().
+		Background(t.SelectedBg).
+		Foreground(t.Accent).
+		Bold(true).
+		Padding(0, 1).
+		Render(fmt.Sprintf("🔁 HABITS (%d)", len(habits)))
+	rows = append(rows, habitsHeader, subtleSep)
 	if len(habits) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render("  No habits"), "")
 	} else {
@@ -89,8 +101,13 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 	}
 
 	// ── 3. Backlog Section ───────────────────────────────────────────
-	rows = append(rows, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("☱ BACKLOG"))
-	rows = append(rows, lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", innerW)))
+	backlogHeader := lipgloss.NewStyle().
+		Background(t.SelectedBg).
+		Foreground(t.Accent).
+		Bold(true).
+		Padding(0, 1).
+		Render(fmt.Sprintf("☱ BACKLOG (%d)", len(backlog)))
+	rows = append(rows, backlogHeader, subtleSep)
 	if len(backlog) == 0 {
 		rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render("  No backlog tasks"), "")
 	} else {
@@ -117,6 +134,10 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 		// If selection is positioned above the current screen layout view
 		if selectedLineIdx < offset {
 			offset = selectedLineIdx
+			// If we are close to the top, scroll all the way to the top to show headers
+			if offset <= 8 {
+				offset = 0
+			}
 		}
 		// If selection dips below the bottom visible edge line bounds
 		if selectedLineIdx >= offset+(maxVisible-2) {
@@ -160,7 +181,7 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, innerW int) []string {
 	isSelected := m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID
 
-	chk := "[ ]"
+	chk := "☐"
 	isDone := false
 	if task.SchedulingType == model.Habit {
 		dateStr := m.SelectedDay.Format("2006-01-02")
@@ -174,11 +195,11 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 		isDone = task.LifecycleState == model.StateCompleted
 	}
 	if isDone {
-		chk = "[✓]"
+		chk = "☑"
 	}
 
 	title := theme.SentenceCase(task.Title)
-	maxTitleW := innerW - 7
+	maxTitleW := innerW - 6
 	if len([]rune(title)) > maxTitleW {
 		if maxTitleW > 2 {
 			title = string([]rune(title)[:maxTitleW-1]) + "…"
@@ -191,10 +212,10 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 	if isSelected {
 		prefix = "▶ "
 	}
-	indicator := ""
-	titleLine := fmt.Sprintf("%s%s %s%s", prefix, chk, title, indicator)
+	titleLine := fmt.Sprintf("%s%s %s", prefix, chk, title)
 
 	var details []string
+	details = append(details, string(task.Priority))
 	details = append(details, fmt.Sprintf("%d SP", task.StoryPoints))
 	if task.SchedulingType == model.Reminder {
 		remDays := formatRemainingDays(task.TimeWindow.Start)
@@ -214,10 +235,28 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 	}
 	detailLine := "     " + detailStr
 
+	if isSelected {
+		titleLineLen := lipgloss.Width(titleLine)
+		if titleLineLen < innerW {
+			titleLine += strings.Repeat(" ", innerW-titleLineLen)
+		}
+		if detailStr != "" {
+			detailLineLen := lipgloss.Width(detailLine)
+			if detailLineLen < innerW {
+				detailLine += strings.Repeat(" ", innerW-detailLineLen)
+			}
+		}
+	}
+
 	var titleStyle, detailStyle lipgloss.Style
 	if isSelected {
-		titleStyle = lipgloss.NewStyle().Foreground(t.FocusPurple).Bold(true)
-		detailStyle = lipgloss.NewStyle().Foreground(t.FocusPurple)
+		titleStyle = lipgloss.NewStyle().
+			Foreground(t.FocusPurple).
+			Bold(true).
+			Background(t.SelectedBg)
+		detailStyle = lipgloss.NewStyle().
+			Foreground(t.FocusPurple).
+			Background(t.SelectedBg)
 	} else if isDone {
 		titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Bold(true)
 		detailStyle = lipgloss.NewStyle().Foreground(t.Muted)
@@ -242,8 +281,16 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 				desc = string([]rune(desc)[:maxDescW])
 			}
 		}
-		descLine := "     " + lipgloss.NewStyle().Italic(true).Render(desc)
-		itemRows = append(itemRows, lipgloss.NewStyle().Foreground(t.Muted).Render(descLine))
+		descLine := "     " + desc
+		descLineLen := lipgloss.Width(descLine)
+		if descLineLen < innerW {
+			descLine += strings.Repeat(" ", innerW-descLineLen)
+		}
+		descStyle := lipgloss.NewStyle().
+			Foreground(t.Muted).
+			Italic(true).
+			Background(t.SelectedBg)
+		itemRows = append(itemRows, descStyle.Render(descLine))
 	}
 
 	itemRows = append(itemRows, "")

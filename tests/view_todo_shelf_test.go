@@ -175,11 +175,11 @@ func TestRenderTodoShelfHabits(t *testing.T) {
 	if !strings.Contains(rendered, "HABITS") {
 		t.Error("expected shelf rendering to contain 'HABITS'")
 	}
-	if !strings.Contains(rendered, "[✓] Drink water") {
-		t.Error("expected habit completed today to render as [✓] Drink water")
+	if !strings.Contains(rendered, "☑ Drink water") {
+		t.Error("expected habit completed today to render as ☑ Drink water")
 	}
-	if !strings.Contains(rendered, "[ ] Stretch") {
-		t.Error("expected habit completed yesterday to render as [ ] Stretch")
+	if !strings.Contains(rendered, "☐ Stretch") {
+		t.Error("expected habit completed yesterday to render as ☐ Stretch")
 	}
 }
 

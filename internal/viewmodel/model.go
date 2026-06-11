@@ -92,6 +92,7 @@ type Model struct {
 
 	ConfirmOpen bool
 	ConfirmTask model.Task
+	ConfirmActionType string
 	WarningOpen bool
 	WarningMsg  string
 

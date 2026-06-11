@@ -255,6 +255,12 @@ func (m *Model) HandleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					task.LifecycleState = model.StateBacklog
 					m.StatusMsg = fmt.Sprintf("Task '%s' marked incomplete.", task.Title)
 				} else {
+					if task.SchedulingType == model.Reminder {
+						m.ConfirmTask = task
+						m.ConfirmOpen = true
+						m.ConfirmActionType = "complete_reminder"
+						return m, nil
+					}
 					task.LifecycleState = model.StateCompleted
 					m.StatusMsg = fmt.Sprintf("Task '%s' completed!", task.Title)
 				}
@@ -275,6 +281,7 @@ func (m *Model) HandleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if exists {
 			m.ConfirmTask = task
 			m.ConfirmOpen = true
+			m.ConfirmActionType = "delete"
 		}
 		return m, nil
 	case "t":

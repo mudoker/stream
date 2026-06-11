@@ -213,7 +213,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		restRows := durationToRows(restDur)
 		if restRows > 0 {
 			restEndTime := rc.Task.TimeWindow.End.Add(restDur)
-			restStr := RenderRestBlock(t, colW, restRows, int(restDur.Minutes()), restEndTime, isCompleted)
+			restStr := RenderRestBlock(t, colW, restRows, int(restDur.Minutes()), restEndTime, isCompleted, isSelected)
 			restLines := strings.Split(restStr, "\n")
 			for i, line := range restLines {
 				r := startRow + h + i
@@ -316,7 +316,7 @@ func embedTextInLine(leftBorder, rightBorder, fillChar, text string, width int, 
 	return borderStyle.Render(leftBorder) + content + borderStyle.Render(rightBorder)
 }
 
-func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time, isCompleted bool) string {
+func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time, isCompleted bool, isFocused bool) string {
 	if w < 3 {
 		w = 3
 	}
@@ -325,7 +325,9 @@ func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time, i
 	}
 
 	var borderColor lipgloss.Color
-	if isCompleted {
+	if isFocused {
+		borderColor = t.FocusPurple
+	} else if isCompleted {
 		borderColor = lipgloss.Color("#4c644f") // Soft dark forest green border
 	} else {
 		borderColor = t.Muted
@@ -333,7 +335,9 @@ func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time, i
 
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
 	var textStyle lipgloss.Style
-	if isCompleted {
+	if isFocused {
+		textStyle = lipgloss.NewStyle().Foreground(t.FocusPurple).Italic(true)
+	} else if isCompleted {
 		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Italic(true) // Softer sage green text
 	} else {
 		textStyle = lipgloss.NewStyle().Foreground(borderColor).Italic(true)

@@ -32,7 +32,7 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 	} else if isZenFocus {
 		borderColor = t.SuccessColor
 	} else if isSelected {
-		borderColor = lipgloss.Color("#ff8700")
+		borderColor = t.FocusPurple
 	} else if hasCollision {
 		borderColor = lipgloss.Color("#ff0000")
 	} else if isActive {
@@ -143,7 +143,7 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 	} else if isZenFocus {
 		titleStyle = titleStyle.Foreground(t.SuccessColor)
 	} else if isSelected {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff8700"))
+		titleStyle = titleStyle.Foreground(t.FocusPurple)
 	} else if hasCollision {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff0000"))
 	} else if isCompleted {
@@ -261,7 +261,7 @@ func RenderShortCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h in
 	} else if isZenFocus {
 		stripColor = t.SuccessColor
 	} else if isSelected {
-		stripColor = lipgloss.Color("#ff8700")
+		stripColor = t.FocusPurple
 	} else if hasCollision {
 		stripColor = lipgloss.Color("#ff0000")
 	} else if isActive {
@@ -308,7 +308,7 @@ func RenderShortCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h in
 	} else if isZenFocus {
 		textStyle = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true)
 	} else if isSelected {
-		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff8700")).Bold(true)
+		textStyle = lipgloss.NewStyle().Foreground(t.FocusPurple).Bold(true)
 	} else if hasCollision {
 		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true)
 	} else if isActive {

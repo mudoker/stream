@@ -171,7 +171,7 @@ func getWeekViewLines(m *viewmodel.Model, t theme.Theme, colWidth int) ([][]stri
 				timeText := fmt.Sprintf("%s-%s", rc.Task.TimeWindow.Start.Format("15:04"), rc.Task.TimeWindow.End.Format("15:04"))
 				blockColor := t.PriorityColor(rc.Task.Priority)
 				if rc.Task.UUID == m.SelectedTaskUUID {
-					blockColor = lipgloss.Color("#ff8700")
+					blockColor = t.FocusPurple
 				}
 
 				cardW := colWidth - 4

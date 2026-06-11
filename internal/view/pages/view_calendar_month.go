@@ -197,8 +197,8 @@ func RenderMonthView(m *viewmodel.Model, t theme.Theme, height int) string {
 			titleStyle := lipgloss.NewStyle().Foreground(t.Fg)
 
 			if isSelected {
-				timeStyle = timeStyle.Foreground(lipgloss.Color("#ff8700"))
-				titleStyle = titleStyle.Foreground(lipgloss.Color("#ff8700")).Bold(true)
+				timeStyle = timeStyle.Foreground(t.FocusPurple)
+				titleStyle = titleStyle.Foreground(t.FocusPurple).Bold(true)
 				titleText = "👉 " + titleText
 			} else {
 				titleStyle = titleStyle.Foreground(pColor)

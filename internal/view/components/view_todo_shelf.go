@@ -218,6 +218,9 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 	if isSelected {
 		titleStyle = lipgloss.NewStyle().Foreground(t.FocusPurple).Bold(true)
 		detailStyle = lipgloss.NewStyle().Foreground(t.FocusPurple)
+	} else if isDone {
+		titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Bold(true)
+		detailStyle = lipgloss.NewStyle().Foreground(t.Muted)
 	} else {
 		titleStyle = lipgloss.NewStyle().Foreground(t.PriorityColor(task.Priority))
 		detailStyle = lipgloss.NewStyle().Foreground(t.Muted)

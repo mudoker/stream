@@ -275,7 +275,7 @@ func renderAgendaPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 			}
 
 			if task.LifecycleState == model.StateCompleted {
-				line = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Faint(true).Render(line)
+				line = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Bold(true).Render(line)
 			} else if task.LifecycleState == model.StateActive {
 				line = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(line)
 			} else {

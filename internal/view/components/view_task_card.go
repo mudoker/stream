@@ -38,7 +38,7 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 	} else if isActive {
 		borderColor = t.Accent
 	} else if isCompleted {
-		borderColor = lipgloss.Color("#45475a") // Dim border for completed
+		borderColor = lipgloss.Color("#4c644f") // Soft dark forest green border for completed
 	}
 
 	// Priority badge
@@ -102,6 +102,9 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 
 	// Truncate title using safe rune slicing
 	titleStr := theme.SentenceCase(task.Title)
+	if isCompleted {
+		titleStr = "✔ " + titleStr
+	}
 	if strings.HasSuffix(task.UUID, "_moving") {
 		titleStr = "[Moving] " + titleStr
 	}
@@ -147,7 +150,7 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 	} else if hasCollision {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("#ff0000"))
 	} else if isCompleted {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("#a6e3a1")).Faint(true)
+		titleStyle = titleStyle.Foreground(lipgloss.Color("#88b08b")).Bold(true) // Softer sage green for completed title
 	}
 	titleLine := titleStyle.Render(titleStr)
 	metaLine := metaStr
@@ -267,7 +270,7 @@ func RenderShortCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h in
 	} else if isActive {
 		stripColor = t.Accent
 	} else if isCompleted {
-		stripColor = lipgloss.Color("#45475a") // dim border for completed
+		stripColor = lipgloss.Color("#4c644f") // Soft dark forest green strip for completed
 	}
 
 	var vertChar string
@@ -285,6 +288,9 @@ func RenderShortCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h in
 	}
 
 	titleStr := theme.SentenceCase(task.Title)
+	if isCompleted {
+		titleStr = "✔ " + titleStr
+	}
 	if strings.HasSuffix(task.UUID, "_moving") {
 		titleStr = "[Moving] " + titleStr
 	}
@@ -314,7 +320,7 @@ func RenderShortCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h in
 	} else if isActive {
 		textStyle = lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
 	} else if isCompleted {
-		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Faint(true)
+		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Bold(true) // Softer sage green for completed title
 	} else {
 		textStyle = lipgloss.NewStyle().Foreground(t.Fg)
 	}

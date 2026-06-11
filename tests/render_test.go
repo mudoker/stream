@@ -183,8 +183,8 @@ func TestRenderRestBlock(t *testing.T) {
 	th := theme.NewTheme()
 	testTime := time.Date(2026, 6, 10, 10, 15, 0, 0, time.UTC) // Format will be 10:15
 
-	// Test height 1
-	h1 := cleanAnsi(pages.RenderRestBlock(th, 20, 1, 15, testTime))
+	// Test height 1 (not completed)
+	h1 := cleanAnsi(pages.RenderRestBlock(th, 20, 1, 15, testTime, false))
 	if !strings.Contains(h1, "Rest 15m (10:15)") {
 		t.Errorf("Expected height-1 rest block to contain 'Rest 15m (10:15)', got: %q", h1)
 	}
@@ -192,8 +192,8 @@ func TestRenderRestBlock(t *testing.T) {
 		t.Errorf("Expected height-1 rest block to have bottom corners '└'/'┘', got: %q", h1)
 	}
 
-	// Test height 2
-	h2 := cleanAnsi(pages.RenderRestBlock(th, 20, 2, 15, testTime))
+	// Test height 2 (not completed)
+	h2 := cleanAnsi(pages.RenderRestBlock(th, 20, 2, 15, testTime, false))
 	h2Lines := strings.Split(h2, "\n")
 	if len(h2Lines) != 2 {
 		t.Fatalf("Expected height-2 rest block to have 2 lines, got %d", len(h2Lines))
@@ -208,8 +208,8 @@ func TestRenderRestBlock(t *testing.T) {
 		t.Errorf("Expected bottom line of height-2 rest block to have bottom corners '└'/'┘', got: %q", h2Lines[1])
 	}
 
-	// Test height 3
-	h3 := cleanAnsi(pages.RenderRestBlock(th, 20, 3, 15, testTime))
+	// Test height 3 (not completed)
+	h3 := cleanAnsi(pages.RenderRestBlock(th, 20, 3, 15, testTime, false))
 	h3Lines := strings.Split(h3, "\n")
 	if len(h3Lines) != 3 {
 		t.Fatalf("Expected height-3 rest block to have 3 lines, got %d", len(h3Lines))
@@ -225,6 +225,12 @@ func TestRenderRestBlock(t *testing.T) {
 	}
 	if !strings.HasPrefix(h3Lines[2], "└") || !strings.HasSuffix(h3Lines[2], "┘") {
 		t.Errorf("Expected bottom line of height-3 rest block to have bottom corners, got: %q", h3Lines[2])
+	}
+
+	// Test completed state
+	hCompleted := cleanAnsi(pages.RenderRestBlock(th, 26, 1, 15, testTime, true))
+	if !strings.Contains(hCompleted, "Rest 15m (10:15) ✔") {
+		t.Errorf("Expected completed rest block to contain 'Rest 15m (10:15) ✔', got: %q", hCompleted)
 	}
 }
 

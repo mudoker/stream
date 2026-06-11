@@ -208,11 +208,12 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			taskRows[colIndex][r] = line
 		}
 
+		isCompleted := rc.Task.LifecycleState == model.StateCompleted
 		restDur := viewmodel.CalculateTaskRestTime(rc.Task)
 		restRows := durationToRows(restDur)
 		if restRows > 0 {
 			restEndTime := rc.Task.TimeWindow.End.Add(restDur)
-			restStr := RenderRestBlock(t, colW, restRows, int(restDur.Minutes()), restEndTime)
+			restStr := RenderRestBlock(t, colW, restRows, int(restDur.Minutes()), restEndTime, isCompleted)
 			restLines := strings.Split(restStr, "\n")
 			for i, line := range restLines {
 				r := startRow + h + i
@@ -315,7 +316,7 @@ func embedTextInLine(leftBorder, rightBorder, fillChar, text string, width int, 
 	return borderStyle.Render(leftBorder) + content + borderStyle.Render(rightBorder)
 }
 
-func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time) string {
+func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time, isCompleted bool) string {
 	if w < 3 {
 		w = 3
 	}
@@ -323,9 +324,20 @@ func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time) s
 		h = 1
 	}
 
-	borderColor := lipgloss.Color("#a6e3a1")
+	var borderColor lipgloss.Color
+	if isCompleted {
+		borderColor = lipgloss.Color("#4c644f") // Soft dark forest green border
+	} else {
+		borderColor = t.Muted
+	}
+
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
-	textStyle := lipgloss.NewStyle().Foreground(borderColor).Italic(true)
+	var textStyle lipgloss.Style
+	if isCompleted {
+		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Italic(true) // Softer sage green text
+	} else {
+		textStyle = lipgloss.NewStyle().Foreground(borderColor).Italic(true)
+	}
 
 	bottomLeft := "└"
 	bottomRight := "┘"
@@ -334,6 +346,9 @@ func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time) s
 
 	restEndTimeStr := endTime.Format("15:04")
 	restText := fmt.Sprintf("󰔛 Rest %dm (%s)", restMins, restEndTimeStr)
+	if isCompleted {
+		restText = fmt.Sprintf("󰔛 Rest %dm (%s) ✔", restMins, restEndTimeStr)
+	}
 
 	var lines []string
 

@@ -92,6 +92,7 @@ func (m *Model) HandleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "b":
 		// Force Break
 		m.ZenTimer.RecordElapsedTimes()
+		oldIdx := m.ZenTimer.CurrentSessionIdx
 		finished := m.ZenTimer.NextSession()
 		if m.DB != nil {
 			m.DB.UpdateTask(m.ZenTimer.Task)
@@ -109,6 +110,14 @@ func (m *Model) HandleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.StatusMsg = "Focus sessions completed!"
 		} else {
 			m.StatusMsg = "Skipped to next block."
+			if oldIdx >= 0 && oldIdx < len(m.ZenTimer.Sessions) {
+				prevSessType := m.ZenTimer.Sessions[oldIdx].Type
+				if prevSessType == timer.FocusSession {
+					PlaySound("bell")
+				} else if prevSessType == timer.BreakSession {
+					PlaySound("message-new-instant")
+				}
+			}
 		}
 	}
 	return m, nil

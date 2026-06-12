@@ -6,12 +6,30 @@ import (
 
 	"stream/internal/db"
 	"stream/internal/model"
+	"stream/internal/viewmodel/timer"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.PrevSelectedTaskUUID = m.SelectedTaskUUID
+
+	completedTasksBefore := make(map[string]bool)
+	for _, t := range m.Tasks {
+		if t.LifecycleState == model.StateCompleted {
+			completedTasksBefore[t.UUID] = true
+		}
+	}
+
+	defer func() {
+		for _, t := range m.Tasks {
+			if t.LifecycleState == model.StateCompleted && !completedTasksBefore[t.UUID] {
+				PlaySound("complete")
+				break
+			}
+		}
+	}()
+
 	var cmds []tea.Cmd
 
 	if m.IsLocked {
@@ -63,6 +81,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.DB != nil {
 					m.DB.UpdateTask(m.ZenTimer.Task)
 					m.refreshTasks()
+				}
+				if !finished && oldIdx >= 0 && oldIdx < len(m.ZenTimer.Sessions) {
+					prevSessType := m.ZenTimer.Sessions[oldIdx].Type
+					if prevSessType == timer.FocusSession {
+						PlaySound("bell")
+					} else if prevSessType == timer.BreakSession {
+						PlaySound("message-new-instant")
+					}
 				}
 			}
 

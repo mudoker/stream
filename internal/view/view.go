@@ -110,8 +110,9 @@ func (v *View) Render() string {
 	}
 	todoStyle := lipgloss.NewStyle().
 		Width(l.TodoW).
-		Height(appContentHeight).
-		MaxHeight(appContentHeight).
+		Height(appContentHeight - 2).
+		MaxHeight(appContentHeight - 2).
+		Padding(1, 1).
 		BorderLeft(true).
 		BorderStyle(lipgloss.Border{Left: "│"}).
 		BorderForeground(todoBorderCol)

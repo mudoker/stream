@@ -36,7 +36,8 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 		Render(strings.Repeat("─", innerW))
 
 	// Track line markers so we can dynamically snap scroll to our active selection
-	selectedLineIdx := -1
+	selectedLineStart := -1
+	selectedLineEnd := -1
 
 	var rows []string
 	rows = append(rows,
@@ -75,9 +76,12 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 	} else {
 		for _, task := range reminders {
 			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
-				selectedLineIdx = len(rows)
+				selectedLineStart = len(rows)
 			}
 			rows = append(rows, renderShelfTaskRow(m, t, task, innerW)...)
+			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
+				selectedLineEnd = len(rows)
+			}
 		}
 	}
 
@@ -94,9 +98,12 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 	} else {
 		for _, task := range habits {
 			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
-				selectedLineIdx = len(rows)
+				selectedLineStart = len(rows)
 			}
 			rows = append(rows, renderShelfTaskRow(m, t, task, innerW)...)
+			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
+				selectedLineEnd = len(rows)
+			}
 		}
 	}
 
@@ -113,15 +120,18 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 	} else {
 		for _, task := range backlog {
 			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
-				selectedLineIdx = len(rows)
+				selectedLineStart = len(rows)
 			}
 			rows = append(rows, renderShelfTaskRow(m, t, task, innerW)...)
+			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
+				selectedLineEnd = len(rows)
+			}
 		}
 	}
 
 	// Flatten rows array down to raw line tokens
 	allLines := strings.Split(strings.Join(rows, "\n"), "\n")
-	maxVisible := appContentHeight - 2
+	maxVisible := appContentHeight - 4
 	if maxVisible < 4 {
 		maxVisible = 4
 	}
@@ -130,22 +140,29 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 	offset := m.ShelfScrollOffset
 
 	// If a task row is actively selected, force viewport boundaries to wrap it cleanly
-	if selectedLineIdx != -1 {
+	if selectedLineStart != -1 {
 		isFirstTask := len(shelfTasks) > 0 && m.SelectedTaskUUID == shelfTasks[0].UUID
 		if isFirstTask {
 			offset = 0
 		} else {
+			paddingTop := 1
+			paddingBottom := 3 // Be generous to render fully
+
 			// If selection is positioned above the current screen layout view
-			if selectedLineIdx < offset {
-				offset = selectedLineIdx
+			if selectedLineStart < offset+paddingTop {
+				offset = selectedLineStart - paddingTop
 				// If we are close to the top, scroll all the way to the top to show headers
 				if offset <= 8 {
 					offset = 0
 				}
 			}
 			// If selection dips below the bottom visible edge line bounds
-			if selectedLineIdx >= offset+(maxVisible-2) {
-				offset = selectedLineIdx - (maxVisible - 3)
+			if selectedLineEnd+paddingBottom >= offset+maxVisible {
+				offset = selectedLineEnd + paddingBottom - maxVisible
+			}
+			// Make sure we never scroll past the start of the task
+			if offset > selectedLineStart {
+				offset = selectedLineStart
 			}
 		}
 		m.ShelfScrollOffset = offset
@@ -176,11 +193,11 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 
 	if endSlice < len(allLines) {
 		visible = append(visible, lipgloss.NewStyle().Foreground(t.Muted).Render("  ▼ scroll down"))
+	} else {
+		visible = append(visible, "") // Bottom edge aesthetic gap buffer
 	}
 
-	return lipgloss.NewStyle().
-		Padding(1, 1).
-		Render(strings.Join(visible, "\n"))
+	return strings.Join(visible, "\n")
 }
 
 func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, innerW int) []string {

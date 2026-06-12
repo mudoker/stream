@@ -68,7 +68,7 @@ func GetTodoShelfTasks(allTasks []model.Task) []model.Task {
 	var habits []model.Task
 	var backlog []model.Task
 	for _, t := range allTasks {
-		if t.LifecycleState == model.StateCompleted && t.SchedulingType != model.Habit {
+		if t.LifecycleState == model.StateCompleted && t.SchedulingType == model.Reminder {
 			continue
 		}
 		if t.SchedulingType == model.Reminder {

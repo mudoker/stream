@@ -580,3 +580,119 @@ func TestDeleteTaskConfirmationWithEnter(t *testing.T) {
 	}
 }
 
+func TestTaskDurationAdjustModeWorkflow(t *testing.T) {
+	start := time.Date(2026, 6, 6, 10, 0, 0, 0, time.UTC)
+	task := model.Task{
+		UUID:           "task-1",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: start,
+			End:   start.Add(time.Hour),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{task},
+		SelectedTaskUUID: "task-1",
+	}
+
+	m.EnterTaskDurationAdjustMode()
+	if m.CurrentMode != viewmodel.ModeTaskDurationAdjust {
+		t.Fatal("expected mode to be ModeTaskDurationAdjust")
+	}
+	if m.TaskMoveOriginalTimeWindow != task.TimeWindow {
+		t.Fatal("expected original time window to be recorded")
+	}
+
+	// Press 'j' (increase by 15 mins)
+	m.HandleTaskDurationAdjustKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+
+	// Clone should have duration 75 mins
+	if len(m.Tasks) != 2 {
+		t.Fatalf("expected 2 tasks in memory during adjust, got %d", len(m.Tasks))
+	}
+	clone := m.Tasks[1]
+	if clone.UUID != "task-1_adjusting" {
+		t.Fatalf("expected clone UUID to be task-1_adjusting, got %s", clone.UUID)
+	}
+	dur := clone.TimeWindow.End.Sub(clone.TimeWindow.Start)
+	if dur != 75*time.Minute {
+		t.Fatalf("expected clone duration to be 75 mins, got %s", dur)
+	}
+
+	// Try to decrease below 15 minutes: original duration is 60. Now it's 75.
+	// 5 * 15m = 75m. If we subtract 75m, it would become 0. So it should clamp to 15m.
+	m.TaskMovePrefix = "5" // set count
+	m.HandleTaskDurationAdjustKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	dur = m.Tasks[1].TimeWindow.End.Sub(m.Tasks[1].TimeWindow.Start)
+	if dur != 15*time.Minute {
+		t.Fatalf("expected duration to clamp to 15 mins, got %s", dur)
+	}
+
+	// Confirm
+	m.HandleTaskDurationAdjustKeys(tea.KeyMsg{Type: tea.KeyEnter})
+	if len(m.Tasks) != 1 {
+		t.Fatalf("expected 1 task in memory after confirm, got %d", len(m.Tasks))
+	}
+	dur = m.Tasks[0].TimeWindow.End.Sub(m.Tasks[0].TimeWindow.Start)
+	if dur != 15*time.Minute {
+		t.Fatalf("expected original task duration to be updated to 15 mins, got %s", dur)
+	}
+}
+
+func TestTaskDurationAdjustCancel(t *testing.T) {
+	start := time.Date(2026, 6, 6, 10, 0, 0, 0, time.UTC)
+	task := model.Task{
+		UUID:           "task-1",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: start,
+			End:   start.Add(time.Hour),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{task},
+		SelectedTaskUUID: "task-1",
+	}
+
+	m.EnterTaskDurationAdjustMode()
+	m.HandleTaskDurationAdjustKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m.HandleTaskDurationAdjustKeys(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if len(m.Tasks) != 1 {
+		t.Fatalf("expected 1 task after cancel, got %d", len(m.Tasks))
+	}
+	dur := m.Tasks[0].TimeWindow.End.Sub(m.Tasks[0].TimeWindow.Start)
+	if dur != time.Hour {
+		t.Fatalf("expected original task duration to be restored, got %s", dur)
+	}
+}
+
+func TestEnterKeyOnDashboardOrAnalyticsDoesNothing(t *testing.T) {
+	task := model.Task{
+		UUID:           "task-1",
+		SchedulingType: model.Anchored,
+	}
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{task},
+		SelectedTaskUUID: "task-1",
+		CurrentView:      viewmodel.DashboardView,
+		CurrentMode:      viewmodel.ModeNormal,
+	}
+
+	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mVal := toModelVal(res)
+	if mVal.DetailOpen {
+		t.Error("expected DetailOpen to remain false on dashboard page when pressing enter")
+	}
+
+	m.CurrentView = viewmodel.AnalyticsView
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	mVal = toModelVal(res)
+	if mVal.DetailOpen {
+		t.Error("expected DetailOpen to remain false on analytics page when pressing enter")
+	}
+}
+
+

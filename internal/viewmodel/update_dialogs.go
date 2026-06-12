@@ -94,9 +94,39 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.ConfirmOpen {
-		switch msg.String() {
-		case "y", "Y":
+		keyStr := msg.String()
+		if m.ConfirmActionType == "deanchor" {
+			if keyStr == "enter" {
+				m.ConfirmTask.SchedulingType = model.Floating
+				m.ConfirmTask.LifecycleState = model.StateReady
+				m.ConfirmTask.UpdatedAt = time.Now()
+				if m.DB != nil {
+					m.DB.UpdateTask(m.ConfirmTask)
+					m.refreshTasks()
+				} else {
+					m.updateTaskInMemory(m.ConfirmTask)
+				}
+				m.triggerGCalPushIfAnchored(m.ConfirmTask)
+				m.StatusMsg = fmt.Sprintf("Task '%s' de-anchored to backlog.", m.ConfirmTask.Title)
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+			} else {
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.StatusMsg = "De-anchoring canceled."
+			}
+			return m, nil
+		}
+
+		switch keyStr {
+		case "y", "Y", "enter":
 			if m.ConfirmActionType == "complete_reminder" {
+				if keyStr == "enter" {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.StatusMsg = "Completion canceled."
+					return m, nil
+				}
 				m.ConfirmTask.LifecycleState = model.StateCompleted
 				m.ConfirmTask.UpdatedAt = time.Now()
 				m.DB.UpdateTask(m.ConfirmTask)
@@ -115,7 +145,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
 					m.DetailOpen = false
 				}
-				if m.ZenTimer != nil && m.ZenTimer.Task.UUID == m.ConfirmTask.UUID {
+				if zt := m.ZenTimer; zt != nil && zt.Task.UUID == m.ConfirmTask.UUID {
 					m.ZenTimer = nil
 				}
 				m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", m.ConfirmTask.Title)
@@ -123,7 +153,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.ConfirmActionType = ""
 				return m, nil
 			}
-		case "n", "N", "esc", "enter":
+		case "n", "N", "esc":
 			if m.ConfirmActionType == "complete_reminder" {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""

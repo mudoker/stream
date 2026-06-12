@@ -245,9 +245,17 @@ func TestReminderCreationFormSubmit(t *testing.T) {
 		t.Fatalf("expected 2 tasks in DB, got %d", len(tasks))
 	}
 
-	task2 := tasks[1]
-	if task2.Title != "Doctor Appointment" {
-		t.Errorf("expected title 'Doctor Appointment', got %q", task2.Title)
+	var task2 model.Task
+	found := false
+	for _, t := range tasks {
+		if t.Title == "Doctor Appointment" {
+			task2 = t
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected to find Doctor Appointment task")
 	}
 	if task2.TimeWindow.Start.Second() != 0 {
 		t.Errorf("expected due time 14:30 to have second == 0, got %d", task2.TimeWindow.Start.Second())

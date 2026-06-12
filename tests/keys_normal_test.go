@@ -220,6 +220,12 @@ func TestQuickAnchorDeAnchorWorkflow(t *testing.T) {
 
 	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
 
+	if !m.ConfirmOpen || m.ConfirmActionType != "deanchor" {
+		t.Fatal("expected confirm modal to open for de-anchoring")
+	}
+
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
 	if m.Tasks[0].SchedulingType != model.Floating {
 		t.Fatal("expected task to be de-anchored to Floating")
 	}

@@ -172,6 +172,20 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 		yesBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Y] Yes, Complete")
 		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Cancel")
 		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+	} else if m.ConfirmActionType == "deanchor" {
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("De-anchor Task"))
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+		lines = append(lines, "  Are you sure you want to de-anchor")
+		lines = append(lines, "  and return this task to the backlog?")
+		lines = append(lines, fmt.Sprintf("  \"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)))
+		lines = append(lines, "")
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+
+		yesBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Confirm")
+		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Any Key] Cancel")
+		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
 	} else {
 		lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("Confirm Delete"))
 		lines = append(lines, ModalSep(innerW))
@@ -182,8 +196,8 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 		lines = append(lines, ModalSep(innerW))
 		lines = append(lines, "")
 
-		yesBtn := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("[Y] Yes, Delete")
-		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Cancel")
+		yesBtn := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("[Y/Enter] Yes, Delete")
+		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N/Esc] No, Cancel")
 		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
 	}
 

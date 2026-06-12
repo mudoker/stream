@@ -170,16 +170,10 @@ func (m *Model) HandleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		task, exists := m.GetActiveTask()
 		if exists {
 			if task.SchedulingType == model.Anchored {
-				// De-anchor
-				task.SchedulingType = model.Floating
-				task.LifecycleState = model.StateReady
-				if m.DB != nil {
-					m.DB.UpdateTask(task)
-					m.refreshTasks()
-				} else {
-					m.updateTaskInMemory(task)
-				}
-				m.StatusMsg = fmt.Sprintf("Task '%s' de-anchored to backlog.", task.Title)
+				m.ConfirmTask = task
+				m.ConfirmOpen = true
+				m.ConfirmActionType = "deanchor"
+				return m, nil
 			} else {
 				// Anchor: open start time prompt
 				m.AnchorPromptTask = task

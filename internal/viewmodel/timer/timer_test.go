@@ -11,15 +11,15 @@ func TestNewZenTimerAndOperations(t *testing.T) {
 	task := model.Task{
 		UUID:        "timer-task",
 		Title:       "Timer Task",
-		StoryPoints: 3, // 135 minutes -> 4 sessions (90m focus, 20m break, 45m focus, 5m break)
+		StoryPoints: 3, // 135 minutes -> 6 sessions (50m focus, 10m break, 50m focus, 10m break, 35m focus, 5m break)
 	}
 
 	zt := NewZenTimer(task)
 	if zt.Task.UUID != "timer-task" {
 		t.Errorf("expected task UUID to be timer-task")
 	}
-	if len(zt.Sessions) != 4 {
-		t.Errorf("expected 4 sessions, got %d", len(zt.Sessions))
+	if len(zt.Sessions) != 6 {
+		t.Errorf("expected 6 sessions, got %d", len(zt.Sessions))
 	}
 
 	// Test Tick focus session
@@ -44,8 +44,8 @@ func TestNewZenTimerAndOperations(t *testing.T) {
 	// Test Update Duration
 	task.StoryPoints = 4
 	zt.UpdateTaskDuration(task)
-	if len(zt.Sessions) != 5 {
-		t.Errorf("expected sessions to be updated to 5, got %d", len(zt.Sessions))
+	if len(zt.Sessions) != 7 {
+		t.Errorf("expected sessions to be updated to 7, got %d", len(zt.Sessions))
 	}
 
 	// Test RecordElapsedTimes
@@ -124,9 +124,9 @@ func TestTimerMoreEdgeCases(t *testing.T) {
 		},
 	}
 	zt := NewZenTimer(taskAnchored)
-	// 90 minutes should yield 2 sessions (45m focus, 5m break, 40m focus)
-	if len(zt.Sessions) < 2 {
-		t.Errorf("expected at least 2 sessions for 90m Anchored task, got %d", len(zt.Sessions))
+	// 90 minutes should yield 4 sessions (50m focus, 10m break, 40m focus, 5m break)
+	if len(zt.Sessions) != 4 {
+		t.Errorf("expected 4 sessions for 90m Anchored task, got %d", len(zt.Sessions))
 	}
 
 	// 2. NewZenTimer where elapsed times exceed total sessions

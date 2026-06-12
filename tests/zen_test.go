@@ -23,11 +23,13 @@ func TestPartitionTask(t *testing.T) {
 			name:     "180 minutes task (>= 110m)",
 			duration: 180 * time.Minute,
 			expected: []timer.Session{
-				{Type: timer.FocusSession, Duration: 90 * time.Minute},
-				{Type: timer.BreakSession, Duration: 20 * time.Minute},
 				{Type: timer.FocusSession, Duration: 50 * time.Minute},
 				{Type: timer.BreakSession, Duration: 10 * time.Minute},
-				{Type: timer.FocusSession, Duration: 40 * time.Minute},
+				{Type: timer.FocusSession, Duration: 50 * time.Minute},
+				{Type: timer.BreakSession, Duration: 10 * time.Minute},
+				{Type: timer.FocusSession, Duration: 50 * time.Minute},
+				{Type: timer.BreakSession, Duration: 10 * time.Minute},
+				{Type: timer.FocusSession, Duration: 30 * time.Minute},
 				{Type: timer.BreakSession, Duration: 5 * time.Minute},
 			},
 		},
@@ -78,8 +80,8 @@ func TestZenTimerUpdateTaskDuration(t *testing.T) {
 
 	zt := timer.NewZenTimer(task)
 
-	if len(zt.Sessions) != 2 {
-		t.Fatalf("expected 2 sessions, got %d", len(zt.Sessions))
+	if len(zt.Sessions) != 4 {
+		t.Fatalf("expected 4 sessions, got %d", len(zt.Sessions))
 	}
 
 	zt.TimeRemaining = 70 * time.Minute
@@ -90,8 +92,8 @@ func TestZenTimerUpdateTaskDuration(t *testing.T) {
 
 	zt.UpdateTaskDuration(newTask)
 
-	if len(zt.Sessions) != 4 {
-		t.Fatalf("expected 4 sessions, got %d", len(zt.Sessions))
+	if len(zt.Sessions) != 3 {
+		t.Fatalf("expected 3 sessions, got %d", len(zt.Sessions))
 	}
 	if zt.TimeRemaining != 70*time.Minute {
 		t.Errorf("expected TimeRemaining to be preserved at 70m, got %v", zt.TimeRemaining)

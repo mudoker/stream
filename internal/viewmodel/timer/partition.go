@@ -29,14 +29,7 @@ func PartitionTask(total time.Duration) []Session {
 		}
 	}
 
-	// 1. Exactly one 90-minute Focus session allowed maximum
-	if rem >= 90*time.Minute {
-		sessions = append(sessions, Session{Type: FocusSession, Duration: 90 * time.Minute})
-		sessions = append(sessions, Session{Type: BreakSession, Duration: 20 * time.Minute})
-		rem -= 90 * time.Minute // Subtracting ONLY work time
-	}
-
-	// 2. Process remaining focus time using 50-min and 25-min blocks
+	// 1. Process focus time using 50-min and 25-min blocks
 	for rem > 0 {
 		if rem >= 50*time.Minute {
 			sessions = append(sessions, Session{Type: FocusSession, Duration: 50 * time.Minute})
@@ -47,14 +40,14 @@ func PartitionTask(total time.Duration) []Session {
 			sessions = append(sessions, Session{Type: BreakSession, Duration: 5 * time.Minute})
 			rem -= 25 * time.Minute
 		} else {
-			// 3. Handle trailing leftover focus time (less than 25 minutes)
+			// 2. Handle trailing leftover focus time (less than 25 minutes)
 			if len(sessions) > 0 {
 				// Distribute leftover focus time to an existing Focus session,
-				// ensuring we don't burst past our caps (90m, 50m).
+				// ensuring we don't burst past our cap (50m).
 				appended := false
 				for i := len(sessions) - 1; i >= 0; i-- {
 					if sessions[i].Type == FocusSession {
-						if sessions[i].Duration == 90*time.Minute || sessions[i].Duration == 50*time.Minute {
+						if sessions[i].Duration == 50*time.Minute {
 							continue
 						}
 						// If adding it keeps it under or equal to a 50m cap, add it

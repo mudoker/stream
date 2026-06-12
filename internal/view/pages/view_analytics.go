@@ -484,8 +484,8 @@ func renderHealthMetricsPanel(m *viewmodel.Model, t theme.Theme, w, h int, stats
 		}
 		lines = append(lines,
 			renderRow("Average Block:", fmt.Sprintf("%d min", avgBlockMins)),
-			renderRow("Longest Session:", "90 min"),
-			renderRow("Recovery Window:", "15 min"),
+			renderRow("Longest Session:", "50 min"),
+			renderRow("Recovery Window:", "10 min"),
 		)
 	}
 

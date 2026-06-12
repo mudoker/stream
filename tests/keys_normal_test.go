@@ -523,3 +523,60 @@ func TestDayViewTimelineScrollingAndFallback(t *testing.T) {
 		t.Fatalf("expected selection to be task-1 on J press, got %s", m3.SelectedTaskUUID)
 	}
 }
+
+func TestDeleteTaskConfirmationWithEnter(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	task := model.Task{
+		UUID:           "test-delete-confirm-task",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		Title:          "To Delete",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateBacklog,
+	}
+	database.AddTask(task)
+	m.RefreshTasks()
+
+	m.SelectedTaskUUID = task.UUID
+	m.TodoShelfFocus = true
+
+	// 1. Try to cancel deletion with Esc
+	m.ConfirmTask = task
+	m.ConfirmOpen = true
+	m.ConfirmActionType = "delete"
+
+	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = toModelVal(res)
+	if m.ConfirmOpen {
+		t.Error("expected confirm modal to close on Esc")
+	}
+	// Verify task still exists in DB
+	if _, exists := database.GetTask(task.UUID); !exists {
+		t.Error("expected task to still exist after canceling deletion")
+	}
+
+	// 2. Try to confirm deletion with Enter
+	m.ConfirmTask = task
+	m.ConfirmOpen = true
+	m.ConfirmActionType = "delete"
+
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = toModelVal(res)
+	if m.ConfirmOpen {
+		t.Error("expected confirm modal to close on Enter")
+	}
+	// Verify task is deleted from DB
+	if _, exists := database.GetTask(task.UUID); exists {
+		t.Error("expected task to be deleted from DB after Enter")
+	}
+}
+

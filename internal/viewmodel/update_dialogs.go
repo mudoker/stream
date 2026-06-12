@@ -1,12 +1,6 @@
 package viewmodel
 
 import (
-	"fmt"
-	"strconv"
-	"time"
-
-	"stream/internal/model"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -28,14 +22,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.AnchorPromptOpen = false
 
 		if m.PromptOpen {
-			if m.PromptTask.SchedulingType != model.Reminder {
-				m.PromptTask.LifecycleState = model.StateReady
-				if m.DB != nil {
-					m.DB.UpdateTask(m.PromptTask)
-					m.refreshTasks()
-				}
-			}
-			m.PromptOpen = false
+			m.cancelPromptTask()
 		}
 
 		m.ReviewOpen = false
@@ -45,6 +32,10 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		if m.CurrentMode == ModeTaskMove {
 			m.cancelTaskMove()
+			return m, nil
+		}
+		if m.CurrentMode == ModeTaskDurationAdjust {
+			m.cancelTaskDurationAdjust()
 			return m, nil
 		}
 		if m.CurrentMode == ModeZen {
@@ -57,336 +48,23 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.WarningOpen {
-		switch msg.String() {
-		case "enter", "q", "space":
-			m.WarningOpen = false
-			m.WarningMsg = ""
-			return m, nil
+	// Route based on open modal/state
+	if m.WarningOpen || m.AuthNoticeOpen || m.SessionExpiryPromptOpen || m.ConfirmOpen {
+		if handled, cmd := m.handleConfirmDialogKeys(msg); handled {
+			return m, cmd
 		}
-		return m, nil
 	}
 
-	if m.AuthNoticeOpen {
-		switch msg.String() {
-		case "esc", "enter", "q":
-			m.AuthNoticeOpen = false
-			m.AuthNoticeMsg = ""
-			m.StatusMsg = "Returned to normal mode."
-			return m, nil
+	if m.HelpOpen || m.AnchorPromptOpen || m.PromptOpen || m.ReviewOpen || m.DetailOpen {
+		if handled, cmd := m.handleConfirmDialogKeys(msg); handled {
+			return m, cmd
 		}
-		return m, nil
-	}
-
-	if m.SessionExpiryPromptOpen {
-		switch msg.String() {
-		case "y", "Y", "enter":
-			m.SessionTimeRemainingSeconds = m.DB.GetUserSettings().LockTimeoutMinutes * 60
-			m.SessionExpiryPromptOpen = false
-			m.StatusMsg = "Session timer reset."
-			return m, nil
-		case "n", "N", "esc":
-			m.SessionExpiryPromptOpen = false
-			m.StatusMsg = "Session will lock in 1 minute."
-			return m, nil
+		if handled, cmd := m.handleHelpAndDetailKeys(msg); handled {
+			return m, cmd
 		}
-		return m, nil
-	}
-
-	if m.ConfirmOpen {
-		keyStr := msg.String()
-		if m.ConfirmActionType == "deanchor" {
-			if keyStr == "enter" {
-				m.ConfirmTask.SchedulingType = model.Floating
-				m.ConfirmTask.LifecycleState = model.StateReady
-				m.ConfirmTask.UpdatedAt = time.Now()
-				if m.DB != nil {
-					m.DB.UpdateTask(m.ConfirmTask)
-					m.refreshTasks()
-				} else {
-					m.updateTaskInMemory(m.ConfirmTask)
-				}
-				m.triggerGCalPushIfAnchored(m.ConfirmTask)
-				m.StatusMsg = fmt.Sprintf("Task '%s' de-anchored to backlog.", m.ConfirmTask.Title)
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-			} else {
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = "De-anchoring canceled."
-			}
-			return m, nil
+		if handled, cmd := m.handlePromptDialogKeys(msg); handled {
+			return m, cmd
 		}
-
-		switch keyStr {
-		case "y", "Y", "enter":
-			if m.ConfirmActionType == "complete_reminder" {
-				if keyStr == "enter" {
-					m.ConfirmOpen = false
-					m.ConfirmActionType = ""
-					m.StatusMsg = "Completion canceled."
-					return m, nil
-				}
-				m.ConfirmTask.LifecycleState = model.StateCompleted
-				m.ConfirmTask.UpdatedAt = time.Now()
-				m.DB.UpdateTask(m.ConfirmTask)
-				m.refreshTasks()
-				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-					m.DetailOpen = false
-				}
-				m.StatusMsg = fmt.Sprintf("Reminder '%s' completed!", m.ConfirmTask.Title)
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				return m, nil
-			} else {
-				m.DB.DeleteTask(m.ConfirmTask.UUID)
-				m.refreshTasks()
-				m.triggerGCalPushIfAnchored(m.ConfirmTask)
-				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-					m.DetailOpen = false
-				}
-				if zt := m.ZenTimer; zt != nil && zt.Task.UUID == m.ConfirmTask.UUID {
-					m.ZenTimer = nil
-				}
-				m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", m.ConfirmTask.Title)
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				return m, nil
-			}
-		case "n", "N", "esc":
-			if m.ConfirmActionType == "complete_reminder" {
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = "Completion canceled."
-			} else {
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = "Deletion canceled."
-			}
-			return m, nil
-		}
-		return m, nil
-	}
-
-	if m.HelpOpen {
-		switch msg.String() {
-		case "esc", "q", "?":
-			m.HelpOpen = false
-			m.HelpScrollOffset = 0
-			return m, nil
-		case "j", "down":
-			m.HelpScrollOffset++
-			return m, nil
-		case "k", "up":
-			if m.HelpScrollOffset > 0 {
-				m.HelpScrollOffset--
-			}
-			return m, nil
-		case "ctrl+d":
-			m.HelpScrollOffset += 5
-			return m, nil
-		case "ctrl+u":
-			m.HelpScrollOffset -= 5
-			if m.HelpScrollOffset < 0 {
-				m.HelpScrollOffset = 0
-			}
-			return m, nil
-		case "g":
-			m.HelpScrollOffset = 0
-			return m, nil
-		case "G":
-			m.HelpScrollOffset = 9999
-			return m, nil
-		}
-		return m, nil
-	}
-
-	if m.AnchorPromptOpen {
-		switch msg.String() {
-		case "tab", "down":
-			m.AnchorActiveField = (m.AnchorActiveField + 1) % 2
-			m.focusAnchorPromptFields()
-			return m, nil
-		case "shift+tab", "up":
-			m.AnchorActiveField = (m.AnchorActiveField - 1 + 2) % 2
-			m.focusAnchorPromptFields()
-			return m, nil
-		case "enter":
-			timeStr := m.AnchorTimeInput.Value()
-			hour, min := ParseFlexibleTime(timeStr, 9, 0)
-
-			now := time.Now()
-			startTime := time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), hour, min, 0, 0, now.Location())
-
-			durStr := m.AnchorDurationInput.Value()
-			durationMins := 60
-			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
-				durationMins = d
-			}
-			dur := time.Duration(durationMins) * time.Minute
-
-			t := m.AnchorPromptTask
-			t.SchedulingType = model.Anchored
-			t.TimeWindow = model.TimeWindow{
-				Start: startTime,
-				End:   startTime.Add(dur),
-			}
-			t.LifecycleState = model.StateScheduled
-
-			if m.DB != nil {
-				m.DB.UpdateTask(t)
-				m.refreshTasks()
-			} else {
-				m.updateTaskInMemory(t)
-			}
-			m.SelectedTaskUUID = t.UUID
-			m.AutoScrollToSelectedTask()
-			m.triggerGCalPush(t)
-
-			m.StatusMsg = fmt.Sprintf("Task '%s' anchored to %s.", t.Title, startTime.Format("15:04"))
-			m.AnchorPromptOpen = false
-			return m, nil
-
-		case "esc":
-			m.AnchorPromptOpen = false
-			m.StatusMsg = "Anchoring canceled."
-			return m, nil
-		}
-
-		var cmd tea.Cmd
-		if m.AnchorActiveField == 0 {
-			m.AnchorTimeInput, cmd = m.AnchorTimeInput.Update(msg)
-		} else {
-			m.AnchorDurationInput, cmd = m.AnchorDurationInput.Update(msg)
-		}
-		return m, cmd
-	}
-
-	if m.PromptOpen {
-		switch msg.String() {
-		case "left", "up", "shift+tab":
-			m.PromptSelectedIdx = (m.PromptSelectedIdx - 1 + 3) % 3
-			return m, nil
-		case "right", "down", "tab":
-			m.PromptSelectedIdx = (m.PromptSelectedIdx + 1) % 3
-			return m, nil
-		case "s", "S":
-			m.PromptSelectedIdx = 1
-			return m, nil
-		case "d", "D":
-			m.PromptSelectedIdx = 2
-			return m, nil
-		case "f", "F":
-			m.PromptSelectedIdx = 0
-			return m, nil
-		case "esc":
-			// Escape immediately cancels/dismisses the prompt
-			m.PromptTask.LifecycleState = model.StateReady
-			m.DB.UpdateTask(m.PromptTask)
-			m.refreshTasks()
-			m.PromptOpen = false
-			m.StatusMsg = "Task prompt dismissed."
-			return m, nil
-		case "enter":
-			switch m.PromptSelectedIdx {
-			case 0: // Start Focus (or Dismiss if Reminder)
-				if m.PromptTask.SchedulingType == model.Reminder {
-					m.PromptOpen = false
-					m.StatusMsg = fmt.Sprintf("Reminder '%s' dismissed.", m.PromptTask.Title)
-					return m, nil
-				}
-				m.StartZenMode(m.PromptTask)
-				m.PromptOpen = false
-				return m, nil
-			case 1: // Snooze 5m
-				m.PromptTask.TimeWindow.Start = m.PromptTask.TimeWindow.Start.Add(5 * time.Minute)
-				if m.PromptTask.SchedulingType != model.Reminder {
-					m.PromptTask.TimeWindow.End = m.PromptTask.TimeWindow.End.Add(5 * time.Minute)
-				}
-				m.DB.UpdateTask(m.PromptTask)
-				m.refreshTasks()
-				m.PromptOpen = false
-				m.StatusMsg = "Task start snoozed by 5m."
-				return m, nil
-			case 2: // Dismiss
-				m.PromptTask.LifecycleState = model.StateReady
-				m.DB.UpdateTask(m.PromptTask)
-				m.refreshTasks()
-				m.PromptOpen = false
-				m.StatusMsg = "Task prompt dismissed."
-				return m, nil
-			}
-		}
-		return m, nil
-	}
-
-	if m.ReviewOpen {
-		switch msg.String() {
-		case "y", "enter":
-			today := time.Now()
-			shifted := 0
-			for _, t := range m.Tasks {
-				if t.SchedulingType == model.Anchored &&
-					t.TimeWindow.Start.Year() == today.Year() && t.TimeWindow.Start.Month() == today.Month() && t.TimeWindow.Start.Day() == today.Day() &&
-					t.LifecycleState != model.StateCompleted {
-
-					t.TimeWindow.Start = t.TimeWindow.Start.AddDate(0, 0, 1)
-					t.TimeWindow.End = t.TimeWindow.End.AddDate(0, 0, 1)
-					t.LifecycleState = model.StateScheduled
-					m.DB.UpdateTask(t)
-					shifted++
-				}
-			}
-			m.refreshTasks()
-			m.ReviewOpen = false
-			m.StatusMsg = fmt.Sprintf("Moved %d incomplete tasks to tomorrow.", shifted)
-			return m, nil
-		case "n", "esc":
-			m.ReviewOpen = false
-			m.StatusMsg = "Daily review closed."
-			return m, nil
-		}
-		return m, nil
-	}
-
-	if m.DetailOpen {
-		switch msg.String() {
-		case "esc", "enter":
-			m.DetailOpen = false
-			return m, nil
-		case "z":
-			m.StartZenMode(m.DetailTask)
-			m.DetailOpen = false
-			return m, nil
-		case "x":
-			if m.DetailTask.SchedulingType == model.Reminder && m.DetailTask.LifecycleState != model.StateCompleted {
-				m.ConfirmTask = m.DetailTask
-				m.ConfirmOpen = true
-				m.ConfirmActionType = "complete_reminder"
-				return m, nil
-			}
-			if m.DetailTask.LifecycleState == model.StateCompleted {
-				m.DetailTask.LifecycleState = model.StateBacklog
-				m.StatusMsg = fmt.Sprintf("Task '%s' marked incomplete.", m.DetailTask.Title)
-			} else {
-				m.DetailTask.LifecycleState = model.StateCompleted
-				m.StatusMsg = fmt.Sprintf("Task '%s' completed!", m.DetailTask.Title)
-			}
-			m.DB.UpdateTask(m.DetailTask)
-			m.refreshTasks()
-			m.DetailOpen = false
-			return m, nil
-		case "d":
-			m.ConfirmTask = m.DetailTask
-			m.ConfirmOpen = true
-			m.ConfirmActionType = "delete"
-			return m, nil
-		case "e":
-			m.startEditMode(m.DetailTask)
-			m.DetailOpen = false
-			return m, nil
-		}
-		return m, nil
 	}
 
 	switch m.CurrentMode {
@@ -398,6 +76,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleFormKeys(msg)
 	case ModeTaskMove:
 		return m.HandleTaskMoveKeys(msg)
+	case ModeTaskDurationAdjust:
+		return m.HandleTaskDurationAdjustKeys(msg)
 	case ModeWorkspaceForm:
 		return m.handleWorkspaceFormKeys(msg)
 	case ModeProfileForm:

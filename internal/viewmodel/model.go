@@ -30,6 +30,7 @@ const (
 	ModeCommand         UIState = "COMMAND"
 	ModeForm            UIState = "WIZARD"
 	ModeTaskMove        UIState = "TASK_MOVE"
+	ModeTaskDurationAdjust UIState = "DURATION_ADJUST"
 	ModeWorkspaceForm   UIState = "WORKSPACE_WIZARD"
 	ModeWorkspacePicker UIState = "WS_PICKER"
 	ModeProfileForm     UIState = "PROFILE_WIZARD"

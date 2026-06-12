@@ -31,7 +31,7 @@ func CalculateTaskRestTime(t model.Task) time.Duration {
 }
 
 func (m *Model) HasPriorityOverlapCollision(t model.Task) bool {
-	if m.CurrentMode == ModeTaskMove || strings.HasSuffix(t.UUID, "_moving") {
+	if m.CurrentMode == ModeTaskMove || m.CurrentMode == ModeTaskDurationAdjust || strings.HasSuffix(t.UUID, "_moving") || strings.HasSuffix(t.UUID, "_adjusting") {
 		return false
 	}
 	if t.SchedulingType != model.Anchored {
@@ -56,5 +56,7 @@ func (m *Model) HasPriorityOverlapCollision(t model.Task) bool {
 }
 
 func movingTaskBaseUUID(uuid string) string {
-	return strings.TrimSuffix(uuid, "_moving")
+	uuid = strings.TrimSuffix(uuid, "_moving")
+	uuid = strings.TrimSuffix(uuid, "_adjusting")
+	return uuid
 }

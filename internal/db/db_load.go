@@ -69,7 +69,8 @@ func (db *JSONDB) load() error {
 				t.SchedulingType != model.Anchored &&
 				t.SchedulingType != model.Floating &&
 				t.SchedulingType != model.Reminder &&
-				t.SchedulingType != model.Habit) {
+				t.SchedulingType != model.Habit &&
+				t.SchedulingType != model.Event) {
 				continue
 			}
 			db.tasks[t.UUID] = t

@@ -64,6 +64,7 @@ func (m *Model) cycleFocus() {
 				m.SelectedTaskUUID = ""
 			}
 		} else if m.TodoShelfFocus {
+			m.LastTodoShelfTaskUUID = m.SelectedTaskUUID
 			m.SidebarFocus = true
 			m.TodoShelfFocus = false
 		} else {
@@ -71,7 +72,20 @@ func (m *Model) cycleFocus() {
 			m.TodoShelfFocus = true
 			shelf := m.GetTodoShelfTasks()
 			if len(shelf) > 0 {
-				m.SelectedTaskUUID = shelf[0].UUID
+				found := false
+				if m.LastTodoShelfTaskUUID != "" {
+					for _, t := range shelf {
+						if t.UUID == m.LastTodoShelfTaskUUID {
+							found = true
+							break
+						}
+					}
+				}
+				if found {
+					m.SelectedTaskUUID = m.LastTodoShelfTaskUUID
+				} else {
+					m.SelectedTaskUUID = shelf[0].UUID
+				}
 			} else {
 				m.SelectedTaskUUID = ""
 			}
@@ -79,6 +93,10 @@ func (m *Model) cycleFocus() {
 	} else {
 		m.SidebarFocus = !m.SidebarFocus
 	}
+}
+
+func (m *Model) CycleFocus() {
+	m.cycleFocus()
 }
 
 func (m *Model) moveSidebarView(delta int) {

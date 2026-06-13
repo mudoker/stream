@@ -131,6 +131,7 @@ type Model struct {
 	LockPasswordInput           textinput.Model
 	SessionTimeRemainingSeconds int
 	SessionExpiryPromptOpen     bool
+	LastTodoShelfTaskUUID       string
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
@@ -167,6 +168,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		SessionTimeRemainingSeconds: settings.LockTimeoutMinutes * 60,
 		SessionExpiryPromptOpen:     false,
 		AuthNoticeOpen:              false,
+		LastTodoShelfTaskUUID:       "",
 	}
 
 	m.refreshWorkspaces()

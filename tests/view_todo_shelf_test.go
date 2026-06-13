@@ -270,3 +270,60 @@ func TestTodoShelfCompletedSectionRendering(t *testing.T) {
 		t.Error("expected rendering to contain '☑ Done backlog'")
 	}
 }
+
+func TestTodoShelfFocusRecall(t *testing.T) {
+	m := &viewmodel.Model{
+		CurrentView:    viewmodel.DayView,
+		TodoShelfFocus: true,
+		Tasks: []model.Task{
+			{
+				UUID:           "task-1",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "task-2",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+		},
+		SelectedTaskUUID: "task-2",
+	}
+
+	// 1. Defocus the todo shelf (TodoShelfFocus -> SidebarFocus)
+	m.CycleFocus()
+	if m.TodoShelfFocus {
+		t.Fatal("expected todo shelf to be defocused")
+	}
+	if m.LastTodoShelfTaskUUID != "task-2" {
+		t.Fatalf("expected last focused task UUID to be task-2, got %s", m.LastTodoShelfTaskUUID)
+	}
+
+	// 2. Cycle again (SidebarFocus -> TimelineFocus)
+	m.CycleFocus()
+
+	// 3. Cycle again (TimelineFocus -> TodoShelfFocus)
+	m.CycleFocus()
+	if !m.TodoShelfFocus {
+		t.Fatal("expected todo shelf to be refocused")
+	}
+	if m.SelectedTaskUUID != "task-2" {
+		t.Fatalf("expected selection to be restored to task-2, got %s", m.SelectedTaskUUID)
+	}
+
+	// 4. Defocus again
+	m.CycleFocus()
+
+	// 5. Remove task-2 from Tasks list (simulate deletion/completion shift)
+	m.Tasks = []model.Task{m.Tasks[0]} // only task-1 remains
+
+	// 6. Refocus the shelf again (SidebarFocus -> Timeline -> TodoShelfFocus)
+	m.CycleFocus()
+	m.CycleFocus()
+	if !m.TodoShelfFocus {
+		t.Fatal("expected shelf to be refocused")
+	}
+	if m.SelectedTaskUUID != "task-1" {
+		t.Fatalf("expected selection to fall back to task-1, got %s", m.SelectedTaskUUID)
+	}
+}

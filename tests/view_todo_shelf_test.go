@@ -171,7 +171,7 @@ func TestRenderTodoShelfHabits(t *testing.T) {
 		},
 	}
 
-	rendered := components.RenderTodoShelf(m, th, 20)
+	rendered := components.RenderTodoShelf(m, th, 40)
 	if !strings.Contains(rendered, "HABITS") {
 		t.Error("expected shelf rendering to contain 'HABITS'")
 	}
@@ -225,5 +225,48 @@ func TestReminderRemainingDays(t *testing.T) {
 	}
 	if !strings.Contains(rendered, "overdue by 1 day") {
 		t.Error("expected rendering to contain 'overdue by 1 day'")
+	}
+}
+
+func TestTodoShelfCompletedSectionRendering(t *testing.T) {
+	th := theme.NewTheme()
+	m := &viewmodel.Model{
+		Layout: viewmodel.Layout{
+			TodoW: 30,
+		},
+		Tasks: []model.Task{
+			{
+				UUID:           "backlog-active",
+				Title:          "Active backlog",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "backlog-completed",
+				Title:          "Done backlog",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateCompleted,
+			},
+		},
+	}
+
+	shelfTasks := m.GetTodoShelfTasks()
+	if len(shelfTasks) != 2 {
+		t.Fatalf("expected 2 shelf tasks, got %d", len(shelfTasks))
+	}
+	// Verify that the completed task is placed at the end (very bottom)
+	if shelfTasks[0].UUID != "backlog-active" {
+		t.Errorf("expected active task to be first, got %s", shelfTasks[0].UUID)
+	}
+	if shelfTasks[1].UUID != "backlog-completed" {
+		t.Errorf("expected completed task to be last, got %s", shelfTasks[1].UUID)
+	}
+
+	rendered := components.RenderTodoShelf(m, th, 40)
+	if !strings.Contains(rendered, "COMPLETED") {
+		t.Error("expected rendering to contain 'COMPLETED' section")
+	}
+	if !strings.Contains(rendered, "☑ Done backlog") {
+		t.Error("expected rendering to contain '☑ Done backlog'")
 	}
 }

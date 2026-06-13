@@ -370,68 +370,20 @@ func embedTextInLine(leftBorder, rightBorder, fillChar, text string, width int, 
 }
 
 func RenderRestBlock(t theme.Theme, w, h int, restMins int, endTime time.Time, isCompleted bool, isFocused bool) string {
-	if w < 3 {
-		w = 3
-	}
-	if h < 1 {
-		h = 1
-	}
-
-	var borderColor lipgloss.Color
+	var color lipgloss.Color
 	if isFocused {
-		borderColor = t.FocusPurple
+		color = t.FocusPurple
 	} else if isCompleted {
-		borderColor = lipgloss.Color("#5b8e5d") // Medium forest green border for completed rest block
+		color = lipgloss.Color("#5b8e5d")
 	} else {
-		borderColor = lipgloss.Color("#94e2d5") // Soothing pastel teal for active/pending rest block
+		color = lipgloss.Color("#94e2d5")
 	}
-
-	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
-	var textStyle lipgloss.Style
-	if isFocused {
-		textStyle = lipgloss.NewStyle().Foreground(t.FocusPurple).Italic(true)
-	} else if isCompleted {
-		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Italic(true) // Softer sage green text
-	} else {
-		textStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#94e2d5")).Italic(true)
-	}
-
-	bottomLeft := "└"
-	bottomRight := "┘"
-	horizChar := "╌"
-	vertChar := "┊"
-
 	restEndTimeStr := endTime.Format("15:04")
-	restText := fmt.Sprintf("󰔛 Rest %dm (%s)", restMins, restEndTimeStr)
+	text := fmt.Sprintf("󰔛 Rest %dm (%s)", restMins, restEndTimeStr)
 	if isCompleted {
-		restText = fmt.Sprintf("󰔛 Rest %dm (%s) ✔", restMins, restEndTimeStr)
+		text = fmt.Sprintf("󰔛 Rest %dm (%s) ✔", restMins, restEndTimeStr)
 	}
-
-	var lines []string
-
-	if h == 1 {
-		// For h = 1, show text in one line with bottom border: └╌ Rest 15m (10:15) ╌┘
-		line := embedTextInLine(bottomLeft, bottomRight, horizChar, restText, w, borderStyle, textStyle)
-		lines = append(lines, line)
-	} else {
-		// For h >= 2, we have no top border line since it merges with the task's joint bottom border.
-		// Render vertical side borders and bottom border.
-		bottomLine := borderStyle.Render(bottomLeft + strings.Repeat(horizChar, w-2) + bottomRight)
-
-		centerRow := (h - 1) / 2
-		for i := 0; i < h-1; i++ {
-			var line string
-			if i == centerRow {
-				line = embedTextInLine(vertChar, vertChar, " ", restText, w, borderStyle, textStyle)
-			} else {
-				line = borderStyle.Render(vertChar) + strings.Repeat(" ", w-2) + borderStyle.Render(vertChar)
-			}
-			lines = append(lines, line)
-		}
-		lines = append(lines, bottomLine)
-	}
-
-	return strings.Join(lines, "\n")
+	return renderTimelineBufferBlock(w, h, text, false, color)
 }
 
 func durationToRows(dur time.Duration) int {

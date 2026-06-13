@@ -4,12 +4,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"stream/constant"
 )
 
 const (
-	RowsPerHour = 8   // 7.5-minute slots per hour (8 rows/hour)
-	TotalRows   = 192 // 24h * 8 rows
-	GutterWidth = 11  // " HH:MM ───┼" timestamp gutter
+	RowsPerHour = constant.RowsPerHour
+	TotalRows   = constant.TotalRows
+	GutterWidth = constant.GutterWidth
 )
 
 // TimeToRow converts a time.Time to its local day row index (0 to TotalRows-1).

@@ -92,6 +92,7 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				m.ConfirmActionType = ""
 				return true, nil
 			} else {
+				m.AdjustSelectionBeforeDeletion(m.ConfirmTask.UUID)
 				m.DB.DeleteTask(m.ConfirmTask.UUID)
 				m.refreshTasks()
 				m.triggerGCalPushIfAnchored(m.ConfirmTask)

@@ -327,3 +327,124 @@ func TestTodoShelfFocusRecall(t *testing.T) {
 		t.Fatalf("expected selection to fall back to task-1, got %s", m.SelectedTaskUUID)
 	}
 }
+
+func TestTodoShelfDeleteSelectionAdjustment(t *testing.T) {
+	m := &viewmodel.Model{
+		CurrentView:           viewmodel.DayView,
+		TodoShelfFocus:        true,
+		SelectedTaskUUID:      "task-2",
+		LastTodoShelfTaskUUID: "task-2",
+		Tasks: []model.Task{
+			{
+				UUID:           "task-1",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "task-2",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "task-3",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+		},
+	}
+
+	// Test 1: Deleting middle task (task-2) shifts selection to task-3 (next sibling)
+	m.AdjustSelectionBeforeDeletion("task-2")
+	if m.SelectedTaskUUID != "task-3" {
+		t.Fatalf("expected SelectedTaskUUID to be 'task-3', got '%s'", m.SelectedTaskUUID)
+	}
+	if m.LastTodoShelfTaskUUID != "task-3" {
+		t.Fatalf("expected LastTodoShelfTaskUUID to be 'task-3', got '%s'", m.LastTodoShelfTaskUUID)
+	}
+
+	// Test 2: Deleting last task (task-3) shifts selection to task-2 (previous sibling)
+	m.Tasks = []model.Task{
+		{
+			UUID:           "task-1",
+			SchedulingType: model.Floating,
+			LifecycleState: model.StateReady,
+		},
+		{
+			UUID:           "task-3",
+			SchedulingType: model.Floating,
+			LifecycleState: model.StateReady,
+		},
+	}
+	m.SelectedTaskUUID = "task-3"
+	m.LastTodoShelfTaskUUID = "task-3"
+	m.AdjustSelectionBeforeDeletion("task-3")
+	if m.SelectedTaskUUID != "task-1" {
+		t.Fatalf("expected SelectedTaskUUID to be 'task-1', got '%s'", m.SelectedTaskUUID)
+	}
+	if m.LastTodoShelfTaskUUID != "task-1" {
+		t.Fatalf("expected LastTodoShelfTaskUUID to be 'task-1', got '%s'", m.LastTodoShelfTaskUUID)
+	}
+
+	// Test 3: Deleting only task (task-1) clears selection
+	m.Tasks = []model.Task{
+		{
+			UUID:           "task-1",
+			SchedulingType: model.Floating,
+			LifecycleState: model.StateReady,
+		},
+	}
+	m.SelectedTaskUUID = "task-1"
+	m.LastTodoShelfTaskUUID = "task-1"
+	m.AdjustSelectionBeforeDeletion("task-1")
+	if m.SelectedTaskUUID != "" {
+		t.Fatalf("expected SelectedTaskUUID to be empty, got '%s'", m.SelectedTaskUUID)
+	}
+	if m.LastTodoShelfTaskUUID != "" {
+		t.Fatalf("expected LastTodoShelfTaskUUID to be empty, got '%s'", m.LastTodoShelfTaskUUID)
+	}
+}
+
+func TestTimelineDeleteSelectionAdjustment(t *testing.T) {
+	now := time.Now()
+	m := &viewmodel.Model{
+		CurrentView:      viewmodel.DayView,
+		TodoShelfFocus:   false,
+		SelectedTaskUUID: "task-2",
+		SelectedDay:      now,
+		Tasks: []model.Task{
+			{
+				UUID:           "task-1",
+				SchedulingType: model.Anchored,
+				TimeWindow: model.TimeWindow{
+					Start: now.Add(-time.Hour),
+					End:   now,
+				},
+			},
+			{
+				UUID:           "task-2",
+				SchedulingType: model.Anchored,
+				TimeWindow: model.TimeWindow{
+					Start: now,
+					End:   now.Add(time.Hour),
+				},
+			},
+			{
+				UUID:           "task-3",
+				SchedulingType: model.Anchored,
+				TimeWindow: model.TimeWindow{
+					Start: now.Add(time.Hour),
+					End:   now.Add(2 * time.Hour),
+				},
+			},
+		},
+	}
+
+	// Test 1: Deleting middle task (task-2) shifts selection to task-3 (next sibling)
+	m.AdjustSelectionBeforeDeletion("task-2")
+	if m.SelectedTaskUUID != "task-3" {
+		t.Fatalf("expected SelectedTaskUUID to be 'task-3', got '%s'", m.SelectedTaskUUID)
+	}
+	if m.TimelineHour != now.Add(time.Hour).Hour() {
+		t.Fatalf("expected TimelineHour to be %d, got %d", now.Add(time.Hour).Hour(), m.TimelineHour)
+	}
+}

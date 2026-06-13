@@ -58,7 +58,7 @@ func (m *Model) GetActiveTask() (model.Task, bool) {
 }
 
 func (m *Model) GetTodoShelfTasks() []model.Task {
-	return tasks.GetTodoShelfTasks(m.Tasks)
+	return tasks.GetTodoShelfTasks(m.Tasks, m.SelectedDay)
 }
 
 func (m *Model) GetAllActiveTasks() []model.Task {

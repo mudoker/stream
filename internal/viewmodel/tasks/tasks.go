@@ -63,14 +63,34 @@ func GetDayTasks(allTasks []model.Task, day time.Time) []model.Task {
 	return list
 }
 
-func GetTodoShelfTasks(allTasks []model.Task) []model.Task {
+func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Task {
 	var reminders []model.Task
 	var habits []model.Task
 	var backlog []model.Task
+	var completed []model.Task
+
 	for _, t := range allTasks {
-		if t.LifecycleState == model.StateCompleted && t.SchedulingType == model.Reminder {
+		isDone := false
+		if t.SchedulingType == model.Habit {
+			dateStr := selectedDay.Format("2006-01-02")
+			for _, d := range t.CompletedDates {
+				if d == dateStr {
+					isDone = true
+					break
+				}
+			}
+		} else {
+			isDone = t.LifecycleState == model.StateCompleted
+		}
+
+		if isDone {
+			if t.SchedulingType == model.Reminder {
+				continue
+			}
+			completed = append(completed, t)
 			continue
 		}
+
 		if t.SchedulingType == model.Reminder {
 			reminders = append(reminders, t)
 		} else if t.SchedulingType == model.Habit {
@@ -79,11 +99,15 @@ func GetTodoShelfTasks(allTasks []model.Task) []model.Task {
 			backlog = append(backlog, t)
 		}
 	}
+
 	SortReminders(reminders)
 	ImportSort(habits)
 	ImportSort(backlog)
+	ImportSort(completed)
+
 	res := append(reminders, habits...)
-	return append(res, backlog...)
+	res = append(res, backlog...)
+	return append(res, completed...)
 }
 
 func sameDay(a, b time.Time) bool {

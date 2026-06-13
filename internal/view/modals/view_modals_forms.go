@@ -26,7 +26,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	fields = append(fields, "")
 
 	renderField := func(num, label string, input string, index int) string {
-		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(num)
+		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("%2s", num))
 		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
 		if f.ActiveField == index {
 			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
@@ -35,7 +35,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	}
 
 	renderDropdown := func(num, label string, value string, index int) string {
-		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(num)
+		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("%2s", num))
 		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
 		if f.ActiveField == index {
 			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)

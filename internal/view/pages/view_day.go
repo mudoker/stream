@@ -198,7 +198,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 
 		// Render Top Commute Buffer
-		if rc.Task.SchedulingType == model.Event && rc.Task.Location != "" && rc.Task.CommuteBuffer > 0 {
+		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
 			commuteDur := time.Duration(rc.Task.CommuteBuffer) * time.Minute
 			commuteRows := durationToRows(commuteDur)
 			topStartRow := startRow - commuteRows
@@ -236,7 +236,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 
 		// Render Bottom Commute Buffer
-		if rc.Task.SchedulingType == model.Event && rc.Task.Location != "" && rc.Task.CommuteBuffer > 0 {
+		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
 			commuteDur := time.Duration(rc.Task.CommuteBuffer) * time.Minute
 			commuteRows := durationToRows(commuteDur)
 			bottomEndRow := startRow + h + commuteRows

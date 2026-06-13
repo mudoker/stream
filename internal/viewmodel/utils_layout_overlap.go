@@ -2,6 +2,7 @@ package viewmodel
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"stream/internal/model"
@@ -13,7 +14,7 @@ func taskEffectiveInterval(t model.Task) (time.Time, time.Time) {
 	start := t.TimeWindow.Start
 	end := t.TimeWindow.End.Add(CalculateTaskRestTime(t))
 
-	if t.SchedulingType == model.Event && t.Location != "" && t.CommuteBuffer > 0 {
+	if t.SchedulingType == model.Event && strings.TrimSpace(t.Location) != "" && t.CommuteBuffer > 0 {
 		commute := time.Duration(t.CommuteBuffer) * time.Minute
 		start = start.Add(-commute)
 		end = end.Add(commute)

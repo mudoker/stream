@@ -17,8 +17,8 @@ func (m *Model) EnterTaskMoveMode() {
 		m.StatusMsg = "No task selected to move."
 		return
 	}
-	if task.SchedulingType != model.Anchored {
-		m.StatusMsg = "Only anchored tasks can be moved with v."
+	if task.SchedulingType != model.Anchored && task.SchedulingType != model.Event {
+		m.StatusMsg = "Only anchored tasks and events can be moved with v."
 		return
 	}
 
@@ -79,8 +79,8 @@ func (m *Model) applyTaskMove(direction int) {
 		m.StatusMsg = "No task selected to move."
 		return
 	}
-	if task.SchedulingType != model.Anchored {
-		m.StatusMsg = "Only anchored tasks can be moved with v."
+	if task.SchedulingType != model.Anchored && task.SchedulingType != model.Event {
+		m.StatusMsg = "Only anchored tasks and events can be moved with v."
 		return
 	}
 

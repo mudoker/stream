@@ -68,14 +68,8 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case "enter":
-		if m.Form.ActiveField == 10 {
-			m.SubmitForm()
-			m.CurrentMode = ModeNormal
-			return m, nil
-		}
-		curIdx = (curIdx + 1) % len(visible)
-		m.Form.ActiveField = visible[curIdx]
-		m.focusFormFields()
+		m.SubmitForm()
+		m.CurrentMode = ModeNormal
 		return m, nil
 	case "esc":
 		m.CurrentMode = ModeNormal

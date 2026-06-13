@@ -23,13 +23,8 @@ func (m *Model) handleProfileFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.focusProfileFormFields()
 		return m, nil
 	case "enter":
-		if m.ProfileForm.ActiveField == 3 {
-			m.submitProfileForm()
-			m.CurrentMode = ModeNormal
-			return m, nil
-		}
-		m.ProfileForm.ActiveField = (m.ProfileForm.ActiveField + 1) % 4
-		m.focusProfileFormFields()
+		m.submitProfileForm()
+		m.CurrentMode = ModeNormal
 		return m, nil
 	case "esc":
 		m.CurrentMode = ModeNormal

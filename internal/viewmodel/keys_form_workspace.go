@@ -22,13 +22,8 @@ func (m *Model) handleWorkspaceFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.focusWorkspaceFormFields()
 		return m, nil
 	case "enter":
-		if m.WorkspaceForm.ActiveField == 3 {
-			m.submitWorkspaceForm()
-			m.CurrentMode = ModeNormal
-			return m, nil
-		}
-		m.WorkspaceForm.ActiveField = (m.WorkspaceForm.ActiveField + 1) % 4
-		m.focusWorkspaceFormFields()
+		m.submitWorkspaceForm()
+		m.CurrentMode = ModeNormal
 		return m, nil
 	case "esc":
 		m.CurrentMode = ModeNormal

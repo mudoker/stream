@@ -102,9 +102,35 @@ func (m *Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.CommandSelectedIndex = (m.CommandSelectedIndex + 1) % len(cmdList)
 		}
 		return m, nil
+	case "tab":
+		if len(cmdList) > 0 {
+			m.CommandSelectedIndex = (m.CommandSelectedIndex + 1) % len(cmdList)
+			val := cmdList[m.CommandSelectedIndex].Name
+			if idx := strings.Index(val, "<"); idx != -1 {
+				val = strings.TrimRight(val[:idx], " ") + " "
+			}
+			m.CommandInput.SetValue(val)
+		}
+		return m, nil
+	case "shift+tab":
+		if len(cmdList) > 0 {
+			m.CommandSelectedIndex--
+			if m.CommandSelectedIndex < 0 {
+				m.CommandSelectedIndex = len(cmdList) - 1
+			}
+			val := cmdList[m.CommandSelectedIndex].Name
+			if idx := strings.Index(val, "<"); idx != -1 {
+				val = strings.TrimRight(val[:idx], " ") + " "
+			}
+			m.CommandInput.SetValue(val)
+		}
+		return m, nil
 	case "enter":
 		if len(cmdList) > 0 && m.CommandSelectedIndex >= 0 && m.CommandSelectedIndex < len(cmdList) {
 			val := cmdList[m.CommandSelectedIndex].Name
+			if idx := strings.Index(val, "<"); idx != -1 {
+				val = strings.TrimRight(val[:idx], " ") + " "
+			}
 			m.CommandInput.SetValue(val)
 		}
 		m.CurrentMode = ModeNormal

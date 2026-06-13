@@ -108,7 +108,7 @@ Switch views instantly to suit your focus level:
 * <kbd>Tab</kbd> / <kbd>Down</kbd> : Move to next field
 * <kbd>Shift+Tab</kbd> / <kbd>Up</kbd> : Move to previous field
 * <kbd>Left</kbd> / <kbd>Right</kbd> : Cycle dropdown choices
-* <kbd>Enter</kbd> : Submit / Advance field
+* <kbd>Enter</kbd> : Submit form
 * <kbd>Esc</kbd> : Dismiss Wizard
 
 ### Zen Mode (Timer)

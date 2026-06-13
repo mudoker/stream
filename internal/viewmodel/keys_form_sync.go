@@ -30,13 +30,8 @@ func (m *Model) handleSyncFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "enter":
-		if m.SyncForm.ActiveField == 2 {
-			m.submitSyncForm()
-			m.CurrentMode = ModeNormal
-			return m, nil
-		}
-		m.SyncForm.ActiveField = (m.SyncForm.ActiveField + 1) % 3
-		m.focusSyncFormFields()
+		m.submitSyncForm()
+		m.CurrentMode = ModeNormal
 		return m, nil
 	case "esc":
 		m.CurrentMode = ModeNormal

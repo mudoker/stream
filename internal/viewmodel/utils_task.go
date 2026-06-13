@@ -16,6 +16,9 @@ func absInt(v int) int {
 }
 
 func CalculateTaskRestTime(t model.Task) time.Duration {
+	if t.SchedulingType == model.Event {
+		return 0
+	}
 	workDur := t.TimeWindow.End.Sub(t.TimeWindow.Start)
 	if t.SchedulingType != model.Anchored {
 		workDur = time.Duration(t.StoryPoints) * 45 * time.Minute

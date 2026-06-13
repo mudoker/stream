@@ -24,7 +24,7 @@ type TaskMetricsInfo struct {
 
 func ComputeTaskMetricsInfo(m *viewmodel.Model, t theme.Theme, task model.Task) TaskMetricsInfo {
 	var plannedDur time.Duration
-	if task.SchedulingType == model.Anchored {
+	if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
 		plannedDur = task.TimeWindow.End.Sub(task.TimeWindow.Start)
 	} else {
 		plannedDur = time.Duration(task.StoryPoints) * 45 * time.Minute
@@ -105,9 +105,18 @@ func RenderDetailPanel(m *viewmodel.Model, t theme.Theme, height int) string {
 	sb.WriteString(fmt.Sprintf("Lifecycle     %s\n", task.LifecycleState))
 	sb.WriteString(fmt.Sprintf("Schedule      %s\n\n", task.SchedulingType))
 
-	if task.SchedulingType == model.Anchored {
+	if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
 		sb.WriteString(fmt.Sprintf("Start Time    %s\n", task.TimeWindow.Start.Format("2006-01-02 15:04")))
 		sb.WriteString(fmt.Sprintf("End Time      %s\n\n", task.TimeWindow.End.Format("15:04")))
+		if task.SchedulingType == model.Event {
+			if task.Location != "" {
+				sb.WriteString(fmt.Sprintf("Location      %s\n", task.Location))
+			}
+			if task.CommuteBuffer > 0 {
+				sb.WriteString(fmt.Sprintf("Commute Buf   %d mins\n", task.CommuteBuffer))
+			}
+			sb.WriteString("\n")
+		}
 	}
 
 	sb.WriteString("DESCRIPTION\n")
@@ -162,11 +171,19 @@ func RenderDetailModal(m *viewmodel.Model, t theme.Theme) string {
 	}
 	sb.WriteString(fmt.Sprintf("  Schedule: %s\n", task.SchedulingType))
 
-	if task.SchedulingType == model.Anchored {
+	if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
 		sb.WriteString("\n")
 		sb.WriteString(fmt.Sprintf("  %s  →  %s\n",
 			task.TimeWindow.Start.Format("Mon Jan 2  15:04"),
 			task.TimeWindow.End.Format("15:04")))
+		if task.SchedulingType == model.Event {
+			if task.Location != "" {
+				sb.WriteString(fmt.Sprintf("  Location: %s\n", task.Location))
+			}
+			if task.CommuteBuffer > 0 {
+				sb.WriteString(fmt.Sprintf("  Commute:  %d mins\n", task.CommuteBuffer))
+			}
+		}
 	}
 
 	sb.WriteString("\n")

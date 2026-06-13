@@ -72,7 +72,13 @@ func taskCardMetaStr(t theme.Theme, task model.Task, contentW int, priorityBadge
 	timeStrStyled := mutedStyle.Render(timeStr)
 	bulletStyled := mutedStyle.Render("  •  ")
 
-	metaStr := fmt.Sprintf("%s%s%s%s%s", priorityBadge, bulletStyled, spStrStyled, bulletStyled, timeStrStyled)
+	var metaStr string
+	if task.SchedulingType == model.Event {
+		metaStr = fmt.Sprintf("%s%s%s", priorityBadge, bulletStyled, timeStrStyled)
+	} else {
+		metaStr = fmt.Sprintf("%s%s%s%s%s", priorityBadge, bulletStyled, spStrStyled, bulletStyled, timeStrStyled)
+	}
+
 	if lipgloss.Width(metaStr) > contentW-1 {
 		metaStr = fmt.Sprintf("%s%s%s", priorityBadge, bulletStyled, timeStrStyled)
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 var PriorityOptions = []string{"0 (Critical)", "1 (High)", "2 (Medium)", "3 (Low)"}
-var TaskTypeOptions = []string{"Anchored", "Floating", "Reminder", "Habit"}
+var TaskTypeOptions = []string{"Anchored", "Floating", "Reminder", "Habit", "Event"}
 var SPOptions = []int{0, 1, 2, 3, 5, 8, 13}
 
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -68,7 +68,7 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case "enter":
-		if m.Form.ActiveField == 8 {
+		if m.Form.ActiveField == 10 {
 			m.SubmitForm()
 			m.CurrentMode = ModeNormal
 			return m, nil
@@ -91,18 +91,28 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case 1:
 		m.Form.DescInput, cmd = m.Form.DescInput.Update(msg)
 	case 5:
-		if m.Form.TaskTypeIdx == 0 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 4 {
 			m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.DueDateInput, cmd = m.Form.DueDateInput.Update(msg)
 		}
 	case 6:
-		if m.Form.TaskTypeIdx == 0 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 4 {
 			m.Form.DurationInput, cmd = m.Form.DurationInput.Update(msg)
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
 		}
 	case 7:
+		if m.Form.TaskTypeIdx == 4 {
+			m.Form.LocationInput, cmd = m.Form.LocationInput.Update(msg)
+		} else {
+			m.Form.TagsInput, cmd = m.Form.TagsInput.Update(msg)
+		}
+	case 8:
+		if m.Form.TaskTypeIdx == 4 {
+			m.Form.CommuteInput, cmd = m.Form.CommuteInput.Update(msg)
+		}
+	case 9:
 		m.Form.TagsInput, cmd = m.Form.TagsInput.Update(msg)
 	}
 
@@ -116,6 +126,8 @@ func (m *Model) focusFormFields() {
 	m.Form.DurationInput.Blur()
 	m.Form.TagsInput.Blur()
 	m.Form.DueDateInput.Blur()
+	m.Form.LocationInput.Blur()
+	m.Form.CommuteInput.Blur()
 
 	switch m.Form.ActiveField {
 	case 0:
@@ -123,18 +135,28 @@ func (m *Model) focusFormFields() {
 	case 1:
 		m.Form.DescInput.Focus()
 	case 5:
-		if m.Form.TaskTypeIdx == 0 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 4 {
 			m.Form.StartTimeInput.Focus()
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.DueDateInput.Focus()
 		}
 	case 6:
-		if m.Form.TaskTypeIdx == 0 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 4 {
 			m.Form.DurationInput.Focus()
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.StartTimeInput.Focus()
 		}
 	case 7:
+		if m.Form.TaskTypeIdx == 4 {
+			m.Form.LocationInput.Focus()
+		} else {
+			m.Form.TagsInput.Focus()
+		}
+	case 8:
+		if m.Form.TaskTypeIdx == 4 {
+			m.Form.CommuteInput.Focus()
+		}
+	case 9:
 		m.Form.TagsInput.Focus()
 	}
 }
@@ -164,7 +186,7 @@ func (m *Model) SubmitForm() {
 	var startTime time.Time
 	duration := 60
 
-	if taskType == 0 {
+	if taskType == 0 || taskType == 4 {
 		timeStr := m.Form.StartTimeInput.Value()
 		hour, min := ParseFlexibleTime(timeStr, 9, 0)
 		now := time.Now()
@@ -241,6 +263,23 @@ func (m *Model) SubmitForm() {
 			Start: startTime,
 			End:   startTime.Add(time.Duration(duration) * time.Minute),
 		}
+		if isEdit && existingTask.LifecycleState == model.StateCompleted {
+			newTask.LifecycleState = model.StateCompleted
+		} else {
+			newTask.LifecycleState = model.StateScheduled
+		}
+	} else if taskType == 4 {
+		newTask.SchedulingType = model.Event
+		newTask.TimeWindow = model.TimeWindow{
+			Start: startTime,
+			End:   startTime.Add(time.Duration(duration) * time.Minute),
+		}
+		newTask.Location = m.Form.LocationInput.Value()
+		commuteMins := 0
+		if c, err := strconv.Atoi(m.Form.CommuteInput.Value()); err == nil && c > 0 {
+			commuteMins = c
+		}
+		newTask.CommuteBuffer = commuteMins
 		if isEdit && existingTask.LifecycleState == model.StateCompleted {
 			newTask.LifecycleState = model.StateCompleted
 		} else {

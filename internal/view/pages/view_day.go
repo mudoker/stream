@@ -70,7 +70,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	// ── Resolve overlapping tasks and overlay cards ──────────────────
 	var anchoredTasks []model.Task
 	for _, task := range m.Tasks {
-		if task.SchedulingType == model.Anchored && viewmodel.SameDay(task.TimeWindow.Start, m.SelectedDay) {
+		if (task.SchedulingType == model.Anchored || task.SchedulingType == model.Event) && viewmodel.SameDay(task.TimeWindow.Start, m.SelectedDay) {
 			anchoredTasks = append(anchoredTasks, task)
 		}
 	}
@@ -197,6 +197,33 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			selectedEndRow = startRow + h
 		}
 
+		// Render Top Commute Buffer
+		if rc.Task.SchedulingType == model.Event && rc.Task.Location != "" && rc.Task.CommuteBuffer > 0 {
+			commuteDur := time.Duration(rc.Task.CommuteBuffer) * time.Minute
+			commuteRows := durationToRows(commuteDur)
+			topStartRow := startRow - commuteRows
+			if topStartRow < 0 {
+				topStartRow = 0
+			}
+			topH := startRow - topStartRow
+			if topH > 0 {
+				topCommuteTime := rc.Task.TimeWindow.Start.Add(-commuteDur)
+				topCommuteStr := RenderTopCommuteBlock(t, colW, topH, rc.Task.CommuteBuffer, topCommuteTime, isSelected)
+				topCommuteLines := strings.Split(topCommuteStr, "\n")
+				for i, line := range topCommuteLines {
+					r := topStartRow + i
+					if r >= viewmodel.TotalRows {
+						break
+					}
+					taskRows[colIndex][r] = line
+				}
+				if isSelected {
+					selectedStartRow = topStartRow
+				}
+			}
+		}
+
+		// Render main task card
 		cardStr := components.RenderTaskCard(m, t, rc.Task, colW, h, isActive, isSelected)
 		cardLines := strings.Split(cardStr, "\n")
 
@@ -206,6 +233,32 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				break
 			}
 			taskRows[colIndex][r] = line
+		}
+
+		// Render Bottom Commute Buffer
+		if rc.Task.SchedulingType == model.Event && rc.Task.Location != "" && rc.Task.CommuteBuffer > 0 {
+			commuteDur := time.Duration(rc.Task.CommuteBuffer) * time.Minute
+			commuteRows := durationToRows(commuteDur)
+			bottomEndRow := startRow + h + commuteRows
+			if bottomEndRow > viewmodel.TotalRows {
+				bottomEndRow = viewmodel.TotalRows
+			}
+			bottomH := bottomEndRow - (startRow + h)
+			if bottomH > 0 {
+				bottomCommuteTime := rc.Task.TimeWindow.End.Add(commuteDur)
+				bottomCommuteStr := RenderBottomCommuteBlock(t, colW, bottomH, rc.Task.CommuteBuffer, bottomCommuteTime, isSelected)
+				bottomCommuteLines := strings.Split(bottomCommuteStr, "\n")
+				for i, line := range bottomCommuteLines {
+					r := startRow + h + i
+					if r >= viewmodel.TotalRows {
+						break
+					}
+					taskRows[colIndex][r] = line
+				}
+				if isSelected {
+					selectedEndRow = startRow + h + bottomH
+				}
+			}
 		}
 
 		isCompleted := rc.Task.LifecycleState == model.StateCompleted

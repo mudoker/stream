@@ -69,7 +69,7 @@ func (m *Model) CalculateAnalyticsStats() AnalyticsStats {
 			}
 
 			dur := t.ExecutionMetrics.ElapsedFocusSeconds
-			if dur == 0 && t.SchedulingType == model.Anchored {
+			if dur == 0 && (t.SchedulingType == model.Anchored || t.SchedulingType == model.Event) {
 				dur = int(t.TimeWindow.End.Sub(t.TimeWindow.Start).Seconds())
 			} else if dur == 0 {
 				dur = t.StoryPoints * 45 * 60
@@ -162,7 +162,7 @@ func (m *Model) CalculateAnalyticsStats() AnalyticsStats {
 	totalInLast7Days := 0
 	for _, t := range m.Tasks {
 		inLast7Days := false
-		if t.SchedulingType == model.Anchored {
+		if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event {
 			inLast7Days = t.TimeWindow.Start.After(sevenDaysAgo)
 		} else {
 			inLast7Days = t.CreatedAt.After(sevenDaysAgo)
@@ -216,7 +216,7 @@ func (m *Model) CalculateAnalyticsStats() AnalyticsStats {
 		if t.LifecycleState == model.StateCompleted {
 			dateStr := t.UpdatedAt.Format("2006-01-02")
 			dur := t.ExecutionMetrics.ElapsedFocusSeconds
-			if dur == 0 && t.SchedulingType == model.Anchored {
+			if dur == 0 && (t.SchedulingType == model.Anchored || t.SchedulingType == model.Event) {
 				dur = int(t.TimeWindow.End.Sub(t.TimeWindow.Start).Seconds())
 			} else if dur == 0 {
 				dur = t.StoryPoints * 45 * 60

@@ -182,6 +182,10 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 	case "z":
 		task, exists := m.GetActiveTask()
 		if exists {
+			if task.SchedulingType == model.Event {
+				m.StatusMsg = "Focus sessions are disabled for events."
+				return true, nil
+			}
 			if m.ZenTimer != nil && m.ZenTimer.Task.UUID == task.UUID {
 				m.CurrentMode = ModeZen
 				m.StatusMsg = "Returned to active Zen focus session."

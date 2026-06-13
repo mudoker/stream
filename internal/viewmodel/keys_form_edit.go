@@ -33,11 +33,21 @@ func (m *Model) startEditMode(task model.Task) {
 		}
 	}
 
+	m.Form.LocationInput.SetValue("")
+	m.Form.CommuteInput.SetValue("0")
+
 	if task.SchedulingType == model.Anchored {
 		m.Form.TaskTypeIdx = 0
 		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
 		durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
 		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
+	} else if task.SchedulingType == model.Event {
+		m.Form.TaskTypeIdx = 4
+		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
+		durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
+		m.Form.LocationInput.SetValue(task.Location)
+		m.Form.CommuteInput.SetValue(fmt.Sprintf("%d", task.CommuteBuffer))
 	} else if task.SchedulingType == model.Reminder {
 		m.Form.TaskTypeIdx = 2
 		if task.TimeWindow.Start.Second() == 1 {

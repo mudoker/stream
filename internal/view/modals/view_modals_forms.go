@@ -67,13 +67,19 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	if f.TaskTypeIdx == 0 {
 		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
-		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 7))
+		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
 	} else if f.TaskTypeIdx == 2 {
 		fields = append(fields, renderField(nextFieldNum(), "Due Date", f.DueDateInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), 6))
-		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 7))
+		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
+	} else if f.TaskTypeIdx == 4 {
+		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
+		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
+		fields = append(fields, renderField(nextFieldNum(), "Location", f.LocationInput.View(), 7))
+		fields = append(fields, renderField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), 8))
+		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
 	} else {
-		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 7))
+		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
 	}
 	fields = append(fields, "")
 	fields = append(fields, ModalSep(innerW))
@@ -81,7 +87,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 
 	submitFg := t.Muted
 	submitText := "  Submit  "
-	if f.ActiveField == 8 {
+	if f.ActiveField == 10 {
 		submitFg = t.SuccessColor
 		submitText = "[ Submit ]"
 	}

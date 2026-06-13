@@ -21,6 +21,7 @@ const (
 	Reminder  SchedulingType = "REMINDER"  // Reminder with due time
 	Recurring SchedulingType = "RECURRING" // Recurring task template
 	Habit     SchedulingType = "HABIT"     // Habit repeatable daily
+	Event     SchedulingType = "EVENT"     // Calendar event
 )
 
 type LifecycleState string
@@ -77,6 +78,8 @@ type Task struct {
 	LifecycleState   LifecycleState   `json:"lifecycle_state"`
 	ExecutionMetrics ExecutionMetrics `json:"execution_metrics"`
 	GCalMetadata     GCalMetadata     `json:"gcal_metadata"`
+	Location         string           `json:"location,omitempty"`
+	CommuteBuffer    int              `json:"commute_buffer,omitempty"` // in minutes
 	CreatedAt        time.Time        `json:"created_at"`
 	UpdatedAt        time.Time        `json:"updated_at"`
 	Tags             []string         `json:"tags,omitempty"`
@@ -120,7 +123,7 @@ type UserSettings struct {
 }
 
 func IsGCalSyncable(task Task) bool {
-	return task.SchedulingType == Anchored
+	return task.SchedulingType == Anchored || task.SchedulingType == Event
 }
 
 func (s UserSettings) NormalizedGCalSync() UserSettings {

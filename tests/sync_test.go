@@ -17,6 +17,7 @@ func TestIsGCalSyncable(t *testing.T) {
 		want     bool
 	}{
 		{"Anchored task is syncable", model.Anchored, true},
+		{"Event task is syncable", model.Event, true},
 		{"Floating task is not syncable", model.Floating, false},
 		{"Reminder task is not syncable", model.Reminder, false},
 		{"Habit task is not syncable", model.Habit, false},

@@ -53,7 +53,7 @@ func ImportSort(tasks []model.Task) {
 func GetDayTasks(allTasks []model.Task, day time.Time) []model.Task {
 	var list []model.Task
 	for _, t := range allTasks {
-		if t.SchedulingType == model.Anchored && sameDay(t.TimeWindow.Start, day) {
+		if (t.SchedulingType == model.Anchored || t.SchedulingType == model.Event) && sameDay(t.TimeWindow.Start, day) {
 			list = append(list, t)
 		}
 	}

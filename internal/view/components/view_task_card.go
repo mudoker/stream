@@ -129,13 +129,36 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 	}
 
 	var contentLines []string
-	if h == 3 {
-		contentLines = []string{titleLine}
-	} else if h == 4 {
-		contentLines = []string{titleLine, metaLine}
+	if task.SchedulingType == model.Event && task.Location != "" {
+		locStr := "📍 " + task.Location
+		locRunes := []rune(locStr)
+		if len(locRunes) > contentAreaW {
+			if contentAreaW > 2 {
+				locStr = string(locRunes[:contentAreaW-1]) + "…"
+			} else {
+				locStr = string(locRunes[:contentAreaW])
+			}
+		}
+		locLine := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(locStr)
+		if h == 3 {
+			contentLines = []string{titleLine}
+		} else if h == 4 {
+			contentLines = []string{titleLine, locLine}
+		} else if h == 5 {
+			contentLines = []string{titleLine, locLine, metaLine}
+		} else {
+			sepLine := strings.Repeat("─", contentAreaW)
+			contentLines = []string{titleLine, sepLine, locLine, metaLine}
+		}
 	} else {
-		sepLine := strings.Repeat("─", contentAreaW)
-		contentLines = []string{titleLine, sepLine, metaLine}
+		if h == 3 {
+			contentLines = []string{titleLine}
+		} else if h == 4 {
+			contentLines = []string{titleLine, metaLine}
+		} else {
+			sepLine := strings.Repeat("─", contentAreaW)
+			contentLines = []string{titleLine, sepLine, metaLine}
+		}
 	}
 
 	heightContent := h - 2

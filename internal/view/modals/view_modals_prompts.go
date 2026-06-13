@@ -37,9 +37,17 @@ func RenderPromptModal(m *viewmodel.Model, t theme.Theme) string {
 	lines = append(lines, fmt.Sprintf("  Priority: %s   •   Est: %s", pBadge, spInfo))
 
 	// Scheduled time or due time
-	if m.PromptTask.SchedulingType == model.Anchored {
+	if m.PromptTask.SchedulingType == model.Anchored || m.PromptTask.SchedulingType == model.Event {
 		timeInfo := fmt.Sprintf("%s - %s", m.PromptTask.TimeWindow.Start.Format("15:04"), m.PromptTask.TimeWindow.End.Format("15:04"))
 		lines = append(lines, fmt.Sprintf("  Scheduled: %s", lipgloss.NewStyle().Foreground(t.Accent).Render(timeInfo)))
+		if m.PromptTask.SchedulingType == model.Event {
+			if m.PromptTask.Location != "" {
+				lines = append(lines, fmt.Sprintf("  Location:  %s", lipgloss.NewStyle().Foreground(t.Fg).Render(m.PromptTask.Location)))
+			}
+			if m.PromptTask.CommuteBuffer > 0 {
+				lines = append(lines, fmt.Sprintf("  Commute:   %d mins", m.PromptTask.CommuteBuffer))
+			}
+		}
 	} else if m.PromptTask.SchedulingType == model.Reminder {
 		dueInfo := m.PromptTask.TimeWindow.Start.Format("15:04")
 		lines = append(lines, fmt.Sprintf("  Due Time:  %s", lipgloss.NewStyle().Foreground(t.Accent).Render(dueInfo)))

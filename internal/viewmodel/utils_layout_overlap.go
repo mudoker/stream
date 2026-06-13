@@ -2,16 +2,30 @@ package viewmodel
 
 import (
 	"sort"
+	"time"
 
 	"stream/internal/model"
 )
 
+// taskEffectiveInterval computes the start and end boundaries of a task,
+// including any rest buffers or commute buffers.
+func taskEffectiveInterval(t model.Task) (time.Time, time.Time) {
+	start := t.TimeWindow.Start
+	end := t.TimeWindow.End.Add(CalculateTaskRestTime(t))
+
+	if t.SchedulingType == model.Event && t.Location != "" && t.CommuteBuffer > 0 {
+		commute := time.Duration(t.CommuteBuffer) * time.Minute
+		start = start.Add(-commute)
+		end = end.Add(commute)
+	}
+	return start, end
+}
+
 // ResolveOverlaps processes a list of tasks for a single day and assigns columns to handle overlapping times
 func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
-	// Filter to Anchored tasks
 	var anchored []model.Task
 	for _, t := range tasks {
-		if t.SchedulingType == model.Anchored {
+		if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event {
 			anchored = append(anchored, t)
 		}
 	}
@@ -20,15 +34,13 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 		return nil
 	}
 
-	// Sort tasks by start time, then actual end time + rest time, then priority weight.
+	// Sort tasks by effective start time, then effective end time, then priority weight.
 	sort.Slice(anchored, func(i, j int) bool {
-		startI := anchored[i].TimeWindow.Start
-		startJ := anchored[j].TimeWindow.Start
+		startI, endI := taskEffectiveInterval(anchored[i])
+		startJ, endJ := taskEffectiveInterval(anchored[j])
 		if !startI.Equal(startJ) {
 			return startI.Before(startJ)
 		}
-		endI := anchored[i].TimeWindow.End.Add(CalculateTaskRestTime(anchored[i]))
-		endJ := anchored[j].TimeWindow.End.Add(CalculateTaskRestTime(anchored[j]))
 		if !endI.Equal(endJ) {
 			return endI.Before(endJ)
 		}
@@ -41,12 +53,14 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 	results := make([]ScheduledColumn, len(anchored))
 
 	for i, task := range anchored {
+		taskStart, _ := taskEffectiveInterval(task)
+
 		// Remove inactive tasks that don't overlap with current task start
 		var nextActive []model.Task
 		var nextCols []int
 		for j, act := range active {
-			effEnd := act.TimeWindow.End.Add(CalculateTaskRestTime(act))
-			if effEnd.After(task.TimeWindow.Start) {
+			_, effEnd := taskEffectiveInterval(act)
+			if effEnd.After(taskStart) {
 				nextActive = append(nextActive, act)
 				nextCols = append(nextCols, cols[j])
 			}
@@ -80,11 +94,9 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 	}
 
 	// Find the max column index in any overlapping group to calculate TotalCol
-	// We can group tasks into connected components of overlapping intervals
 	for i := 0; i < len(results); i++ {
 		maxCol := results[i].ColIndex
 
-		// Look ahead and behind for overlapping tasks to find the max column count in this overlap cluster
 		for j := 0; j < len(results); j++ {
 			if i == j {
 				continue
@@ -92,11 +104,8 @@ func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 			tI := results[i].Task
 			tJ := results[j].Task
 
-			// Check if intervals overlap
-			startI := tI.TimeWindow.Start
-			endI := tI.TimeWindow.End.Add(CalculateTaskRestTime(tI))
-			startJ := tJ.TimeWindow.Start
-			endJ := tJ.TimeWindow.End.Add(CalculateTaskRestTime(tJ))
+			startI, endI := taskEffectiveInterval(tI)
+			startJ, endJ := taskEffectiveInterval(tJ)
 
 			// Two intervals overlap if each starts before the other ends.
 			overlap := startI.Before(endJ) && startJ.Before(endI)

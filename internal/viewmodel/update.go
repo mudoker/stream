@@ -24,7 +24,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	defer func() {
 		for _, t := range m.Tasks {
 			if t.LifecycleState == model.StateCompleted && !completedTasksBefore[t.UUID] {
-				PlaySound("complete")
+				PlaySoundRepeated("complete", 3, 250*time.Millisecond)
 				break
 			}
 		}
@@ -87,7 +87,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if prevSessType == timer.FocusSession {
 						PlaySound("bell")
 					} else if prevSessType == timer.BreakSession {
-						PlaySound("message-new-instant")
+						PlaySoundRepeated("message-new-instant", 3, 250*time.Millisecond)
 					}
 				}
 			}

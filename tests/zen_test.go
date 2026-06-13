@@ -30,7 +30,6 @@ func TestPartitionTask(t *testing.T) {
 				{Type: timer.FocusSession, Duration: 50 * time.Minute},
 				{Type: timer.BreakSession, Duration: 10 * time.Minute},
 				{Type: timer.FocusSession, Duration: 30 * time.Minute},
-				{Type: timer.BreakSession, Duration: 5 * time.Minute},
 			},
 		},
 		{
@@ -40,7 +39,6 @@ func TestPartitionTask(t *testing.T) {
 				{Type: timer.FocusSession, Duration: 50 * time.Minute},
 				{Type: timer.BreakSession, Duration: 10 * time.Minute},
 				{Type: timer.FocusSession, Duration: 30 * time.Minute},
-				{Type: timer.BreakSession, Duration: 5 * time.Minute},
 			},
 		},
 		{
@@ -48,7 +46,6 @@ func TestPartitionTask(t *testing.T) {
 			duration: 40 * time.Minute,
 			expected: []timer.Session{
 				{Type: timer.FocusSession, Duration: 40 * time.Minute},
-				{Type: timer.BreakSession, Duration: 5 * time.Minute},
 			},
 		},
 	}
@@ -80,8 +77,8 @@ func TestZenTimerUpdateTaskDuration(t *testing.T) {
 
 	zt := timer.NewZenTimer(task)
 
-	if len(zt.Sessions) != 4 {
-		t.Fatalf("expected 4 sessions, got %d", len(zt.Sessions))
+	if len(zt.Sessions) != 3 {
+		t.Fatalf("expected 3 sessions, got %d", len(zt.Sessions))
 	}
 
 	zt.TimeRemaining = 70 * time.Minute

@@ -115,7 +115,7 @@ func (m *Model) HandleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if prevSessType == timer.FocusSession {
 					PlaySound("bell")
 				} else if prevSessType == timer.BreakSession {
-					PlaySound("message-new-instant")
+					PlaySoundRepeated("message-new-instant", 3, 250*time.Millisecond)
 				}
 			}
 		}

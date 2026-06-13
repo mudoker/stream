@@ -27,7 +27,6 @@ func PartitionTask(total time.Duration) []Session {
 	if rem <= 0 {
 		return []Session{
 			{Type: FocusSession, Duration: constant.TimerDefaultFocusDuration},
-			{Type: BreakSession, Duration: constant.TimerDefaultBreakDuration},
 		}
 	}
 
@@ -70,6 +69,11 @@ func PartitionTask(total time.Duration) []Session {
 			}
 			rem = 0 // All remaining work time accounted for
 		}
+	}
+
+	// Remove trailing break session if it exists
+	if len(sessions) > 0 && sessions[len(sessions)-1].Type == BreakSession {
+		sessions = sessions[:len(sessions)-1]
 	}
 
 	return sessions

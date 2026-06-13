@@ -76,7 +76,9 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
 		fields = append(fields, renderField(nextFieldNum(), "Location", f.LocationInput.View(), 7))
-		fields = append(fields, renderField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), 8))
+		if strings.TrimSpace(f.LocationInput.Value()) != "" {
+			fields = append(fields, renderField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), 8))
+		}
 		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
 	} else {
 		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))

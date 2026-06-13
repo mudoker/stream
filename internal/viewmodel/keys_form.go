@@ -276,8 +276,10 @@ func (m *Model) SubmitForm() {
 		}
 		newTask.Location = m.Form.LocationInput.Value()
 		commuteMins := 0
-		if c, err := strconv.Atoi(m.Form.CommuteInput.Value()); err == nil && c > 0 {
-			commuteMins = c
+		if strings.TrimSpace(newTask.Location) != "" {
+			if c, err := strconv.Atoi(m.Form.CommuteInput.Value()); err == nil && c > 0 {
+				commuteMins = c
+			}
 		}
 		newTask.CommuteBuffer = commuteMins
 		if isEdit && existingTask.LifecycleState == model.StateCompleted {

@@ -63,3 +63,57 @@ func TestEventTaskFormCreation(t *testing.T) {
 		t.Errorf("expected CalculateTaskRestTime to return 0 for Event, got %v", rest)
 	}
 }
+
+func TestEventTaskFormCreationNoLocation(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	m.Form = viewmodel.NewTaskForm()
+
+	// Fill the form fields for an Event, but keep Location empty
+	m.Form.TitleInput.SetValue("Remote Sync")
+	m.Form.DescInput.SetValue("Zoom meeting")
+	m.Form.PriorityIdx = 1
+	m.Form.TaskTypeIdx = 4 // Event task type
+	m.Form.StartTimeInput.SetValue("14:00")
+	m.Form.DurationInput.SetValue("60")
+	m.Form.LocationInput.SetValue("") // empty location
+	m.Form.CommuteInput.SetValue("30") // entered but location is empty
+	m.Form.TagsInput.SetValue("meeting")
+
+	// Verify field 8 is not visible
+	visible := m.Form.VisibleFields()
+	for _, fld := range visible {
+		if fld == 8 {
+			t.Errorf("field 8 (Commute Buffer) should not be visible when location is empty")
+		}
+	}
+
+	// Submit the form
+	m.SubmitForm()
+
+	// Retrieve the created task from database
+	tasks := database.GetTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task in database, got %d", len(tasks))
+	}
+
+	task := tasks[0]
+	if task.Title != "Remote Sync" {
+		t.Errorf("expected Title 'Remote Sync', got '%s'", task.Title)
+	}
+	if task.Location != "" {
+		t.Errorf("expected Location to be empty, got '%s'", task.Location)
+	}
+	if task.CommuteBuffer != 0 {
+		t.Errorf("expected CommuteBuffer to be 0 since location was empty, got %d", task.CommuteBuffer)
+	}
+}

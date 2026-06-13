@@ -1,6 +1,7 @@
 package viewmodel
 
 import (
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -85,6 +86,9 @@ func (f TaskForm) VisibleFields() []int {
 	case 2: // Reminder
 		return []int{0, 1, 2, 4, 5, 6, 9, 10}
 	case 4: // Event
+		if strings.TrimSpace(f.LocationInput.Value()) == "" {
+			return []int{0, 1, 2, 3, 4, 5, 6, 7, 9, 10}
+		}
 		return []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	default: // Floating, Habit
 		return []int{0, 1, 2, 3, 4, 9, 10}

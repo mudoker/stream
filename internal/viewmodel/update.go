@@ -21,10 +21,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	var zenTaskUUID string
+	if m.ZenTimer != nil {
+		zenTaskUUID = m.ZenTimer.Task.UUID
+	}
+
 	defer func() {
 		for _, t := range m.Tasks {
 			if t.LifecycleState == model.StateCompleted && !completedTasksBefore[t.UUID] {
-				PlaySoundRepeated("complete", 3, 250*time.Millisecond)
+				if t.UUID == zenTaskUUID {
+					PlaySoundRepeated("complete", 3, 250*time.Millisecond)
+				} else {
+					PlaySound("complete")
+				}
 				break
 			}
 		}

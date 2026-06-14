@@ -334,6 +334,7 @@ func (m *Model) SubmitForm() {
 			m.ConfirmTask = existingTask
 			m.ConfirmOpen = true
 			m.ConfirmActionType = "edit_recurring"
+			m.ConfirmSelectedIndex = 0
 			m.IsEditing = false
 			m.Form.IsEditing = false
 			m.EditingTaskUUID = ""

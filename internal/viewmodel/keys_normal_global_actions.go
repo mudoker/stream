@@ -171,6 +171,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 			m.ConfirmOpen = true
 			if task.RecurringParentUUID != "" {
 				m.ConfirmActionType = "delete_recurring"
+				m.ConfirmSelectedIndex = 0
 			} else {
 				m.ConfirmActionType = "delete"
 			}

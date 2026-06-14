@@ -268,6 +268,7 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			m.ConfirmOpen = true
 			if task.RecurringParentUUID != "" {
 				m.ConfirmActionType = "delete_recurring"
+				m.ConfirmSelectedIndex = 0
 			} else {
 				m.ConfirmActionType = "delete"
 			}

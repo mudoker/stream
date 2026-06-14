@@ -132,26 +132,34 @@ func TestHabitCreationFormSubmit(t *testing.T) {
 	m.Form.SPIdx = 2       // 2 SP
 	m.Form.TaskTypeIdx = 3 // Habit
 	m.Form.TagsInput.SetValue("health, daily")
+	m.Form.RecurringDaysInput.SetValue("Mon, Tue, Wed, Thu, Fri, Sat, Sun")
 
 	m.SubmitForm()
 
 	tasks := database.GetTasks()
-	if len(tasks) != 1 {
-		t.Fatalf("expected 1 task in DB, got %d", len(tasks))
+	if len(tasks) != 8 {
+		t.Fatalf("expected 8 recurring habit tasks in DB, got %d", len(tasks))
 	}
 
-	task := tasks[0]
-	if task.Title != "Drink Water" {
-		t.Errorf("expected title 'Drink Water', got %q", task.Title)
-	}
-	if task.Description != "8 glasses a day" {
-		t.Errorf("expected description '8 glasses a day', got %q", task.Description)
-	}
-	if task.SchedulingType != model.Habit {
-		t.Errorf("expected SchedulingType to be Habit, got %s", task.SchedulingType)
-	}
-	if len(task.Tags) != 2 || task.Tags[0] != "health" || task.Tags[1] != "daily" {
-		t.Errorf("unexpected tags: %v", task.Tags)
+	for _, task := range tasks {
+		if task.Title != "Drink Water" {
+			t.Errorf("expected title 'Drink Water', got %q", task.Title)
+		}
+		if task.Description != "8 glasses a day" {
+			t.Errorf("expected description '8 glasses a day', got %q", task.Description)
+		}
+		if task.SchedulingType != model.Habit {
+			t.Errorf("expected SchedulingType to be Habit, got %s", task.SchedulingType)
+		}
+		if len(task.Tags) != 2 || task.Tags[0] != "health" || task.Tags[1] != "daily" {
+			t.Errorf("unexpected tags: %v", task.Tags)
+		}
+		if task.RecurringParentUUID == "" {
+			t.Errorf("expected RecurringParentUUID to be set")
+		}
+		if !model.IsTaskAnchored(task) {
+			t.Errorf("expected habit to be anchored by default")
+		}
 	}
 }
 
@@ -170,19 +178,26 @@ func TestHabitCommandPalette(t *testing.T) {
 	m.RunCommand("habit Read Books")
 
 	tasks := database.GetTasks()
-	if len(tasks) != 1 {
-		t.Fatalf("expected 1 task in DB, got %d", len(tasks))
+	if len(tasks) != 7 {
+		t.Fatalf("expected 7 recurring habit tasks in DB, got %d", len(tasks))
 	}
 
-	task := tasks[0]
-	if task.Title != "Read Books" {
-		t.Errorf("expected title 'Read Books', got %q", task.Title)
-	}
-	if task.SchedulingType != model.Habit {
-		t.Errorf("expected SchedulingType to be Habit, got %s", task.SchedulingType)
-	}
-	if task.StoryPoints != 0 {
-		t.Errorf("expected StoryPoints to be 0, got %d", task.StoryPoints)
+	for _, task := range tasks {
+		if task.Title != "Read Books" {
+			t.Errorf("expected title 'Read Books', got %q", task.Title)
+		}
+		if task.SchedulingType != model.Habit {
+			t.Errorf("expected SchedulingType to be Habit, got %s", task.SchedulingType)
+		}
+		if task.StoryPoints != 0 {
+			t.Errorf("expected StoryPoints to be 0, got %d", task.StoryPoints)
+		}
+		if task.RecurringParentUUID == "" {
+			t.Errorf("expected RecurringParentUUID to be set")
+		}
+		if !model.IsTaskAnchored(task) {
+			t.Errorf("expected habit to be anchored by default")
+		}
 	}
 }
 

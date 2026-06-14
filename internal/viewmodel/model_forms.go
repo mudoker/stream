@@ -116,10 +116,15 @@ func (f TaskForm) VisibleFields() []int {
 		}
 	}
 
-	if !f.IsEditing && (f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3) {
-		fields = append(fields, 11)
-		if f.IsRecurringIdx == 1 {
+	if !f.IsEditing {
+		if f.TaskTypeIdx == 3 {
+			// Habit is always recurring
 			fields = append(fields, 12, 13)
+		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 {
+			fields = append(fields, 11)
+			if f.IsRecurringIdx == 1 {
+				fields = append(fields, 12, 13)
+			}
 		}
 	}
 

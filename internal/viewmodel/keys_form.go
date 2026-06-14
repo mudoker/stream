@@ -194,13 +194,13 @@ func (m *Model) SubmitForm() {
 	spVal := SPOptions[m.Form.SPIdx]
 	taskType := m.Form.TaskTypeIdx
 
-	var startTime time.Time
+	now := time.Now()
+	startTime := time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), 9, 0, 0, 0, now.Location())
 	duration := 60
 
 	if taskType == 0 || taskType == 4 {
 		timeStr := m.Form.StartTimeInput.Value()
 		hour, min := ParseFlexibleTime(timeStr, 9, 0)
-		now := time.Now()
 		startTime = time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), hour, min, 0, 0, now.Location())
 		durStr := m.Form.DurationInput.Value()
 		if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
@@ -222,7 +222,6 @@ func (m *Model) SubmitForm() {
 			hour, min = ParseFlexibleTime(timeStr, 9, 0)
 			sec = 0
 		}
-		now := time.Now()
 		startTime = time.Date(dueDay.Year(), dueDay.Month(), dueDay.Day(), hour, min, sec, 0, now.Location())
 	}
 
@@ -355,7 +354,7 @@ func (m *Model) SubmitForm() {
 		m.triggerGCalPush(newTask)
 		m.StatusMsg = fmt.Sprintf("Task '%s' updated successfully.", title)
 	} else {
-		if m.Form.IsRecurringIdx == 1 {
+		if m.Form.IsRecurringIdx == 1 || taskType == 3 {
 			endDateStr := strings.TrimSpace(m.Form.RecurringEndDateInput.Value())
 			endDate, err := time.Parse("2006-01-02", endDateStr)
 			if err != nil {

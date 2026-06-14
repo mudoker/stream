@@ -92,15 +92,32 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		} else if cmdName == "habit" {
 			newTask.SchedulingType = model.Habit
 			newTask.StoryPoints = 0
+
+			parentUUID := uuid.New().String()
+			now := time.Now()
+			startTime := time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), 9, 0, 0, 0, now.Location())
+			endDate := startTime.AddDate(0, 0, 6) // 7 days total
+
+			current := startTime
+			for !current.After(endDate) {
+				instance := newTask
+				instance.UUID = uuid.New().String()
+				instance.RecurringParentUUID = parentUUID
+				instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), 9, 0, 0, 0, startTime.Location())
+				instance.TimeWindow.End = instance.TimeWindow.Start.Add(1 * time.Hour)
+				instance.LifecycleState = model.StateReady
+
+				m.DB.AddTask(instance)
+				current = current.AddDate(0, 0, 1)
+			}
+			m.refreshTasks()
+			m.StatusMsg = fmt.Sprintf("Habit '%s' created (recurring daily for 7 days).", title)
+			return m, nil
 		}
 		m.DB.AddTask(newTask)
 		m.refreshTasks()
 		m.triggerGCalPush(newTask)
-		if cmdName == "habit" {
-			m.StatusMsg = fmt.Sprintf("Habit '%s' created.", title)
-		} else {
-			m.StatusMsg = fmt.Sprintf("Task '%s' created.", title)
-		}
+		m.StatusMsg = fmt.Sprintf("Task '%s' created.", title)
 
 	case "ws-switch":
 		if len(parts) < 2 {

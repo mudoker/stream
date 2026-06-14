@@ -12,7 +12,8 @@ import (
 )
 
 func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
-	f := m.Form
+	f := &m.Form
+	f.SyncDaysSelectedFromInput()
 	const innerW = 52
 
 	var fields []string
@@ -46,6 +47,45 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), valStr)
 	}
 
+	renderDaysSelect := func(num, label string, index int) string {
+		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("%2s", num))
+		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
+		isActiveField := f.ActiveField == index
+		if isActiveField {
+			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
+		}
+
+		dayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+		var dayStrs []string
+		for i, name := range dayNames {
+			sel := f.RecurringDaysSelected[i]
+			isCursor := isActiveField && f.RecurringDaysSubIdx == i
+
+			var dStr string
+			if isCursor {
+				dStr = "[" + name + "]"
+			} else {
+				dStr = " " + name + " "
+			}
+
+			if isCursor {
+				if sel {
+					dStr = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(dStr)
+				} else {
+					dStr = lipgloss.NewStyle().Foreground(t.Accent).Render(dStr)
+				}
+			} else if sel {
+				dStr = lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(dStr)
+			} else {
+				dStr = lipgloss.NewStyle().Foreground(t.Muted).Render(strings.ToLower(dStr))
+			}
+			dayStrs = append(dayStrs, dStr)
+		}
+
+		daysRow := strings.Join(dayStrs, " ")
+		return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), daysRow)
+	}
+
 	priorityValStr := viewmodel.PriorityOptions[f.PriorityIdx]
 	spValStr := fmt.Sprintf("%d", viewmodel.SPOptions[f.SPIdx])
 	typeValStr := viewmodel.TaskTypeOptions[f.TaskTypeIdx]
@@ -60,7 +100,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	fields = append(fields, renderField(nextFieldNum(), "Title", f.TitleInput.View(), 0))
 	fields = append(fields, renderField(nextFieldNum(), "Description", f.DescInput.View(), 1))
 	fields = append(fields, renderDropdown(nextFieldNum(), "Priority", priorityValStr, 2))
-	if f.TaskTypeIdx != 2 {
+	if f.TaskTypeIdx != 2 && f.TaskTypeIdx != 3 && f.TaskTypeIdx != 4 {
 		fields = append(fields, renderDropdown(nextFieldNum(), "Story Points", spValStr, 3))
 	}
 	fields = append(fields, renderDropdown(nextFieldNum(), "Type", typeValStr, 4))
@@ -83,7 +123,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		if f.TaskTypeIdx == 3 {
 			// Habit is always recurring
 			fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
-			fields = append(fields, renderField(nextFieldNum(), "Days (Mon,Wed...)", f.RecurringDaysInput.View(), 13))
+			fields = append(fields, renderDaysSelect(nextFieldNum(), "Days (Mon,Wed...)", 13))
 		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 {
 			recOptStr := "No"
 			if f.IsRecurringIdx == 1 {
@@ -92,7 +132,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			fields = append(fields, renderDropdown(nextFieldNum(), "Is Recurring", recOptStr, 11))
 			if f.IsRecurringIdx == 1 {
 				fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
-				fields = append(fields, renderField(nextFieldNum(), "Days (Mon,Wed...)", f.RecurringDaysInput.View(), 13))
+				fields = append(fields, renderDaysSelect(nextFieldNum(), "Days (Mon,Wed...)", 13))
 			}
 		}
 	}
@@ -108,11 +148,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		submitFg = t.SuccessColor
 		submitText = "[ Submit ]"
 	}
-	submitBtn := lipgloss.NewStyle().
-		Foreground(submitFg).
-		Bold(true).
-		Render(submitText)
-	fields = append(fields, "  "+submitBtn)
+	fields = append(fields, "  "+lipgloss.NewStyle().Foreground(submitFg).Bold(true).Render(submitText))
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
 }

@@ -362,6 +362,11 @@ func (m *Model) SubmitForm() {
 			}
 			endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 0, startTime.Location())
 
+			maxEndDate := startTime.AddDate(0, 1, 0)
+			if endDate.After(maxEndDate) {
+				endDate = time.Date(maxEndDate.Year(), maxEndDate.Month(), maxEndDate.Day(), 23, 59, 59, 0, startTime.Location())
+			}
+
 			daysStr := strings.ToLower(m.Form.RecurringDaysInput.Value())
 			days := map[time.Weekday]bool{
 				time.Sunday:    strings.Contains(daysStr, "sun") || strings.Contains(daysStr, "daily"),

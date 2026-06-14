@@ -472,3 +472,41 @@ func TestRecurringTaskLifecycle(t *testing.T) {
 	}
 }
 
+func TestRecurringCapping(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	m.SelectedDay = time.Date(2026, 6, 14, 0, 0, 0, 0, time.Local)
+
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TitleInput.SetValue("Daily Gym")
+	m.Form.DescInput.SetValue("Health")
+	m.Form.PriorityIdx = 1
+	m.Form.SPIdx = 2
+	m.Form.TaskTypeIdx = 0 // Anchored
+	m.Form.IsRecurringIdx = 1
+	// Set end date to 1 year in the future (2027-06-14)
+	m.Form.RecurringEndDateInput.SetValue("2027-06-14")
+	m.Form.RecurringDaysInput.SetValue("Mon, Tue, Wed, Thu, Fri, Sat, Sun") // daily
+	m.Form.StartTimeInput.SetValue("08:00")
+	m.Form.DurationInput.SetValue("60")
+
+	m.SubmitForm()
+
+	tasks := database.GetTasks()
+	// Capped at 1 month (which is 2026-06-14 to 2026-07-14 inclusive = 31 days)
+	// Let's assert that it's capped (should be 31 tasks instead of 365)
+	if len(tasks) > 35 {
+		t.Errorf("expected recurring tasks to be capped at 1 month, got %d tasks", len(tasks))
+	}
+}
+
+

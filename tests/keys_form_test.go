@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -511,5 +512,103 @@ func TestRecurringCapping(t *testing.T) {
 		t.Errorf("expected recurring tasks to be capped at 1 month, got %d tasks", len(tasks))
 	}
 }
+
+func TestInteractiveDaysSelectAndStoryPointsSkip(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	m.CurrentMode = viewmodel.ModeForm
+	m.Form = viewmodel.NewTaskForm()
+
+	// 1. Verify initially weekdays are selected
+	m.Form.SyncDaysSelectedFromInput()
+	expectedInitial := []bool{true, true, true, true, true, false, false} // Mon-Fri true, Sat-Sun false
+	for i, val := range expectedInitial {
+		if m.Form.RecurringDaysSelected[i] != val {
+			t.Errorf("day %d initial state expected %v, got %v", i, val, m.Form.RecurringDaysSelected[i])
+		}
+	}
+
+	// 2. Test left/right navigation and space toggle
+	m.Form.IsRecurringIdx = 1 // Make recurrence fields visible
+	m.Form.ActiveField = 13 // Days selection
+	m.Form.RecurringDaysSubIdx = 0 // Monday
+
+	// Navigate to Saturday (index 5)
+	// Monday -> Sunday -> Saturday (press left twice)
+	m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	if m.Form.RecurringDaysSubIdx != 5 {
+		t.Errorf("expected sub cursor to be at 5 (Saturday), got %d", m.Form.RecurringDaysSubIdx)
+	}
+
+	// Toggle Saturday (should select it)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	if !m.Form.RecurringDaysSelected[5] {
+		t.Errorf("expected Saturday to be selected")
+	}
+
+	// RecurringDaysInput should update to include Sat
+	daysVal := m.Form.RecurringDaysInput.Value()
+	if !strings.Contains(daysVal, "Sat") {
+		t.Errorf("expected Days input to contain 'Sat', got %q", daysVal)
+	}
+
+	// Toggle it back off
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(" ")})
+	if m.Form.RecurringDaysSelected[5] {
+		t.Errorf("expected Saturday to be unselected")
+	}
+
+	// 3. Verify Story Points skipping for Habit and Event
+	// Start with type Anchored (0): Story Points (3) should be visible
+	m.Form.TaskTypeIdx = 0
+	visible := m.Form.VisibleFields()
+	hasSP := false
+	for _, val := range visible {
+		if val == 3 {
+			hasSP = true
+		}
+	}
+	if !hasSP {
+		t.Errorf("expected Story Points (3) to be visible for Anchored task")
+	}
+
+	// Change type to Habit (3)
+	m.Form.TaskTypeIdx = 3
+	visible = m.Form.VisibleFields()
+	hasSP = false
+	for _, val := range visible {
+		if val == 3 {
+			hasSP = true
+		}
+	}
+	if hasSP {
+		t.Errorf("expected Story Points (3) to be hidden for Habit")
+	}
+
+	// Change type to Event (4)
+	m.Form.TaskTypeIdx = 4
+	visible = m.Form.VisibleFields()
+	hasSP = false
+	for _, val := range visible {
+		if val == 3 {
+			hasSP = true
+		}
+	}
+	if hasSP {
+		t.Errorf("expected Story Points (3) to be hidden for Event")
+	}
+}
+
+
 
 

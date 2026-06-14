@@ -163,7 +163,7 @@ func RenderReviewModal(m *viewmodel.Model, t theme.Theme) string {
 }
 
 func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
-	const innerW = 46
+	const innerW = 50
 	var lines []string
 
 	if m.ConfirmActionType == "complete_reminder" {
@@ -195,67 +195,73 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Any Key] Cancel")
 		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
 	} else if m.ConfirmActionType == "delete_recurring" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("Delete Recurring Task"))
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("♻️  DELETE RECURRING TASK"))
 		lines = append(lines, ModalSep(innerW))
 		lines = append(lines, "")
-		lines = append(lines, "  This is a recurring task/habit.")
+		lines = append(lines, "  This is a recurring task/habit:")
+		lines = append(lines, "  "+lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(theme.SentenceCase(m.ConfirmTask.Title)))
+		lines = append(lines, "")
 		lines = append(lines, "  Choose deletion option:")
 		lines = append(lines, "")
 
-		opt1Style := lipgloss.NewStyle().Foreground(t.Muted)
-		opt1Text := "   Only this occurrence"
+		var opt1, opt2 string
 		if m.ConfirmSelectedIndex == 0 {
-			opt1Style = lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
-			opt1Text = " ▸ Only this occurrence"
+			opt1 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ Only this occurrence ◀")
+		} else {
+			opt1 = lipgloss.NewStyle().Foreground(t.Muted).Render("    Only this occurrence")
 		}
-		lines = append(lines, opt1Style.Render(opt1Text))
 
-		opt2Style := lipgloss.NewStyle().Foreground(t.Muted)
-		opt2Text := "   This and all remaining occurrences"
 		if m.ConfirmSelectedIndex == 1 {
-			opt2Style = lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
-			opt2Text = " ▸ This and all remaining occurrences"
+			opt2 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ This and all remaining occurrences ◀")
+		} else {
+			opt2 = lipgloss.NewStyle().Foreground(t.Muted).Render("    This and all remaining occurrences")
 		}
-		lines = append(lines, opt2Style.Render(opt2Text))
+
+		lines = append(lines, opt1)
+		lines = append(lines, opt2)
 
 		lines = append(lines, "")
 		lines = append(lines, ModalSep(innerW))
 		lines = append(lines, "")
 
-		yesBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Confirm")
-		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
-		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+		confirmBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Confirm")
+		cancelBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
+		hintText := lipgloss.NewStyle().Foreground(t.Muted).Render("j/k navigate")
+		lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
 	} else if m.ConfirmActionType == "edit_recurring" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Edit Recurring Task"))
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("♻️  EDIT RECURRING TASK"))
 		lines = append(lines, ModalSep(innerW))
 		lines = append(lines, "")
-		lines = append(lines, "  This is a recurring task/habit.")
+		lines = append(lines, "  This is a recurring task/habit:")
+		lines = append(lines, "  "+lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(theme.SentenceCase(m.ConfirmTask.Title)))
+		lines = append(lines, "")
 		lines = append(lines, "  Choose update option:")
 		lines = append(lines, "")
 
-		opt1Style := lipgloss.NewStyle().Foreground(t.Muted)
-		opt1Text := "   Only this occurrence"
+		var opt1, opt2 string
 		if m.ConfirmSelectedIndex == 0 {
-			opt1Style = lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
-			opt1Text = " ▸ Only this occurrence"
+			opt1 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ Only this occurrence ◀")
+		} else {
+			opt1 = lipgloss.NewStyle().Foreground(t.Muted).Render("    Only this occurrence")
 		}
-		lines = append(lines, opt1Style.Render(opt1Text))
 
-		opt2Style := lipgloss.NewStyle().Foreground(t.Muted)
-		opt2Text := "   This and all remaining occurrences"
 		if m.ConfirmSelectedIndex == 1 {
-			opt2Style = lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
-			opt2Text = " ▸ This and all remaining occurrences"
+			opt2 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ This and all remaining occurrences ◀")
+		} else {
+			opt2 = lipgloss.NewStyle().Foreground(t.Muted).Render("    This and all remaining occurrences")
 		}
-		lines = append(lines, opt2Style.Render(opt2Text))
+
+		lines = append(lines, opt1)
+		lines = append(lines, opt2)
 
 		lines = append(lines, "")
 		lines = append(lines, ModalSep(innerW))
 		lines = append(lines, "")
 
-		yesBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Confirm")
-		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
-		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+		confirmBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Confirm")
+		cancelBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
+		hintText := lipgloss.NewStyle().Foreground(t.Muted).Render("j/k navigate")
+		lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
 	} else {
 		lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("Confirm Delete"))
 		lines = append(lines, ModalSep(innerW))

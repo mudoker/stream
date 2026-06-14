@@ -76,7 +76,7 @@ func (m *Model) AutoScrollToSelectedTask() {
 	var selectedTask model.Task
 	found := false
 	for _, t := range m.Tasks {
-		if t.UUID == m.SelectedTaskUUID && (t.SchedulingType == model.Anchored || t.SchedulingType == model.Event) {
+		if t.UUID == m.SelectedTaskUUID && model.IsTaskAnchored(t) {
 			selectedTask = t
 			found = true
 			break

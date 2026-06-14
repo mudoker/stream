@@ -57,7 +57,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 	case "a":
 		task, exists := m.GetActiveTask()
 		if exists {
-			if task.SchedulingType == model.Anchored {
+			if model.IsTaskAnchored(task) {
 				m.ConfirmTask = task
 				m.ConfirmOpen = true
 				m.ConfirmActionType = "deanchor"
@@ -169,7 +169,11 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		if exists {
 			m.ConfirmTask = task
 			m.ConfirmOpen = true
-			m.ConfirmActionType = "delete"
+			if task.RecurringParentUUID != "" {
+				m.ConfirmActionType = "delete_recurring"
+			} else {
+				m.ConfirmActionType = "delete"
+			}
 		}
 		return true, nil
 	case "t":

@@ -26,7 +26,7 @@ func taskEffectiveInterval(t model.Task) (time.Time, time.Time) {
 func ResolveOverlaps(tasks []model.Task) []ScheduledColumn {
 	var anchored []model.Task
 	for _, t := range tasks {
-		if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event {
+		if model.IsTaskAnchored(t) {
 			anchored = append(anchored, t)
 		}
 	}

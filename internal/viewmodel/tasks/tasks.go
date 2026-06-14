@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -53,7 +54,7 @@ func ImportSort(tasks []model.Task) {
 func GetDayTasks(allTasks []model.Task, day time.Time) []model.Task {
 	var list []model.Task
 	for _, t := range allTasks {
-		if (t.SchedulingType == model.Anchored || t.SchedulingType == model.Event) && sameDay(t.TimeWindow.Start, day) {
+		if model.IsTaskAnchored(t) && sameDay(t.TimeWindow.Start, day) {
 			list = append(list, t)
 		}
 	}
@@ -68,6 +69,9 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 	var habits []model.Task
 	var backlog []model.Task
 	var completed []model.Task
+
+	recurringCounts := make(map[string]int)
+	recurringInstances := make(map[string]model.Task)
 
 	for _, t := range allTasks {
 		isDone := false
@@ -94,9 +98,38 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 		if t.SchedulingType == model.Reminder {
 			reminders = append(reminders, t)
 		} else if t.SchedulingType == model.Habit {
-			habits = append(habits, t)
+			isAnchoredOnSelectedDay := !t.TimeWindow.Start.IsZero() && sameDay(t.TimeWindow.Start, selectedDay)
+			if !isAnchoredOnSelectedDay {
+				if t.RecurringParentUUID != "" {
+					recurringCounts[t.RecurringParentUUID]++
+					if _, exists := recurringInstances[t.RecurringParentUUID]; !exists {
+						recurringInstances[t.RecurringParentUUID] = t
+					}
+				} else {
+					habits = append(habits, t)
+				}
+			}
 		} else if t.SchedulingType == model.Floating {
-			backlog = append(backlog, t)
+			if t.RecurringParentUUID != "" {
+				recurringCounts[t.RecurringParentUUID]++
+				if _, exists := recurringInstances[t.RecurringParentUUID]; !exists {
+					recurringInstances[t.RecurringParentUUID] = t
+				}
+			} else {
+				backlog = append(backlog, t)
+			}
+		}
+	}
+
+	for parentUUID, count := range recurringCounts {
+		task := recurringInstances[parentUUID]
+		if count > 1 {
+			task.Title = fmt.Sprintf("%s (%d)", task.Title, count)
+		}
+		if task.SchedulingType == model.Habit {
+			habits = append(habits, task)
+		} else {
+			backlog = append(backlog, task)
 		}
 	}
 

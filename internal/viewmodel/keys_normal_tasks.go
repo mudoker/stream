@@ -112,7 +112,7 @@ func (m *Model) GetAgendaTasks() []model.Task {
 	var agendaTasks []model.Task
 	for _, t := range m.Tasks {
 		isTodayOrUpcoming := false
-		if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event {
+		if model.IsTaskAnchored(t) {
 			isTodayOrUpcoming = t.TimeWindow.Start.Year() == today.Year() &&
 				t.TimeWindow.Start.Month() == today.Month() &&
 				t.TimeWindow.Start.Day() == today.Day() || t.TimeWindow.Start.After(today)
@@ -126,8 +126,8 @@ func (m *Model) GetAgendaTasks() []model.Task {
 		}
 	}
 	sort.Slice(agendaTasks, func(i, j int) bool {
-		isScheduledI := agendaTasks[i].SchedulingType == model.Anchored || agendaTasks[i].SchedulingType == model.Event
-		isScheduledJ := agendaTasks[j].SchedulingType == model.Anchored || agendaTasks[j].SchedulingType == model.Event
+		isScheduledI := model.IsTaskAnchored(agendaTasks[i])
+		isScheduledJ := model.IsTaskAnchored(agendaTasks[j])
 		if isScheduledI && isScheduledJ {
 			return agendaTasks[i].TimeWindow.Start.Before(agendaTasks[j].TimeWindow.Start)
 		}
@@ -150,7 +150,7 @@ func (m *Model) GetUpcomingTask() (model.Task, bool) {
 	now := time.Now()
 	var candidates []model.Task
 	for _, t := range m.Tasks {
-		if (t.SchedulingType == model.Anchored || t.SchedulingType == model.Event) && t.LifecycleState != model.StateCompleted {
+		if model.IsTaskAnchored(t) && t.LifecycleState != model.StateCompleted {
 			if t.TimeWindow.Start.After(now) {
 				candidates = append(candidates, t)
 			}

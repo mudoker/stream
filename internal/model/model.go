@@ -85,6 +85,7 @@ type Task struct {
 	Tags             []string         `json:"tags,omitempty"`
 	Notes            string           `json:"notes,omitempty"`
 	CompletedDates   []string         `json:"completed_dates,omitempty"`
+	RecurringParentUUID string        `json:"recurring_parent_uuid,omitempty"`
 }
 
 // SortingWeight computes the priority execution weight: (Priority Value * 1000) + Story Points
@@ -103,6 +104,10 @@ func (t *Task) SortingWeight() int {
 		pVal = 0
 	}
 	return pVal + t.StoryPoints
+}
+
+func IsTaskAnchored(t Task) bool {
+	return t.SchedulingType == Anchored || t.SchedulingType == Event || (t.SchedulingType == Habit && !t.TimeWindow.Start.IsZero())
 }
 
 type GCalSyncMode string

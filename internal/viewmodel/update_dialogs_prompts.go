@@ -36,12 +36,16 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			dur := time.Duration(durationMins) * time.Minute
 
 			t := m.AnchorPromptTask
-			t.SchedulingType = model.Anchored
+			if t.SchedulingType != model.Habit {
+				t.SchedulingType = model.Anchored
+				t.LifecycleState = model.StateScheduled
+			} else {
+				t.LifecycleState = model.StateReady
+			}
 			t.TimeWindow = model.TimeWindow{
 				Start: startTime,
 				End:   startTime.Add(dur),
 			}
-			t.LifecycleState = model.StateScheduled
 
 			if m.DB != nil {
 				m.DB.UpdateTask(t)

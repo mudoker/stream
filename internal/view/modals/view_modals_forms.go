@@ -67,11 +67,9 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	if f.TaskTypeIdx == 0 {
 		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
-		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
 	} else if f.TaskTypeIdx == 2 {
 		fields = append(fields, renderField(nextFieldNum(), "Due Date", f.DueDateInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), 6))
-		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
 	} else if f.TaskTypeIdx == 4 {
 		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
@@ -79,10 +77,21 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
 			fields = append(fields, renderField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), 8))
 		}
-		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
-	} else {
-		fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
 	}
+
+	if !f.IsEditing && (f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3) {
+		recOptStr := "No"
+		if f.IsRecurringIdx == 1 {
+			recOptStr = "Yes"
+		}
+		fields = append(fields, renderDropdown(nextFieldNum(), "Is Recurring", recOptStr, 11))
+		if f.IsRecurringIdx == 1 {
+			fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
+			fields = append(fields, renderField(nextFieldNum(), "Days (Mon,Wed...)", f.RecurringDaysInput.View(), 13))
+		}
+	}
+
+	fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
 	fields = append(fields, "")
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")

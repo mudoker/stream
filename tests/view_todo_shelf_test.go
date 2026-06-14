@@ -448,3 +448,82 @@ func TestTimelineDeleteSelectionAdjustment(t *testing.T) {
 		t.Fatalf("expected TimelineHour to be %d, got %d", now.Add(time.Hour).Hour(), m.TimelineHour)
 	}
 }
+
+func TestRecurringAndHabitShelfBehavior(t *testing.T) {
+	day1 := time.Date(2026, 6, 14, 0, 0, 0, 0, time.Local)
+	day2 := day1.AddDate(0, 0, 1)
+
+	// 1. Habit repeatable test
+	m := &viewmodel.Model{
+		SelectedDay: day1,
+		Tasks: []model.Task{
+			{
+				UUID:           "habit-1",
+				Title:          "Drink Water",
+				SchedulingType: model.Habit,
+				TimeWindow: model.TimeWindow{
+					Start: day1.Add(9 * time.Hour),
+					End:   day1.Add(10 * time.Hour),
+				},
+				LifecycleState: model.StateReady,
+			},
+		},
+	}
+
+	// On Day 1: habit is anchored on Day 1, so it shouldn't be on the shelf
+	shelf1 := m.GetTodoShelfTasks()
+	for _, task := range shelf1 {
+		if task.UUID == "habit-1" {
+			t.Errorf("expected habit-1 to be cleared from Day 1 shelf because it is anchored on Day 1")
+		}
+	}
+
+	// Move to Day 2: habit is NOT anchored on Day 2, so it should appear on the shelf
+	m.SelectedDay = day2
+	shelf2 := m.GetTodoShelfTasks()
+	foundOnDay2Shelf := false
+	for _, task := range shelf2 {
+		if task.UUID == "habit-1" {
+			foundOnDay2Shelf = true
+			break
+		}
+	}
+	if !foundOnDay2Shelf {
+		t.Errorf("expected habit-1 to appear on Day 2 shelf because it is repeatable and not anchored on Day 2")
+	}
+
+	// 2. Grouping de-anchored recurring tasks test
+	m.Tasks = []model.Task{
+		{
+			UUID:                "rec-1",
+			Title:               "Gym",
+			SchedulingType:      model.Floating,
+			RecurringParentUUID: "gym-parent",
+			LifecycleState:      model.StateReady,
+		},
+		{
+			UUID:                "rec-2",
+			Title:               "Gym",
+			SchedulingType:      model.Floating,
+			RecurringParentUUID: "gym-parent",
+			LifecycleState:      model.StateReady,
+		},
+		{
+			UUID:                "rec-3",
+			Title:               "Gym",
+			SchedulingType:      model.Floating,
+			RecurringParentUUID: "gym-parent",
+			LifecycleState:      model.StateReady,
+		},
+	}
+
+	shelfTasks := m.GetTodoShelfTasks()
+	// Should be grouped into a single item
+	if len(shelfTasks) != 1 {
+		t.Fatalf("expected 1 task on the shelf (grouped), got %d", len(shelfTasks))
+	}
+	if shelfTasks[0].Title != "Gym (3)" {
+		t.Errorf("expected grouped title to be 'Gym (3)', got '%s'", shelfTasks[0].Title)
+	}
+}
+

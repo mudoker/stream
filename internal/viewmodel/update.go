@@ -139,8 +139,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.CurrentMode == ModeNormal && !m.PromptOpen && !m.ReviewOpen {
 			now := time.Now()
 			for _, t := range m.Tasks {
-				if t.SchedulingType == model.Anchored &&
-					t.LifecycleState == model.StateScheduled &&
+				if model.IsTaskAnchored(t) &&
+					(t.LifecycleState == model.StateScheduled || t.LifecycleState == model.StateReady) &&
 					t.TimeWindow.Start.Year() == now.Year() && t.TimeWindow.Start.Month() == now.Month() && t.TimeWindow.Start.Day() == now.Day() &&
 					t.TimeWindow.Start.Hour() == now.Hour() && t.TimeWindow.Start.Minute() == now.Minute() {
 

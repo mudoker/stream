@@ -34,7 +34,7 @@ func (m *Model) refreshTasks() {
 	now := time.Now()
 	updatedAny := false
 	for i, t := range m.Tasks {
-		if t.SchedulingType == model.Anchored &&
+		if model.IsTaskAnchored(t) && t.SchedulingType != model.Event &&
 			t.TimeWindow.End.Before(now) &&
 			t.LifecycleState != model.StateCompleted &&
 			t.LifecycleState != model.StateArchived &&

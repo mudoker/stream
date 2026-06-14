@@ -54,6 +54,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 4:
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx - 1 + len(TaskTypeOptions)) % len(TaskTypeOptions)
 			return m, nil
+		case 11:
+			m.Form.IsRecurringIdx = (m.Form.IsRecurringIdx - 1 + 2) % 2
+			return m, nil
 		}
 	case "right", " ":
 		switch m.Form.ActiveField {
@@ -66,6 +69,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 4:
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % len(TaskTypeOptions)
 			return m, nil
+		case 11:
+			m.Form.IsRecurringIdx = (m.Form.IsRecurringIdx + 1) % 2
+			return m, nil
 		}
 	case "enter":
 		m.SubmitForm()
@@ -74,6 +80,7 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.CurrentMode = ModeNormal
 		m.IsEditing = false
+		m.Form.IsEditing = false
 		m.EditingTaskUUID = ""
 		return m, nil
 	}
@@ -108,6 +115,10 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case 9:
 		m.Form.TagsInput, cmd = m.Form.TagsInput.Update(msg)
+	case 12:
+		m.Form.RecurringEndDateInput, cmd = m.Form.RecurringEndDateInput.Update(msg)
+	case 13:
+		m.Form.RecurringDaysInput, cmd = m.Form.RecurringDaysInput.Update(msg)
 	}
 
 	return m, cmd
@@ -122,6 +133,8 @@ func (m *Model) focusFormFields() {
 	m.Form.DueDateInput.Blur()
 	m.Form.LocationInput.Blur()
 	m.Form.CommuteInput.Blur()
+	m.Form.RecurringEndDateInput.Blur()
+	m.Form.RecurringDaysInput.Blur()
 
 	switch m.Form.ActiveField {
 	case 0:
@@ -152,6 +165,10 @@ func (m *Model) focusFormFields() {
 		}
 	case 9:
 		m.Form.TagsInput.Focus()
+	case 12:
+		m.Form.RecurringEndDateInput.Focus()
+	case 13:
+		m.Form.RecurringDaysInput.Focus()
 	}
 }
 
@@ -249,6 +266,7 @@ func (m *Model) SubmitForm() {
 		newTask.ExecutionMetrics = existingTask.ExecutionMetrics
 		newTask.GCalMetadata = existingTask.GCalMetadata
 		newTask.Notes = existingTask.Notes
+		newTask.RecurringParentUUID = existingTask.RecurringParentUUID
 	}
 
 	if taskType == 0 {
@@ -295,6 +313,8 @@ func (m *Model) SubmitForm() {
 	} else if taskType == 3 {
 		newTask.SchedulingType = model.Habit
 		newTask.StoryPoints = 0
+		// By default, a non-recurring habit starts on the shelf (zero TimeWindow)
+		newTask.TimeWindow = model.TimeWindow{}
 		if isEdit && existingTask.LifecycleState == model.StateCompleted {
 			newTask.LifecycleState = model.StateCompleted
 		} else {
@@ -310,11 +330,24 @@ func (m *Model) SubmitForm() {
 	}
 
 	if isEdit {
+		if existingTask.RecurringParentUUID != "" {
+			m.PendingEditTask = newTask
+			m.ConfirmTask = existingTask
+			m.ConfirmOpen = true
+			m.ConfirmActionType = "edit_recurring"
+			m.IsEditing = false
+			m.Form.IsEditing = false
+			m.EditingTaskUUID = ""
+			m.StatusMsg = "Choose recurring update option."
+			return
+		}
+
 		m.DB.UpdateTask(newTask)
 		if m.ZenTimer != nil && m.ZenTimer.Task.UUID == newTask.UUID {
 			m.ZenTimer.UpdateTaskDuration(newTask)
 		}
 		m.IsEditing = false
+		m.Form.IsEditing = false
 		m.EditingTaskUUID = ""
 		m.refreshTasks()
 		m.SelectedTaskUUID = newTask.UUID
@@ -322,6 +355,67 @@ func (m *Model) SubmitForm() {
 		m.triggerGCalPush(newTask)
 		m.StatusMsg = fmt.Sprintf("Task '%s' updated successfully.", title)
 	} else {
+		if m.Form.IsRecurringIdx == 1 {
+			endDateStr := strings.TrimSpace(m.Form.RecurringEndDateInput.Value())
+			endDate, err := time.Parse("2006-01-02", endDateStr)
+			if err != nil {
+				endDate = startTime.AddDate(0, 0, 7)
+			}
+			endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 0, startTime.Location())
+
+			daysStr := strings.ToLower(m.Form.RecurringDaysInput.Value())
+			days := map[time.Weekday]bool{
+				time.Sunday:    strings.Contains(daysStr, "sun") || strings.Contains(daysStr, "daily"),
+				time.Monday:    strings.Contains(daysStr, "mon") || strings.Contains(daysStr, "daily"),
+				time.Tuesday:   strings.Contains(daysStr, "tue") || strings.Contains(daysStr, "daily"),
+				time.Wednesday: strings.Contains(daysStr, "wed") || strings.Contains(daysStr, "daily"),
+				time.Thursday:  strings.Contains(daysStr, "thu") || strings.Contains(daysStr, "daily"),
+				time.Friday:    strings.Contains(daysStr, "fri") || strings.Contains(daysStr, "daily"),
+				time.Saturday:  strings.Contains(daysStr, "sat") || strings.Contains(daysStr, "daily"),
+			}
+			hasAny := false
+			for _, v := range days {
+				if v {
+					hasAny = true
+					break
+				}
+			}
+			if !hasAny {
+				for k := range days {
+					days[k] = true
+				}
+			}
+
+			parentUUID := uuid.New().String()
+			current := startTime
+			count := 0
+			for !current.After(endDate) {
+				if days[current.Weekday()] {
+					instance := newTask
+					instance.UUID = uuid.New().String()
+					instance.RecurringParentUUID = parentUUID
+					instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), startTime.Hour(), startTime.Minute(), startTime.Second(), 0, startTime.Location())
+					
+					if instance.SchedulingType == model.Habit {
+						// A habit is a recurring task with TimeWindow set, so it is anchored by default
+						instance.TimeWindow.End = instance.TimeWindow.Start.Add(time.Duration(duration) * time.Minute)
+						instance.LifecycleState = model.StateReady
+					} else {
+						instance.SchedulingType = model.Anchored
+						instance.TimeWindow.End = instance.TimeWindow.Start.Add(time.Duration(duration) * time.Minute)
+						instance.LifecycleState = model.StateScheduled
+					}
+
+					m.DB.AddTask(instance)
+					count++
+				}
+				current = current.AddDate(0, 0, 1)
+			}
+			m.refreshTasks()
+			m.StatusMsg = fmt.Sprintf("Created %d recurring occurrences.", count)
+			return
+		}
+
 		m.DB.AddTask(newTask)
 		m.refreshTasks()
 		m.SelectedTaskUUID = newTask.UUID

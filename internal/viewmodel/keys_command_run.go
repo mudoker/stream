@@ -249,7 +249,11 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		if exists {
 			m.ConfirmTask = task
 			m.ConfirmOpen = true
-			m.ConfirmActionType = "delete"
+			if task.RecurringParentUUID != "" {
+				m.ConfirmActionType = "delete_recurring"
+			} else {
+				m.ConfirmActionType = "delete"
+			}
 		}
 
 	case "pull", "push", "sync-settings", "gcal-settings":

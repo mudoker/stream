@@ -10,6 +10,7 @@ import (
 
 func (m *Model) startEditMode(task model.Task) {
 	m.IsEditing = true
+	m.Form.IsEditing = true
 	m.EditingTaskUUID = task.UUID
 
 	m.Form.TitleInput.SetValue(task.Title)

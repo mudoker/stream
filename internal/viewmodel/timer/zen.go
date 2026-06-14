@@ -18,7 +18,7 @@ type ZenTimer struct {
 
 func NewZenTimer(t model.Task) *ZenTimer {
 	originalDur := time.Duration(t.StoryPoints) * 45 * time.Minute
-	if t.SchedulingType == model.Anchored {
+	if model.IsTaskAnchored(t) {
 		originalDur = t.TimeWindow.End.Sub(t.TimeWindow.Start)
 	}
 
@@ -147,7 +147,7 @@ func (zt *ZenTimer) AddTime(d time.Duration) {
 func (zt *ZenTimer) UpdateTaskDuration(newTask model.Task) {
 	zt.Task = newTask
 	var newDur time.Duration
-	if newTask.SchedulingType == model.Anchored {
+	if model.IsTaskAnchored(newTask) {
 		newDur = newTask.TimeWindow.End.Sub(newTask.TimeWindow.Start)
 	} else {
 		newDur = time.Duration(newTask.StoryPoints) * 45 * time.Minute

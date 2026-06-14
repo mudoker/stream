@@ -95,6 +95,7 @@ type Model struct {
 
 	ConfirmOpen bool
 	ConfirmTask model.Task
+	PendingEditTask model.Task
 	ConfirmActionType string
 	WarningOpen bool
 	WarningMsg  string
@@ -159,7 +160,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		LastSyncTime:                time.Now(),
 		CommandInput:                cmdInput,
 		TodoShelfFocus:              false,
-		TimelineHour:                9,
+		TimelineHour:                time.Now().Hour(),
 		Form:                        NewTaskForm(),
 		WorkspaceForm:               NewWorkspaceForm(),
 		ProfileForm:                 NewProfileForm(settings.Username, settings.LockTimeoutMinutes),
@@ -175,6 +176,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 	m.refreshWorkspaces()
 	m.refreshTasks()
 	m.selectDefaultTaskForSelectedDay()
+	m.TimelineHour = time.Now().Hour() // Focus on current time on first open
 	return m
 }
 

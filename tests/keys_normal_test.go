@@ -695,4 +695,47 @@ func TestEnterKeyOnDashboardOrAnalyticsDoesNothing(t *testing.T) {
 	}
 }
 
+func TestDayNavigationTimelineHour(t *testing.T) {
+	day1 := time.Date(2026, 6, 14, 0, 0, 0, 0, time.Local)
+
+	m := &viewmodel.Model{
+		SelectedDay: day1,
+		CurrentView: viewmodel.DayView,
+		CurrentMode: viewmodel.ModeNormal,
+		Tasks: []model.Task{
+			{
+				UUID:           "task-1",
+				SchedulingType: model.Anchored,
+				TimeWindow: model.TimeWindow{
+					Start: day1.Add(9 * time.Hour), // 9 AM
+					End:   day1.Add(10 * time.Hour),
+				},
+				LifecycleState: model.StateScheduled,
+			},
+		},
+	}
+
+	// 1. Initial selection focuses on task-1 (9 AM)
+	m.SelectedTaskUUID = "task-1"
+	m.TimelineHour = 9
+
+	// 2. Navigate to Day 2 (L) which has no tasks.
+	// Expected behavior: m.TimelineHour resets to time.Now().Hour()
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
+
+	expectedHour := time.Now().Hour()
+	if m.TimelineHour != expectedHour {
+		t.Errorf("expected TimelineHour to reset to current hour %d on empty day, got %d", expectedHour, m.TimelineHour)
+	}
+
+	// 3. Navigate back to Day 1 (H) which has task-1 (9 AM)
+	// Expected behavior: m.TimelineHour focuses on task-1 (9 AM)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("H")})
+
+	if m.TimelineHour != 9 {
+		t.Errorf("expected TimelineHour to focus on day's task hour 9, got %d", m.TimelineHour)
+	}
+}
+
+
 

@@ -1,6 +1,8 @@
 package viewmodel
 
 import (
+	"time"
+
 	"stream/internal/model"
 )
 
@@ -49,6 +51,7 @@ func (m *Model) selectDefaultTaskForSelectedDay() {
 		m.AutoScrollToSelectedTask()
 	} else {
 		m.SelectedTaskUUID = ""
+		m.TimelineHour = time.Now().Hour()
 	}
 }
 

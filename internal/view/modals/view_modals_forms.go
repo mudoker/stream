@@ -79,15 +79,21 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		}
 	}
 
-	if !f.IsEditing && (f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3) {
-		recOptStr := "No"
-		if f.IsRecurringIdx == 1 {
-			recOptStr = "Yes"
-		}
-		fields = append(fields, renderDropdown(nextFieldNum(), "Is Recurring", recOptStr, 11))
-		if f.IsRecurringIdx == 1 {
+	if !f.IsEditing {
+		if f.TaskTypeIdx == 3 {
+			// Habit is always recurring
 			fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
 			fields = append(fields, renderField(nextFieldNum(), "Days (Mon,Wed...)", f.RecurringDaysInput.View(), 13))
+		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 {
+			recOptStr := "No"
+			if f.IsRecurringIdx == 1 {
+				recOptStr = "Yes"
+			}
+			fields = append(fields, renderDropdown(nextFieldNum(), "Is Recurring", recOptStr, 11))
+			if f.IsRecurringIdx == 1 {
+				fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
+				fields = append(fields, renderField(nextFieldNum(), "Days (Mon,Wed...)", f.RecurringDaysInput.View(), 13))
+			}
 		}
 	}
 

@@ -57,8 +57,11 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 11:
 			m.Form.IsRecurringIdx = (m.Form.IsRecurringIdx - 1 + 2) % 2
 			return m, nil
+		case 13:
+			m.Form.RecurringDaysSubIdx = (m.Form.RecurringDaysSubIdx - 1 + 7) % 7
+			return m, nil
 		}
-	case "right", " ":
+	case "right":
 		switch m.Form.ActiveField {
 		case 2:
 			m.Form.PriorityIdx = (m.Form.PriorityIdx + 1) % 4
@@ -71,6 +74,28 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case 11:
 			m.Form.IsRecurringIdx = (m.Form.IsRecurringIdx + 1) % 2
+			return m, nil
+		case 13:
+			m.Form.RecurringDaysSubIdx = (m.Form.RecurringDaysSubIdx + 1) % 7
+			return m, nil
+		}
+	case " ":
+		switch m.Form.ActiveField {
+		case 2:
+			m.Form.PriorityIdx = (m.Form.PriorityIdx + 1) % 4
+			return m, nil
+		case 3:
+			m.Form.SPIdx = (m.Form.SPIdx + 1) % len(SPOptions)
+			return m, nil
+		case 4:
+			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % len(TaskTypeOptions)
+			return m, nil
+		case 11:
+			m.Form.IsRecurringIdx = (m.Form.IsRecurringIdx + 1) % 2
+			return m, nil
+		case 13:
+			m.Form.RecurringDaysSelected[m.Form.RecurringDaysSubIdx] = !m.Form.RecurringDaysSelected[m.Form.RecurringDaysSubIdx]
+			m.Form.updateDaysInputValue()
 			return m, nil
 		}
 	case "enter":
@@ -118,7 +143,7 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case 12:
 		m.Form.RecurringEndDateInput, cmd = m.Form.RecurringEndDateInput.Update(msg)
 	case 13:
-		m.Form.RecurringDaysInput, cmd = m.Form.RecurringDaysInput.Update(msg)
+		// Do not pass raw text keystrokes to prevent manual text typing on multi-select
 	}
 
 	return m, cmd
@@ -281,6 +306,7 @@ func (m *Model) SubmitForm() {
 		}
 	} else if taskType == 4 {
 		newTask.SchedulingType = model.Event
+		newTask.StoryPoints = 0
 		newTask.TimeWindow = model.TimeWindow{
 			Start: startTime,
 			End:   startTime.Add(time.Duration(duration) * time.Minute),

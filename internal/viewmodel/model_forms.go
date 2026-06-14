@@ -31,6 +31,8 @@ type TaskForm struct {
 	RecurringEndDateInput textinput.Model
 	RecurringDaysInput    textinput.Model
 	IsEditing             bool
+	RecurringDaysSelected []bool // Mon, Tue, Wed, Thu, Fri, Sat, Sun
+	RecurringDaysSubIdx   int    // Cursor (0-6)
 }
 
 func NewTaskForm() TaskForm {
@@ -72,7 +74,7 @@ func NewTaskForm() TaskForm {
 	reDays.Placeholder = "Mon, Wed, Fri"
 	reDays.SetValue("Mon, Tue, Wed, Thu, Fri")
 
-	return TaskForm{
+	form := TaskForm{
 		PriorityIdx:           2,
 		SPIdx:                 2,
 		TaskTypeIdx:           0,
@@ -92,13 +94,17 @@ func NewTaskForm() TaskForm {
 		RecurringEndDateInput: reEnd,
 		RecurringDaysInput:    reDays,
 		IsEditing:             false,
+		RecurringDaysSelected: make([]bool, 7),
+		RecurringDaysSubIdx:   0,
 	}
+	form.SyncDaysSelectedFromInput()
+	return form
 }
 
 func (f TaskForm) VisibleFields() []int {
 	var fields []int
 	fields = append(fields, 0, 1, 2)
-	if f.TaskTypeIdx != 2 {
+	if f.TaskTypeIdx != 2 && f.TaskTypeIdx != 3 && f.TaskTypeIdx != 4 {
 		fields = append(fields, 3)
 	}
 	fields = append(fields, 4)
@@ -130,4 +136,29 @@ func (f TaskForm) VisibleFields() []int {
 
 	fields = append(fields, 9, 10)
 	return fields
+}
+
+func (f *TaskForm) SyncDaysSelectedFromInput() {
+	if len(f.RecurringDaysSelected) != 7 {
+		f.RecurringDaysSelected = make([]bool, 7)
+	}
+	val := strings.ToLower(f.RecurringDaysInput.Value())
+	f.RecurringDaysSelected[0] = strings.Contains(val, "mon") || strings.Contains(val, "daily")
+	f.RecurringDaysSelected[1] = strings.Contains(val, "tue") || strings.Contains(val, "daily")
+	f.RecurringDaysSelected[2] = strings.Contains(val, "wed") || strings.Contains(val, "daily")
+	f.RecurringDaysSelected[3] = strings.Contains(val, "thu") || strings.Contains(val, "daily")
+	f.RecurringDaysSelected[4] = strings.Contains(val, "fri") || strings.Contains(val, "daily")
+	f.RecurringDaysSelected[5] = strings.Contains(val, "sat") || strings.Contains(val, "daily")
+	f.RecurringDaysSelected[6] = strings.Contains(val, "sun") || strings.Contains(val, "daily")
+}
+
+func (f *TaskForm) updateDaysInputValue() {
+	days := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+	var selected []string
+	for i, val := range f.RecurringDaysSelected {
+		if val {
+			selected = append(selected, days[i])
+		}
+	}
+	f.RecurringDaysInput.SetValue(strings.Join(selected, ", "))
 }

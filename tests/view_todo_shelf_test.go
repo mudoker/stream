@@ -525,5 +525,27 @@ func TestRecurringAndHabitShelfBehavior(t *testing.T) {
 	if shelfTasks[0].Title != "Gym (3)" {
 		t.Errorf("expected grouped title to be 'Gym (3)', got '%s'", shelfTasks[0].Title)
 	}
+
+	// 3. Recurring habit test: anchored on Day 2, should NOT appear on shelf on Day 1
+	m.SelectedDay = day1
+	m.Tasks = []model.Task{
+		{
+			UUID:                "rec-habit-1",
+			Title:               "Gym Habit",
+			SchedulingType:      model.Habit,
+			RecurringParentUUID: "gym-habit-parent",
+			TimeWindow: model.TimeWindow{
+				Start: day2.Add(9 * time.Hour),
+				End:   day2.Add(10 * time.Hour),
+			},
+			LifecycleState: model.StateReady,
+		},
+	}
+	shelfDay1 := m.GetTodoShelfTasks()
+	for _, task := range shelfDay1 {
+		if task.UUID == "rec-habit-1" {
+			t.Errorf("expected recurring habit anchored on Day 2 to NOT appear on Day 1 shelf")
+		}
+	}
 }
 

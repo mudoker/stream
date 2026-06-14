@@ -98,14 +98,18 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 		if t.SchedulingType == model.Reminder {
 			reminders = append(reminders, t)
 		} else if t.SchedulingType == model.Habit {
-			isAnchoredOnSelectedDay := !t.TimeWindow.Start.IsZero() && sameDay(t.TimeWindow.Start, selectedDay)
-			if !isAnchoredOnSelectedDay {
-				if t.RecurringParentUUID != "" {
+			if t.RecurringParentUUID != "" {
+				// Recurring habit: only on shelf if de-anchored
+				if t.TimeWindow.Start.IsZero() {
 					recurringCounts[t.RecurringParentUUID]++
 					if _, exists := recurringInstances[t.RecurringParentUUID]; !exists {
 						recurringInstances[t.RecurringParentUUID] = t
 					}
-				} else {
+				}
+			} else {
+				// Non-recurring habit: repeatable, so on shelf if not anchored on selectedDay
+				isAnchoredOnSelectedDay := !t.TimeWindow.Start.IsZero() && sameDay(t.TimeWindow.Start, selectedDay)
+				if !isAnchoredOnSelectedDay {
 					habits = append(habits, t)
 				}
 			}

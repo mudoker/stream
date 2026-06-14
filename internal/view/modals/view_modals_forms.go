@@ -55,34 +55,42 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
 		}
 
-		dayNames := []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+		dayNames := []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
 		var dayStrs []string
 		for i, name := range dayNames {
 			sel := f.RecurringDaysSelected[i]
 			isCursor := isActiveField && f.RecurringDaysSubIdx == i
 
 			var dStr string
-			if isCursor {
-				dStr = "[" + name + "]"
+			if sel && isCursor {
+				// Selected + cursor: bright accent with filled checkbox
+				dStr = lipgloss.NewStyle().
+					Foreground(t.CanvasBg).
+					Background(t.Accent).
+					Bold(true).
+					Render(" ✓" + name + " ")
+			} else if sel && !isCursor {
+				// Selected, no cursor: success color with check
+				dStr = lipgloss.NewStyle().
+					Foreground(t.SuccessColor).
+					Bold(true).
+					Render(" ✓" + name + " ")
+			} else if !sel && isCursor {
+				// Unselected + cursor: accent outline style
+				dStr = lipgloss.NewStyle().
+					Foreground(t.CanvasBg).
+					Background(t.Muted).
+					Render(" ·" + strings.ToLower(name) + " ")
 			} else {
-				dStr = " " + name + " "
-			}
-
-			if isCursor {
-				if sel {
-					dStr = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(dStr)
-				} else {
-					dStr = lipgloss.NewStyle().Foreground(t.Accent).Render(dStr)
-				}
-			} else if sel {
-				dStr = lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(dStr)
-			} else {
-				dStr = lipgloss.NewStyle().Foreground(t.Muted).Render(strings.ToLower(dStr))
+				// Unselected, no cursor: dim
+				dStr = lipgloss.NewStyle().
+					Foreground(t.Muted).
+					Render("  " + strings.ToLower(name) + " ")
 			}
 			dayStrs = append(dayStrs, dStr)
 		}
 
-		daysRow := strings.Join(dayStrs, " ")
+		daysRow := strings.Join(dayStrs, "")
 		return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), daysRow)
 	}
 
@@ -123,7 +131,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		if f.TaskTypeIdx == 3 {
 			// Habit is always recurring
 			fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
-			fields = append(fields, renderDaysSelect(nextFieldNum(), "Days (Mon,Wed...)", 13))
+			fields = append(fields, renderDaysSelect(nextFieldNum(), "Recurring Days", 13))
 		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 {
 			recOptStr := "No"
 			if f.IsRecurringIdx == 1 {
@@ -132,7 +140,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			fields = append(fields, renderDropdown(nextFieldNum(), "Is Recurring", recOptStr, 11))
 			if f.IsRecurringIdx == 1 {
 				fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
-				fields = append(fields, renderDaysSelect(nextFieldNum(), "Days (Mon,Wed...)", 13))
+				fields = append(fields, renderDaysSelect(nextFieldNum(), "Recurring Days", 13))
 			}
 		}
 	}

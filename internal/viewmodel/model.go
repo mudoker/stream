@@ -97,6 +97,7 @@ type Model struct {
 	ConfirmTask model.Task
 	PendingEditTask model.Task
 	ConfirmActionType string
+	ConfirmSelectedIndex int
 	WarningOpen bool
 	WarningMsg  string
 

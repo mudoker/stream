@@ -366,7 +366,7 @@ func TestRecurringTaskLifecycle(t *testing.T) {
 	}
 
 	// Submit confirmation: [1] Only this occurrence
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 
 	tasks = database.GetTasks()
 	// Find the edited task
@@ -406,8 +406,9 @@ func TestRecurringTaskLifecycle(t *testing.T) {
 		t.Fatalf("expected edit recurring confirmation modal to be open again")
 	}
 
-	// Submit confirmation: [2] This and all remaining occurrences
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	// Submit confirmation: [2] This and all remaining occurrences (press 'j' then 'enter')
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 
 	tasks = database.GetTasks()
 	for _, tk := range tasks {
@@ -439,7 +440,7 @@ func TestRecurringTaskLifecycle(t *testing.T) {
 		t.Fatalf("expected delete recurring confirmation modal to be open")
 	}
 
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 
 	tasks = database.GetTasks()
 	if len(tasks) != 2 {
@@ -461,7 +462,9 @@ func TestRecurringTaskLifecycle(t *testing.T) {
 		t.Fatalf("expected delete recurring confirmation modal to be open")
 	}
 
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	// Submit confirmation: [2] This and all remaining occurrences (press 'j' then 'enter')
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 
 	tasks = database.GetTasks()
 	if len(tasks) != 1 {

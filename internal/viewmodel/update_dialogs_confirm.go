@@ -76,41 +76,47 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 		}
 
 		if m.ConfirmActionType == "delete_recurring" {
-			if keyStr == "1" {
-				m.AdjustSelectionBeforeDeletion(m.ConfirmTask.UUID)
-				m.DB.DeleteTask(m.ConfirmTask.UUID)
-				m.refreshTasks()
-				m.triggerGCalPushIfAnchored(m.ConfirmTask)
-				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-					m.DetailOpen = false
-				}
-				if zt := m.ZenTimer; zt != nil && zt.Task.UUID == m.ConfirmTask.UUID {
-					m.ZenTimer = nil
-				}
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = fmt.Sprintf("Occurrence of '%s' deleted.", m.ConfirmTask.Title)
-			} else if keyStr == "2" {
-				tasksToDelete := []string{}
-				for _, t := range m.Tasks {
-					if t.RecurringParentUUID == m.ConfirmTask.RecurringParentUUID && !t.TimeWindow.Start.Before(m.ConfirmTask.TimeWindow.Start) {
-						tasksToDelete = append(tasksToDelete, t.UUID)
+			if keyStr == "j" || keyStr == "down" {
+				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex + 1) % 2
+			} else if keyStr == "k" || keyStr == "up" {
+				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex - 1 + 2) % 2
+			} else if keyStr == "enter" {
+				if m.ConfirmSelectedIndex == 0 {
+					m.AdjustSelectionBeforeDeletion(m.ConfirmTask.UUID)
+					m.DB.DeleteTask(m.ConfirmTask.UUID)
+					m.refreshTasks()
+					m.triggerGCalPushIfAnchored(m.ConfirmTask)
+					if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
+						m.DetailOpen = false
 					}
+					if zt := m.ZenTimer; zt != nil && zt.Task.UUID == m.ConfirmTask.UUID {
+						m.ZenTimer = nil
+					}
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.StatusMsg = fmt.Sprintf("Occurrence of '%s' deleted.", m.ConfirmTask.Title)
+				} else {
+					tasksToDelete := []string{}
+					for _, t := range m.Tasks {
+						if t.RecurringParentUUID == m.ConfirmTask.RecurringParentUUID && !t.TimeWindow.Start.Before(m.ConfirmTask.TimeWindow.Start) {
+							tasksToDelete = append(tasksToDelete, t.UUID)
+						}
+					}
+					m.AdjustSelectionBeforeDeletion(m.ConfirmTask.UUID)
+					for _, uid := range tasksToDelete {
+						m.DB.DeleteTask(uid)
+					}
+					m.refreshTasks()
+					if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
+						m.DetailOpen = false
+					}
+					if zt := m.ZenTimer; zt != nil && zt.Task.UUID == m.ConfirmTask.UUID {
+						m.ZenTimer = nil
+					}
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.StatusMsg = "This and all future occurrences deleted."
 				}
-				m.AdjustSelectionBeforeDeletion(m.ConfirmTask.UUID)
-				for _, uid := range tasksToDelete {
-					m.DB.DeleteTask(uid)
-				}
-				m.refreshTasks()
-				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-					m.DetailOpen = false
-				}
-				if zt := m.ZenTimer; zt != nil && zt.Task.UUID == m.ConfirmTask.UUID {
-					m.ZenTimer = nil
-				}
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = "This and all future occurrences deleted."
 			} else if keyStr == "esc" || keyStr == "q" {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""
@@ -120,41 +126,47 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 		}
 
 		if m.ConfirmActionType == "edit_recurring" {
-			if keyStr == "1" {
-				m.DB.UpdateTask(m.PendingEditTask)
-				m.refreshTasks()
-				m.triggerGCalPush(m.PendingEditTask)
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = fmt.Sprintf("Occurrence of '%s' updated.", m.PendingEditTask.Title)
-			} else if keyStr == "2" {
-				originalStart := m.ConfirmTask.TimeWindow.Start
-				timeShift := m.PendingEditTask.TimeWindow.Start.Sub(originalStart)
-				durationShift := m.PendingEditTask.TimeWindow.End.Sub(m.PendingEditTask.TimeWindow.Start)
+			if keyStr == "j" || keyStr == "down" {
+				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex + 1) % 2
+			} else if keyStr == "k" || keyStr == "up" {
+				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex - 1 + 2) % 2
+			} else if keyStr == "enter" {
+				if m.ConfirmSelectedIndex == 0 {
+					m.DB.UpdateTask(m.PendingEditTask)
+					m.refreshTasks()
+					m.triggerGCalPush(m.PendingEditTask)
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.StatusMsg = fmt.Sprintf("Occurrence of '%s' updated.", m.PendingEditTask.Title)
+				} else {
+					originalStart := m.ConfirmTask.TimeWindow.Start
+					timeShift := m.PendingEditTask.TimeWindow.Start.Sub(originalStart)
+					durationShift := m.PendingEditTask.TimeWindow.End.Sub(m.PendingEditTask.TimeWindow.Start)
 
-				for _, t := range m.Tasks {
-					if t.RecurringParentUUID == m.ConfirmTask.RecurringParentUUID && !t.TimeWindow.Start.Before(originalStart) {
-						t.Title = m.PendingEditTask.Title
-						t.Description = m.PendingEditTask.Description
-						t.Priority = m.PendingEditTask.Priority
-						t.StoryPoints = m.PendingEditTask.StoryPoints
-						t.Tags = m.PendingEditTask.Tags
-						t.Location = m.PendingEditTask.Location
-						t.CommuteBuffer = m.PendingEditTask.CommuteBuffer
-						t.UpdatedAt = time.Now()
+					for _, t := range m.Tasks {
+						if t.RecurringParentUUID == m.ConfirmTask.RecurringParentUUID && !t.TimeWindow.Start.Before(originalStart) {
+							t.Title = m.PendingEditTask.Title
+							t.Description = m.PendingEditTask.Description
+							t.Priority = m.PendingEditTask.Priority
+							t.StoryPoints = m.PendingEditTask.StoryPoints
+							t.Tags = m.PendingEditTask.Tags
+							t.Location = m.PendingEditTask.Location
+							t.CommuteBuffer = m.PendingEditTask.CommuteBuffer
+							t.UpdatedAt = time.Now()
 
-						if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event || t.SchedulingType == model.Habit {
-							t.TimeWindow.Start = t.TimeWindow.Start.Add(timeShift)
-							t.TimeWindow.End = t.TimeWindow.Start.Add(durationShift)
+							if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event || t.SchedulingType == model.Habit {
+								t.TimeWindow.Start = t.TimeWindow.Start.Add(timeShift)
+								t.TimeWindow.End = t.TimeWindow.Start.Add(durationShift)
+							}
+
+							m.DB.UpdateTask(t)
 						}
-
-						m.DB.UpdateTask(t)
 					}
+					m.refreshTasks()
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.StatusMsg = "This and all future occurrences updated."
 				}
-				m.refreshTasks()
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = "This and all future occurrences updated."
 			} else if keyStr == "esc" || keyStr == "q" {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""

@@ -8,7 +8,7 @@ import (
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
 	"github.com/faiface/beep/vorbis"
-	"stream/internal/viewmodel/lofi"
+	"stream/internal/viewmodel/jazzlounge"
 )
 
 // PlaySound plays a sound once using the faiface/beep library.
@@ -46,17 +46,17 @@ func playOnce(soundName string) {
 	}
 	defer streamer.Close()
 
-	lofi.SpeakerMu.Lock()
-	if !lofi.SpeakerInitialized {
+	jazzlounge.SpeakerMu.Lock()
+	if !jazzlounge.SpeakerInitialized {
 		err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 		if err == nil {
-			lofi.SpeakerInitialized = true
-			lofi.SpeakerSampleRate = format.SampleRate
+			jazzlounge.SpeakerInitialized = true
+			jazzlounge.SpeakerSampleRate = format.SampleRate
 		}
 	}
-	initialized := lofi.SpeakerInitialized
-	sampleRate := lofi.SpeakerSampleRate
-	lofi.SpeakerMu.Unlock()
+	initialized := jazzlounge.SpeakerInitialized
+	sampleRate := jazzlounge.SpeakerSampleRate
+	jazzlounge.SpeakerMu.Unlock()
 
 	if !initialized {
 		// Fallback to terminal bell

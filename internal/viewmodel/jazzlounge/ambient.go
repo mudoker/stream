@@ -1,4 +1,4 @@
-package lofi
+package jazzlounge
 
 import (
 	"io"
@@ -29,7 +29,7 @@ type Track struct {
 	VolumeLevel float64
 }
 
-func (e *LofiEngine) AdjustAmbientVolume(name string, delta float64) {
+func (e *JazzLoungeEngine) AdjustAmbientVolume(name string, delta float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -51,7 +51,7 @@ func (e *LofiEngine) AdjustAmbientVolume(name string, delta float64) {
 	}
 }
 
-func (e *LofiEngine) AdjustTrackVolume(id int, delta float64) {
+func (e *JazzLoungeEngine) AdjustTrackVolume(id int, delta float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -73,7 +73,7 @@ func (e *LofiEngine) AdjustTrackVolume(id int, delta float64) {
 	}
 }
 
-func (e *LofiEngine) ToggleAmbient(name string) {
+func (e *JazzLoungeEngine) ToggleAmbient(name string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -129,7 +129,7 @@ func (e *LofiEngine) ToggleAmbient(name string) {
 	}
 }
 
-func (e *LofiEngine) ToggleTrack(id int) {
+func (e *JazzLoungeEngine) ToggleTrack(id int) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 

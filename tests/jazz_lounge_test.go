@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"stream/internal/viewmodel/lofi"
+	"stream/internal/viewmodel/jazzlounge"
 )
 
-func TestLofiEngineVolumeAdjustmentsAndState(t *testing.T) {
-	engine := lofi.GetLofiEngine()
+func TestJazzLoungeEngineVolumeAdjustmentsAndState(t *testing.T) {
+	engine := jazzlounge.GetJazzLoungeEngine()
 
 	// Wait for the engine to initialize in the background
 	var initSuccess bool
@@ -21,7 +21,7 @@ func TestLofiEngineVolumeAdjustmentsAndState(t *testing.T) {
 		time.Sleep(25 * time.Millisecond)
 	}
 	if !initSuccess {
-		t.Fatal("Lofi engine failed to initialize in time")
+		t.Fatal("Jazz Lounge engine failed to initialize in time")
 	}
 
 	// Test default volumes

@@ -1,4 +1,4 @@
-package lofi
+package jazzlounge
 
 import (
 	"math"
@@ -18,7 +18,7 @@ type Sample struct {
 	Format beep.Format
 }
 
-type LofiEngine struct {
+type JazzLoungeEngine struct {
 	assetsPath           string
 	speakerRate          beep.SampleRate
 	pianoSamples         map[int]*Sample
@@ -62,13 +62,13 @@ type LofiEngine struct {
 }
 
 var (
-	lofiEngineInstance *LofiEngine
-	lofiEngineOnce     sync.Once
+	jazzLoungeEngineInstance *JazzLoungeEngine
+	jazzLoungeEngineOnce     sync.Once
 )
 
-func GetLofiEngine() *LofiEngine {
-	lofiEngineOnce.Do(func() {
-		lofiEngineInstance = &LofiEngine{
+func GetJazzLoungeEngine() *JazzLoungeEngine {
+	jazzLoungeEngineOnce.Do(func() {
+		jazzLoungeEngineInstance = &JazzLoungeEngine{
 			pianoSamples:     make(map[int]*Sample),
 			drumSamples:      make(map[string]*Sample),
 			stopChan:         make(chan struct{}),
@@ -77,12 +77,12 @@ func GetLofiEngine() *LofiEngine {
 			sectionBarLength: 32,
 		}
 		// Run initialization asynchronously in the background so it doesn't block the UI thread on boot
-		go lofiEngineInstance.init()
+		go jazzLoungeEngineInstance.init()
 	})
-	return lofiEngineInstance
+	return jazzLoungeEngineInstance
 }
 
-func (e *LofiEngine) init() {
+func (e *JazzLoungeEngine) init() {
 	// Seed the random number generator so each run produces unique melodies and rhythm variations
 	rand.Seed(time.Now().UnixNano())
 
@@ -193,7 +193,7 @@ func (e *LofiEngine) init() {
 	go e.run()
 }
 
-func (e *LofiEngine) run() {
+func (e *JazzLoungeEngine) run() {
 	var tickCount int
 	for {
 		select {
@@ -355,7 +355,7 @@ func (e *LofiEngine) run() {
 	}
 }
 
-func (e *LofiEngine) generateProgression() {
+func (e *JazzLoungeEngine) generateProgression() {
 	e.key = KeysList[rand.Intn(len(KeysList))]
 
 	prog, isMinor := GenerateDynamicProgression()
@@ -387,7 +387,7 @@ func (e *LofiEngine) generateProgression() {
 	}
 }
 
-func (e *LofiEngine) nextChord() {
+func (e *JazzLoungeEngine) nextChord() {
 	nextProgress := e.progress + 1
 	if nextProgress >= len(e.progression) {
 		nextProgress = 0
@@ -424,7 +424,7 @@ func (e *LofiEngine) nextChord() {
 	}
 }
 
-func (e *LofiEngine) autoDJTransition() {
+func (e *JazzLoungeEngine) autoDJTransition() {
 	if e.isTransitioning {
 		return
 	}
@@ -461,7 +461,7 @@ func (e *LofiEngine) autoDJTransition() {
 	}()
 }
 
-func (e *LofiEngine) playChordHit(isDownbeat bool) {
+func (e *JazzLoungeEngine) playChordHit(isDownbeat bool) {
 	chord := e.progression[e.progress]
 	keyPitch := keyToPitch(e.key)
 	rootMIDI := 48 + keyPitch + chord.RootOffset
@@ -477,15 +477,15 @@ func (e *LofiEngine) playChordHit(isDownbeat bool) {
 	}
 }
 
-func (e *LofiEngine) playMelody() {
+func (e *JazzLoungeEngine) playMelody() {
 	// Replaced by processSoloist()
 }
 
-func (e *LofiEngine) playNote(midiNote int) {
+func (e *JazzLoungeEngine) playNote(midiNote int) {
 	// Replaced by processSoloist()
 }
 
-func (e *LofiEngine) playPianoNoteWithVol(midiNote int, volume float64) {
+func (e *JazzLoungeEngine) playPianoNoteWithVol(midiNote int, volume float64) {
 	sample, dist := e.FindClosestSample(midiNote)
 	if sample == nil {
 		return
@@ -503,11 +503,11 @@ func (e *LofiEngine) playPianoNoteWithVol(midiNote int, volume float64) {
 	e.mixer.Add(volStreamer)
 }
 
-func (e *LofiEngine) playDrum(name string) {
+func (e *JazzLoungeEngine) playDrum(name string) {
 	// Replaced by playDrumWithVol
 }
 
-func (e *LofiEngine) playDrumWithVol(name string, volume float64) {
+func (e *JazzLoungeEngine) playDrumWithVol(name string, volume float64) {
 	sample, ok := e.drumSamples[name]
 	if !ok {
 		return
@@ -523,7 +523,7 @@ func (e *LofiEngine) playDrumWithVol(name string, volume float64) {
 	e.mixer.Add(volStreamer)
 }
 
-func (e *LofiEngine) FindClosestSample(midiNote int) (*Sample, int) {
+func (e *JazzLoungeEngine) FindClosestSample(midiNote int) (*Sample, int) {
 	minDiff := 999
 	var bestSample *Sample
 	bestMIDI := 0
@@ -539,7 +539,7 @@ func (e *LofiEngine) FindClosestSample(midiNote int) (*Sample, int) {
 	return bestSample, midiNote - bestMIDI
 }
 
-func (e *LofiEngine) SetPlaying(playing bool) {
+func (e *JazzLoungeEngine) SetPlaying(playing bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -589,19 +589,19 @@ func (e *LofiEngine) SetPlaying(playing bool) {
 	}
 }
 
-func (e *LofiEngine) IsPlaying() bool {
+func (e *JazzLoungeEngine) IsPlaying() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.isPlaying
 }
 
-func (e *LofiEngine) IsInitialized() bool {
+func (e *JazzLoungeEngine) IsInitialized() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.isInitialized
 }
 
-func (e *LofiEngine) SetMasterVolume(level float64) {
+func (e *JazzLoungeEngine) SetMasterVolume(level float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if !e.isInitialized {
@@ -619,7 +619,7 @@ func (e *LofiEngine) SetMasterVolume(level float64) {
 	}
 }
 
-func (e *LofiEngine) SetPianoVolume(level float64) {
+func (e *JazzLoungeEngine) SetPianoVolume(level float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if level < 0 {
@@ -631,7 +631,7 @@ func (e *LofiEngine) SetPianoVolume(level float64) {
 	e.pianoVolLevel = level
 }
 
-func (e *LofiEngine) SetSynthVolume(level float64) {
+func (e *JazzLoungeEngine) SetSynthVolume(level float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if level < 0 {
@@ -643,7 +643,7 @@ func (e *LofiEngine) SetSynthVolume(level float64) {
 	e.synthVolLevel = level
 }
 
-func (e *LofiEngine) SetDrumsVolume(level float64) {
+func (e *JazzLoungeEngine) SetDrumsVolume(level float64) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if level < 0 {
@@ -655,7 +655,7 @@ func (e *LofiEngine) SetDrumsVolume(level float64) {
 	e.drumsVolLevel = level
 }
 
-func (e *LofiEngine) RegenerateProgression() {
+func (e *JazzLoungeEngine) RegenerateProgression() {
 	e.mu.Lock()
 	if !e.isInitialized || e.isTransitioning {
 		e.mu.Unlock()
@@ -665,7 +665,7 @@ func (e *LofiEngine) RegenerateProgression() {
 	e.autoDJTransition()
 }
 
-func (e *LofiEngine) GetState() (
+func (e *JazzLoungeEngine) GetState() (
 	key string,
 	chordDegrees []string,
 	activeChord string,

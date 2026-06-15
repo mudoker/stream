@@ -1,4 +1,4 @@
-package lofi
+package jazzlounge
 
 import (
 	"math"

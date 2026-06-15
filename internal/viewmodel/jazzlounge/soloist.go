@@ -1,4 +1,4 @@
-package lofi
+package jazzlounge
 
 import (
 	"math"
@@ -116,7 +116,7 @@ func generateMotifNotes(startNote int, chord JazzChord, keyPitch int, dir int) [
 	return notes
 }
 
-func (e *LofiEngine) processSoloist(s *Soloist, tickCount int) {
+func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 	if s.PauseTicks > 0 {
 		return
 	}

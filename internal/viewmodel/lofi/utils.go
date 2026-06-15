@@ -36,23 +36,41 @@ func keyToPitch(key string) int {
 	return 0
 }
 
+// getJazzScale returns a chromatic-complete bebop/dorian scale spanning 3 octaves.
+// This gives soloists access to ALL 12 notes per octave so they can use
+// chromatic approach notes, enclosures, and passing tones — not just
+// pentatonic "toy" notes.
 func getJazzScale(key string, isMinor bool) []int {
 	keyPitch := keyToPitch(key)
-	centerMIDI := 60 + keyPitch // C4 is 60 (comfortable middle range)
+	startMIDI := 48 + keyPitch // C3 range
 
-	// Jazz scale intervals
 	var intervals []int
 	if isMinor {
-		// Minor Blues Scale: [0, 3, 5, 6, 7, 10]
-		intervals = []int{0, 3, 5, 6, 7, 10, 12, 15, 17, 18, 19, 22, 24}
+		// Dorian mode (jazz minor workhorse): 0 2 3 5 7 9 10
+		// Plus chromatic passing tones for bebop vocabulary: 1 4 6 8 11
+		// = full chromatic but with dorian "gravity" via chord-tone resolution
+		for oct := 0; oct < 3; oct++ {
+			base := oct * 12
+			for _, n := range []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} {
+				intervals = append(intervals, base+n)
+			}
+		}
+		intervals = append(intervals, 36) // top note
 	} else {
-		// Major Pentatonic Scale: [0, 2, 4, 7, 9]
-		intervals = []int{0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24}
+		// Mixolydian/bebop dominant: 0 2 4 5 7 9 10 11
+		// Plus chromatic passing tones
+		for oct := 0; oct < 3; oct++ {
+			base := oct * 12
+			for _, n := range []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11} {
+				intervals = append(intervals, base+n)
+			}
+		}
+		intervals = append(intervals, 36) // top note
 	}
 
 	scale := make([]int, len(intervals))
 	for i, offset := range intervals {
-		scale[i] = centerMIDI + offset
+		scale[i] = startMIDI + offset
 	}
 	return scale
 }
@@ -74,12 +92,33 @@ func getNoteName(key string, offset int) string {
 	return KeysList[pitch]
 }
 
+// isScaleTone returns true if the MIDI note belongs to the "strong" scale
+// (dorian for minor, mixolydian for major) — used to weight note choices.
+func isScaleTone(midiNote int, key string, isMinor bool) bool {
+	keyPitch := keyToPitch(key)
+	noteClass := ((midiNote - keyPitch) % 12 + 12) % 12
+	if isMinor {
+		// Dorian: 0 2 3 5 7 9 10
+		switch noteClass {
+		case 0, 2, 3, 5, 7, 9, 10:
+			return true
+		}
+	} else {
+		// Mixolydian: 0 2 4 5 7 9 10
+		switch noteClass {
+		case 0, 2, 4, 5, 7, 9, 10:
+			return true
+		}
+	}
+	return false
+}
+
 func initSpeakerShared() (beep.SampleRate, error) {
 	SpeakerMu.Lock()
 	defer SpeakerMu.Unlock()
 	if !SpeakerInitialized {
 		sr := beep.SampleRate(44100)
-		
+
 		type initResult struct {
 			err error
 		}
@@ -88,7 +127,7 @@ func initSpeakerShared() (beep.SampleRate, error) {
 			err := speaker.Init(sr, sr.N(time.Second/10))
 			resChan <- initResult{err: err}
 		}()
-		
+
 		select {
 		case res := <-resChan:
 			if res.err == nil {

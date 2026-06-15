@@ -250,6 +250,34 @@ func (e *LofiEngine) run() {
 				e.processSoloist(e.soloists[e.activeSoloistIdx], tickCount)
 			}
 
+			// 2b. Walking Bass Line (plays on every other tick for quarter-note pulse)
+			if tickCount%2 == 0 && !e.isTransitioning {
+				chord := e.progression[e.progress]
+				kp := keyToPitch(e.key)
+				bassRoot := 36 + kp + chord.RootOffset // C2 range
+				// Walking bass: root, 5th, chromatic approach to next root
+				bassStep := (tickCount / 2) % 4
+				var bassNote int
+				switch bassStep {
+				case 0:
+					bassNote = bassRoot // Root
+				case 1:
+					bassNote = bassRoot + 7 // 5th
+				case 2:
+					bassNote = bassRoot + 5 // 4th (passing tone)
+				case 3:
+					// Chromatic approach to next chord root
+					nextIdx := (e.progress + 1) % len(e.progression)
+					nextRoot := 36 + kp + e.progression[nextIdx].RootOffset
+					if nextRoot > bassRoot {
+						bassNote = nextRoot - 1 // approach from below
+					} else {
+						bassNote = nextRoot + 1 // approach from above
+					}
+				}
+				e.playPianoNoteWithVol(bassNote, e.pianoVolLevel*0.38)
+			}
+
 			// 3. Jazz Drums Sequence (Swung Ride, Soft feathering Kick, Soft Snare rimshot & ghost notes)
 			if e.isTransitioning {
 				step := tickCount % 8
@@ -337,19 +365,25 @@ func (e *LofiEngine) generateProgression() {
 
 	e.progress = 0
 	e.scalePos = len(e.scale) / 2
+	keyPitch := keyToPitch(e.key)
 	for i := range e.soloists {
-		e.soloists[i].ScaleIdx = len(e.scale) / 2
-		e.soloists[i].LastMIDINote = e.scale[e.soloists[i].ScaleIdx]
+		var lowBound int
 		if e.soloists[i].Type == "sax" {
-			e.soloists[i].LastMIDINote -= 12
+			lowBound = 49
+		} else {
+			lowBound = 55
 		}
+		e.soloists[i].LastMIDINote = findNearestChordTone(lowBound+12, e.progression[0], keyPitch, lowBound, lowBound+28)
 		e.soloists[i].Motif = nil
 		e.soloists[i].MotifIdx = 0
-		e.soloists[i].MotifSteps = nil
-		e.soloists[i].MotifStepIdx = 0
+		e.soloists[i].MotifNotes = nil
+		e.soloists[i].MotifNoteIdx = 0
 		e.soloists[i].ImprovState = 0
 		e.soloists[i].MelodyDir = 1
 		e.soloists[i].LastLeap = 0
+		e.soloists[i].PhraseEnergy = 0
+		e.soloists[i].NoteCount = 0
+		e.soloists[i].PhraseLength = 0
 	}
 }
 

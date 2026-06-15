@@ -5,29 +5,38 @@ import (
 	"math/rand"
 )
 
+// Soloist represents a jazz soloist (sax or trumpet) that improvises
+// melodies using MIDI notes directly (not scale indices), enabling
+// chromatic approach notes, enclosures, and bebop vocabulary.
 type Soloist struct {
 	Type         string // "sax" or "trumpet"
 	PhraseTicks  int
 	PauseTicks   int
-	ScaleIdx     int
 	LastMIDINote int
 	Motif        []int
 	MotifIdx     int
 
 	// Composition Fields
-	ImprovState  int
-	MelodyDir    int
-	MotifSteps   []int
-	MotifStepIdx int
-	LastLeap     int
+	ImprovState   int     // 0: stepwise, 1: arpeggio, 2: motif, 3: chromatic approach
+	MelodyDir     int     // +1 ascending, -1 descending
+	MotifNotes    []int   // Actual MIDI notes for a motif pattern
+	MotifNoteIdx  int
+	LastLeap      int
+	PhraseEnergy  float64 // 0.0 to 1.0, builds within a phrase for dynamic arc
+	NoteCount     int     // notes played in this phrase
+	PhraseLength  int     // total notes planned for this phrase
 }
 
+// Rhythmic motifs: durations in ticks
 var PhraseMotifs = [][]int{
-	{2, 2, 2, 2},       // Quarter notes (straight)
-	{1, 1, 1, 1, 1, 1}, // Swing eighth-note run (continuous and flowing)
-	{3, 1, 3, 1},       // Dotted swing (long-short)
-	{2, 1, 2, 1},       // Syncopated push
-	{4, 4, 4},          // Long breathing notes (lyrical)
+	{2, 2, 2, 2},             // Quarter notes (lyrical)
+	{1, 1, 1, 1, 1, 1, 2},   // Eighth-note run ending on quarter
+	{3, 1, 3, 1},             // Dotted swing (long-short)
+	{1, 1, 2, 1, 1, 2},      // Bebop phrasing
+	{4, 2, 2},               // Long note then two shorts
+	{1, 1, 1, 1, 2, 2},      // Run into sustained
+	{2, 1, 1, 2, 1, 1},      // Syncopated push
+	{6, 2},                   // Very long hold then short
 }
 
 func isChordTone(note int, chord JazzChord, keyPitch int) bool {
@@ -45,7 +54,6 @@ func isChordTone(note int, chord JazzChord, keyPitch int) bool {
 func isGuideTone(note int, chord JazzChord, keyPitch int) bool {
 	noteClass := note % 12
 	chordRootClass := (keyPitch + chord.RootOffset) % 12
-	// Guide tones are 3rd (3/4) and 7th (10/11)
 	for _, interval := range chord.Intervals {
 		if interval == 3 || interval == 4 || interval == 10 || interval == 11 {
 			chordToneClass := (chordRootClass + interval) % 12
@@ -57,6 +65,57 @@ func isGuideTone(note int, chord JazzChord, keyPitch int) bool {
 	return false
 }
 
+// findNearestChordTone finds the nearest chord tone to the given MIDI note.
+func findNearestChordTone(fromNote int, chord JazzChord, keyPitch int, lowBound, highBound int) int {
+	best := fromNote
+	bestDist := 999
+	for n := lowBound; n <= highBound; n++ {
+		if isChordTone(n, chord, keyPitch) {
+			d := int(math.Abs(float64(n - fromNote)))
+			if d < bestDist {
+				bestDist = d
+				best = n
+			}
+		}
+	}
+	return best
+}
+
+// findNearestGuideTone finds the nearest guide tone (3rd or 7th) to the given MIDI note.
+func findNearestGuideTone(fromNote int, chord JazzChord, keyPitch int, lowBound, highBound int) int {
+	best := fromNote
+	bestDist := 999
+	for n := lowBound; n <= highBound; n++ {
+		if isGuideTone(n, chord, keyPitch) {
+			d := int(math.Abs(float64(n - fromNote)))
+			if d < bestDist {
+				bestDist = d
+				best = n
+			}
+		}
+	}
+	return best
+}
+
+// generateMotifNotes creates a short melodic motif rooted at startNote using chord tones.
+func generateMotifNotes(startNote int, chord JazzChord, keyPitch int, dir int) []int {
+	motifPatterns := [][]int{
+		{0, 2, -1, 3},       // step up, step back, leap
+		{0, -2, -1, 1, 3},   // dip then climb
+		{0, 4, 3, 2, 0},     // leap up, walk back
+		{0, -1, -2, 0, 2},   // chromatic dip, return, step up
+		{0, 3, 5, 3, 0},     // arch shape
+		{0, -3, -5, -3, 0},  // inverse arch
+	}
+	pattern := motifPatterns[rand.Intn(len(motifPatterns))]
+
+	notes := make([]int, len(pattern))
+	for i, offset := range pattern {
+		notes[i] = startNote + offset*dir
+	}
+	return notes
+}
+
 func (e *LofiEngine) processSoloist(s *Soloist, tickCount int) {
 	if s.PauseTicks > 0 {
 		return
@@ -65,239 +124,205 @@ func (e *LofiEngine) processSoloist(s *Soloist, tickCount int) {
 	keyPitch := keyToPitch(e.key)
 	chord := e.progression[e.progress]
 
-	// Determine if we are at a chord change or anticipating it
-	// Chord changes on tickCount % 16 == 0
-	// We anticipate 1 tick early (tickCount % 16 == 15)
-	isAnticipation := (tickCount%16 == 15)
+	// Instrument range in MIDI
+	var lowBound, highBound int
+	if s.Type == "sax" {
+		lowBound, highBound = 49, 77 // Db3 to F5 (alto sax range)
+	} else {
+		lowBound, highBound = 55, 84 // G3 to C6 (trumpet range)
+	}
+
+	// Chord anticipation: look ahead at next chord 1-2 ticks early
+	isAnticipation := (tickCount%16 == 14) || (tickCount%16 == 15)
 	targetChord := chord
 	if isAnticipation {
 		nextIdx := (e.progress + 1) % len(e.progression)
 		targetChord = e.progression[nextIdx]
 	}
 
+	// === PHRASE MANAGEMENT ===
 	if s.PhraseTicks <= 0 {
-		// Hand off/turn check
 		if e.soloistPhraseActive {
-			// Soloist phrase ended!
+			// Phrase ended — hand off spotlight
 			e.soloistPhraseActive = false
 			e.phraseCounter++
-			
-			// Hand off spotlight to the other soloist
+
 			nextSolIdx := (e.activeSoloistIdx + 1) % len(e.soloists)
 			e.activeSoloistIdx = nextSolIdx
-			
-			// Set a natural breath pause for BOTH soloists
-			// The current soloist pauses to rest
-			s.PauseTicks = rand.Intn(16) + 12
+
+			s.PauseTicks = rand.Intn(12) + 10
 			s.Motif = nil
-			s.MotifSteps = nil
-			
-			// The next soloist takes a tiny breath (e.g. 2 to 4 ticks) before responding
-			e.soloists[nextSolIdx].PauseTicks = rand.Intn(3) + 3
+			s.MotifNotes = nil
+
+			e.soloists[nextSolIdx].PauseTicks = rand.Intn(4) + 3
 			e.soloists[nextSolIdx].Motif = nil
-			e.soloists[nextSolIdx].MotifSteps = nil
+			e.soloists[nextSolIdx].MotifNotes = nil
 			return
-		} else {
-			// Decide whether to start a phrase or stay silent
-			if rand.Float64() < 0.35 {
-				// Take a rest and pass spotlight if we were silent
-				s.PauseTicks = rand.Intn(8) + 4
-				nextSolIdx := (e.activeSoloistIdx + 1) % len(e.soloists)
-				e.activeSoloistIdx = nextSolIdx
-				e.soloists[nextSolIdx].PauseTicks = rand.Intn(3) + 2
-				return
-			}
-
-			// Start playing a melodic phrase (8 to 24 ticks = 1 to 3 measures)
-			e.soloistPhraseActive = true
-			s.PhraseTicks = rand.Intn(16) + 8
-			s.Motif = PhraseMotifs[rand.Intn(len(PhraseMotifs))]
-			s.MotifIdx = 0
-
-			// Setup Composition State for this phrase:
-			// 0: Stepwise scale run, 1: Chord arpeggio, 2: Repeating motif
-			rVal := rand.Float64()
-			if rVal < 0.50 {
-				s.ImprovState = 0
-			} else if rVal < 0.80 {
-				s.ImprovState = 1
-			} else {
-				s.ImprovState = 2
-				// Generate a melodic motif of 3 to 4 steps
-				motifOptions := [][]int{
-					{0, 2, -1},
-					{0, 1, 0, -1},
-					{0, 3, -2, -1},
-					{0, -1, 2, -1},
-				}
-				s.MotifSteps = motifOptions[rand.Intn(len(motifOptions))]
-				s.MotifStepIdx = 0
-			}
-
-			// Question & Answer melodic contour
-			isQuestion := (e.phraseCounter % 2 == 0)
-			if isQuestion {
-				// Question phrase starts in lower register, goes up
-				s.ScaleIdx = rand.Intn(len(e.scale) / 2)
-				s.MelodyDir = 1
-			} else {
-				// Answer phrase starts in higher register, goes down
-				s.ScaleIdx = len(e.scale)/2 + rand.Intn(len(e.scale)/2)
-				s.MelodyDir = -1
-			}
-			s.LastLeap = 0
 		}
+
+		// Decide: play or rest?
+		if rand.Float64() < 0.30 {
+			s.PauseTicks = rand.Intn(8) + 4
+			nextSolIdx := (e.activeSoloistIdx + 1) % len(e.soloists)
+			e.activeSoloistIdx = nextSolIdx
+			e.soloists[nextSolIdx].PauseTicks = rand.Intn(3) + 2
+			return
+		}
+
+		// Start a new phrase
+		e.soloistPhraseActive = true
+		s.PhraseTicks = rand.Intn(20) + 10 // 10-30 ticks
+		s.Motif = PhraseMotifs[rand.Intn(len(PhraseMotifs))]
+		s.MotifIdx = 0
+		s.NoteCount = 0
+		s.PhraseLength = rand.Intn(8) + 5 // 5-12 notes in the phrase
+		s.PhraseEnergy = 0.0
+
+		// Choose improvisation strategy
+		rVal := rand.Float64()
+		if rVal < 0.35 {
+			s.ImprovState = 0 // Stepwise (scale runs)
+		} else if rVal < 0.60 {
+			s.ImprovState = 1 // Chord arpeggio
+		} else if rVal < 0.80 {
+			s.ImprovState = 2 // Motif development
+		} else {
+			s.ImprovState = 3 // Chromatic approach
+		}
+
+		// Q&A contour: questions ascend, answers descend
+		isQuestion := (e.phraseCounter % 2 == 0)
+		mid := (lowBound + highBound) / 2
+		if isQuestion {
+			s.LastMIDINote = lowBound + rand.Intn(mid-lowBound)
+			s.MelodyDir = 1
+		} else {
+			s.LastMIDINote = mid + rand.Intn(highBound-mid)
+			s.MelodyDir = -1
+		}
+		// Snap starting note to nearest chord tone
+		s.LastMIDINote = findNearestChordTone(s.LastMIDINote, chord, keyPitch, lowBound, highBound)
+
+		// Pre-generate motif if needed
+		if s.ImprovState == 2 {
+			s.MotifNotes = generateMotifNotes(s.LastMIDINote, chord, keyPitch, s.MelodyDir)
+			s.MotifNoteIdx = 0
+		}
+
+		s.LastLeap = 0
 	}
 
 	s.PhraseTicks--
 
-	// Phrasing: notes play mostly on downbeats (even ticks) or with swing feel
-	playProb := 0.35
+	// Swing feel: higher play probability on downbeats
+	playProb := 0.30
 	if tickCount%2 == 0 {
-		playProb = 0.65
+		playProb = 0.70
 	}
 	if rand.Float64() > playProb {
 		return
 	}
 
-	// 1. MELODIC STEP GENERATION (Composer Rules)
-	var step int
+	// === NOTE GENERATION ===
 	isChordChange := (tickCount % 16 == 0)
 
-	if isChordChange || isAnticipation {
-		// Guide-tone targeting: snap s.ScaleIdx to the nearest guide/chord tone of the target chord
-		bestDiff := 999
-		bestIdx := s.ScaleIdx
-		for idx := 0; idx < len(e.scale); idx++ {
-			testNote := e.scale[idx]
-			if s.Type == "sax" {
-				testNote -= 12
-			}
-			matchesTarget := false
-			if isChordChange {
-				matchesTarget = isGuideTone(testNote, targetChord, keyPitch)
-			} else {
-				matchesTarget = isChordTone(testNote, targetChord, keyPitch)
-			}
-			if matchesTarget {
-				diff := int(math.Abs(float64(idx - s.ScaleIdx)))
-				if diff < bestDiff {
-					bestDiff = diff
-					bestIdx = idx
-				}
-			}
-		}
-		s.ScaleIdx = bestIdx
-		step = 0 // land on the targeted tone
-	} else if s.LastLeap != 0 {
-		// Opposite-direction leap resolution: resolve the leap by step in the opposite direction
-		if s.LastLeap > 0 {
-			step = -1
+	// Update phrase energy arc: builds to climax at 60-70%, then resolves
+	if s.PhraseLength > 0 {
+		progress := float64(s.NoteCount) / float64(s.PhraseLength)
+		if progress < 0.65 {
+			s.PhraseEnergy = progress / 0.65 // build up
 		} else {
-			step = 1
+			s.PhraseEnergy = 1.0 - (progress-0.65)/0.35 // wind down
+		}
+		if s.PhraseEnergy < 0 {
+			s.PhraseEnergy = 0
+		}
+	}
+
+	var nextNote int
+
+	if isChordChange || isAnticipation {
+		// Target a guide tone of the upcoming/current chord
+		nextNote = findNearestGuideTone(s.LastMIDINote, targetChord, keyPitch, lowBound, highBound)
+	} else if s.LastLeap != 0 {
+		// Resolve leaps by stepping in the opposite direction
+		if s.LastLeap > 0 {
+			nextNote = s.LastMIDINote - 1
+		} else {
+			nextNote = s.LastMIDINote + 1
 		}
 		s.LastLeap = 0
 	} else {
-		// Standard walk based on improvisation state
 		switch s.ImprovState {
-		case 1: // Chord arpeggio: walk through chord tones in range
-			found := false
-			idx := s.ScaleIdx
-			for i := 0; i < len(e.scale); i++ {
-				idx += s.MelodyDir
-				if idx < 0 || idx >= len(e.scale) {
-					s.MelodyDir = -s.MelodyDir
-					idx = s.ScaleIdx
-					continue
-				}
-				testNote := e.scale[idx]
-				if s.Type == "sax" {
-					testNote -= 12
-				}
-				if isChordTone(testNote, targetChord, keyPitch) {
-					step = idx - s.ScaleIdx
-					found = true
-					break
-				}
-			}
-			if !found {
-				step = s.MelodyDir
-			}
-		case 2: // Repeating motif sequencing
-			if len(s.MotifSteps) > 0 {
-				step = s.MotifSteps[s.MotifStepIdx%len(s.MotifSteps)]
-				s.MotifStepIdx++
-				// Melodic Sequence: shift start of motif occasionally
-				if s.MotifStepIdx%len(s.MotifSteps) == 0 {
-					s.ScaleIdx += rand.Intn(3) - 1
+		case 1: // Arpeggio: walk through chord tones
+			nextNote = s.LastMIDINote + s.MelodyDir*rand.Intn(3) + s.MelodyDir
+			nextNote = findNearestChordTone(nextNote, targetChord, keyPitch, lowBound, highBound)
+
+		case 2: // Motif development
+			if len(s.MotifNotes) > 0 {
+				nextNote = s.MotifNotes[s.MotifNoteIdx%len(s.MotifNotes)]
+				s.MotifNoteIdx++
+				// Sequence the motif: shift it when we loop
+				if s.MotifNoteIdx%len(s.MotifNotes) == 0 {
+					shift := rand.Intn(5) - 2 // -2 to +2
+					for j := range s.MotifNotes {
+						s.MotifNotes[j] += shift
+					}
 				}
 			} else {
-				step = s.MelodyDir
+				nextNote = s.LastMIDINote + s.MelodyDir
 			}
-		default: // Stepwise scale run
-			// 80% chance to continue in the same direction, 20% to turn
-			if rand.Float64() < 0.20 {
+
+		case 3: // Chromatic approach: approach target from a half-step below
+			target := findNearestChordTone(s.LastMIDINote+s.MelodyDir*3, targetChord, keyPitch, lowBound, highBound)
+			// Play the chromatic approach note (half step below target)
+			nextNote = target - 1
+			// Next time we'll land on the target
+			s.ImprovState = 1 // switch to arpeggio to land
+
+		default: // Stepwise scale run with occasional direction changes
+			if rand.Float64() < 0.15 {
 				s.MelodyDir = -s.MelodyDir
 			}
-			step = s.MelodyDir
+			// Step by 1 or 2 semitones with bias toward scale tones
+			stepSize := 1
+			if rand.Float64() < 0.4 {
+				stepSize = 2
+			}
+			nextNote = s.LastMIDINote + s.MelodyDir*stepSize
+
+			// Prefer landing on scale tones on downbeats
+			if tickCount%2 == 0 && !isScaleTone(nextNote, e.key, e.isMinor) {
+				nextNote += s.MelodyDir // one more step to land on scale tone
+			}
 		}
 	}
 
-	// 2. APPLY LEAP REGISTRATION
-	if !isChordChange && !isAnticipation && int(math.Abs(float64(step))) >= 2 {
-		s.LastLeap = step
+	// Register leaps
+	leap := nextNote - s.LastMIDINote
+	if !isChordChange && !isAnticipation && int(math.Abs(float64(leap))) >= 5 {
+		s.LastLeap = leap
 	}
 
-	// 3. APPLY STEP WITH BOUNDARY SAFETY & DIRECTION BOUNCE
-	s.ScaleIdx += step
-	if s.ScaleIdx < 0 {
-		s.ScaleIdx = 0
+	// Boundary enforcement
+	if nextNote < lowBound {
+		nextNote = lowBound + rand.Intn(3)
 		s.MelodyDir = 1
-	} else if s.ScaleIdx >= len(e.scale) {
-		s.ScaleIdx = len(e.scale) - 1
+	} else if nextNote > highBound {
+		nextNote = highBound - rand.Intn(3)
 		s.MelodyDir = -1
 	}
 
-	// 4. RESOLVE TO Stable Chord Tone Near the End of an Answer Phrase
-	note := e.scale[s.ScaleIdx]
-	if s.Type == "sax" {
-		note -= 12
+	// Resolve to chord tone on strong downbeats and at phrase end
+	isEnding := s.PhraseTicks <= 2
+	if (tickCount%4 == 0 || isEnding) && !isChordTone(nextNote, targetChord, keyPitch) {
+		nextNote = findNearestChordTone(nextNote, targetChord, keyPitch, lowBound, highBound)
 	}
 
-	isAnswerEnding := (e.phraseCounter%2 == 1) && (s.PhraseTicks <= 2)
+	s.LastMIDINote = nextNote
+	s.NoteCount++
 
-	// Resolve to a chord tone on strong downbeats or during an Answer resolution
-	if (tickCount%2 == 0 || isAnswerEnding) && !isChordTone(note, targetChord, keyPitch) {
-		leftIdx := s.ScaleIdx - 1
-		rightIdx := s.ScaleIdx + 1
-		resolved := false
-		if leftIdx >= 0 {
-			leftNote := e.scale[leftIdx]
-			if s.Type == "sax" {
-				leftNote -= 12
-			}
-			if isChordTone(leftNote, targetChord, keyPitch) {
-				note = leftNote
-				s.ScaleIdx = leftIdx
-				resolved = true
-			}
-		}
-		if !resolved && rightIdx < len(e.scale) {
-			rightNote := e.scale[rightIdx]
-			if s.Type == "sax" {
-				rightNote -= 12
-			}
-			if isChordTone(rightNote, targetChord, keyPitch) {
-				note = rightNote
-				s.ScaleIdx = rightIdx
-				resolved = true
-			}
-		}
-	}
-
-	s.LastMIDINote = note
-
-	// Choose stepTicks from motif or fall back
+	// === RHYTHM ===
 	var stepTicks int
 	if len(s.Motif) > 0 {
 		stepTicks = s.Motif[s.MotifIdx%len(s.Motif)]
@@ -306,19 +331,17 @@ func (e *LofiEngine) processSoloist(s *Soloist, tickCount int) {
 		stepTicks = 2
 	}
 
-	// Choose noteTicks (articulation: staccato vs legato)
+	// Articulation
 	var noteTicks int
 	if stepTicks == 1 {
-		noteTicks = 1 // Legato eighth notes
-	} else {
-		if rand.Float64() < 0.25 {
-			noteTicks = stepTicks - 1 // slightly detached / staccato
-			if noteTicks < 1 {
-				noteTicks = 1
-			}
-		} else {
-			noteTicks = stepTicks // legato
+		noteTicks = 1
+	} else if rand.Float64() < 0.20 {
+		noteTicks = stepTicks - 1
+		if noteTicks < 1 {
+			noteTicks = 1
 		}
+	} else {
+		noteTicks = stepTicks
 	}
 
 	bpm := e.bpm
@@ -327,11 +350,23 @@ func (e *LofiEngine) processSoloist(s *Soloist, tickCount int) {
 
 	s.PauseTicks = stepTicks
 
-	freq := midiToFreq(note)
+	// Dynamic velocity based on phrase arc
+	baseVel := 0.45 + 0.40*s.PhraseEnergy
+	// Add slight randomness for human feel
+	vel := baseVel + (rand.Float64()-0.5)*0.12
+	if vel < 0.25 {
+		vel = 0.25
+	}
+	if vel > 0.95 {
+		vel = 0.95
+	}
+
+	freq := midiToFreq(nextNote)
 	voice := &SynthVoice{
 		SampleRate: e.speakerRate,
 		Frequency:  freq,
-		Amplitude:  e.synthVolLevel * 0.14,
+		Amplitude:  e.synthVolLevel * 0.16,
+		Velocity:   vel,
 		VoiceType:  s.Type,
 		Duration:   duration,
 	}

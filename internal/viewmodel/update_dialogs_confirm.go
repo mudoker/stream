@@ -168,6 +168,20 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					m.StatusMsg = "This and all future occurrences updated."
 				}
 			} else if keyStr == "esc" || keyStr == "q" {
+				if m.DB != nil {
+					m.refreshTasks()
+				} else {
+					for i, t := range m.Tasks {
+						if t.UUID == m.ConfirmTask.UUID {
+							m.Tasks[i] = m.ConfirmTask
+							break
+						}
+					}
+				}
+				if !m.ConfirmTask.TimeWindow.Start.IsZero() {
+					m.SelectedDay = m.ConfirmTask.TimeWindow.Start.Local()
+				}
+				m.AutoScrollToSelectedTask()
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""
 				m.StatusMsg = "Edit canceled."

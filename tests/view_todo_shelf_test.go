@@ -453,13 +453,13 @@ func TestRecurringAndHabitShelfBehavior(t *testing.T) {
 	day1 := time.Date(2026, 6, 14, 0, 0, 0, 0, time.Local)
 	day2 := day1.AddDate(0, 0, 1)
 
-	// 1. Habit repeatable test
+	// 1. Habit repeatable/anchored test
 	m := &viewmodel.Model{
 		SelectedDay: day1,
 		Tasks: []model.Task{
 			{
 				UUID:           "habit-1",
-				Title:          "Drink Water",
+				Title:          "Drink Water (Anchored)",
 				SchedulingType: model.Habit,
 				TimeWindow: model.TimeWindow{
 					Start: day1.Add(9 * time.Hour),
@@ -467,29 +467,53 @@ func TestRecurringAndHabitShelfBehavior(t *testing.T) {
 				},
 				LifecycleState: model.StateReady,
 			},
+			{
+				UUID:           "habit-2",
+				Title:          "Stretch (De-anchored)",
+				SchedulingType: model.Habit,
+				TimeWindow:     model.TimeWindow{},
+				LifecycleState: model.StateReady,
+			},
 		},
 	}
 
-	// On Day 1: habit is anchored on Day 1, so it shouldn't be on the shelf
+	// On Day 1: habit-1 is anchored, so it shouldn't be on the shelf. habit-2 is de-anchored, so it should.
 	shelf1 := m.GetTodoShelfTasks()
+	foundHabit1OnDay1 := false
+	foundHabit2OnDay1 := false
 	for _, task := range shelf1 {
 		if task.UUID == "habit-1" {
-			t.Errorf("expected habit-1 to be cleared from Day 1 shelf because it is anchored on Day 1")
+			foundHabit1OnDay1 = true
 		}
+		if task.UUID == "habit-2" {
+			foundHabit2OnDay1 = true
+		}
+	}
+	if foundHabit1OnDay1 {
+		t.Errorf("expected anchored habit-1 to NOT appear on Day 1 shelf")
+	}
+	if !foundHabit2OnDay1 {
+		t.Errorf("expected de-anchored habit-2 to appear on Day 1 shelf")
 	}
 
-	// Move to Day 2: habit is NOT anchored on Day 2, so it should appear on the shelf
+	// Move to Day 2: habit-1 is anchored, so it should NOT appear on the shelf either. habit-2 is de-anchored, so it should.
 	m.SelectedDay = day2
 	shelf2 := m.GetTodoShelfTasks()
-	foundOnDay2Shelf := false
+	foundHabit1OnDay2 := false
+	foundHabit2OnDay2 := false
 	for _, task := range shelf2 {
 		if task.UUID == "habit-1" {
-			foundOnDay2Shelf = true
-			break
+			foundHabit1OnDay2 = true
+		}
+		if task.UUID == "habit-2" {
+			foundHabit2OnDay2 = true
 		}
 	}
-	if !foundOnDay2Shelf {
-		t.Errorf("expected habit-1 to appear on Day 2 shelf because it is repeatable and not anchored on Day 2")
+	if foundHabit1OnDay2 {
+		t.Errorf("expected anchored habit-1 to NOT appear on Day 2 shelf")
+	}
+	if !foundHabit2OnDay2 {
+		t.Errorf("expected de-anchored habit-2 to appear on Day 2 shelf")
 	}
 
 	// 2. Grouping de-anchored recurring tasks test

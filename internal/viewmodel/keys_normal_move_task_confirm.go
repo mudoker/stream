@@ -57,6 +57,21 @@ func (m *Model) confirmTaskMove() {
 	m.SelectedTaskUUID = originalUUID
 
 	if originalFound && m.DB != nil {
+		if originalTask.RecurringParentUUID != "" {
+			confirmTask := originalTask
+			confirmTask.TimeWindow = m.TaskMoveOriginalTimeWindow
+
+			m.ConfirmTask = confirmTask
+			m.PendingEditTask = originalTask
+			m.ConfirmOpen = true
+			m.ConfirmActionType = "edit_recurring"
+			m.ConfirmSelectedIndex = 0
+			m.CurrentMode = ModeNormal
+			m.TaskMovePrefix = ""
+			m.StatusMsg = "Choose recurring update option."
+			return
+		}
+
 		m.DB.UpdateTask(originalTask)
 		m.refreshTasks()
 		m.triggerGCalPush(originalTask)

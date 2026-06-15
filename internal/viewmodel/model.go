@@ -88,6 +88,10 @@ type Model struct {
 	PromptTask        model.Task
 	PromptSelectedIdx int
 
+	LofiPlayerOpen          bool
+	LofiPlayerSelectedIndex int
+	LastPromptedTimes       map[string]time.Time
+
 	ReviewOpen           bool
 	ReviewTasksCompleted int
 	ReviewTasksDeferred  int
@@ -172,6 +176,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		SessionExpiryPromptOpen:     false,
 		AuthNoticeOpen:              false,
 		LastTodoShelfTaskUUID:       "",
+		LastPromptedTimes:           make(map[string]time.Time),
 	}
 
 	m.refreshWorkspaces()

@@ -40,6 +40,7 @@ func (m *Model) GetCommandList() []CommandEntry {
 		CommandEntry{"sync-settings", "Configure GCal sync mode and interval (seconds)"},
 		CommandEntry{"auth", "Start Google Calendar authorization"},
 		CommandEntry{"stop", "Stop active focus timer session"},
+		CommandEntry{"music", "Open jazz lounge music player modal"},
 	)
 
 	for _, ws := range m.Workspaces {

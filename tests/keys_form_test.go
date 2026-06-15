@@ -609,6 +609,155 @@ func TestInteractiveDaysSelectAndStoryPointsSkip(t *testing.T) {
 	}
 }
 
+func TestHabitStartAndDurationHandling(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TitleInput.SetValue("Daily Workout")
+	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.StartTimeInput.SetValue("08:30")
+	m.Form.DurationInput.SetValue("45")
+	m.Form.RecurringDaysInput.SetValue("Mon")
+
+	m.SubmitForm()
+
+	tasks := database.GetTasks()
+	var habitTasks []model.Task
+	for _, task := range tasks {
+		if task.Title == "Daily Workout" {
+			habitTasks = append(habitTasks, task)
+		}
+	}
+
+	if len(habitTasks) == 0 {
+		t.Fatalf("expected some habit tasks to be created")
+	}
+
+	for _, task := range habitTasks {
+		if !model.IsTaskAnchored(task) {
+			t.Errorf("expected habit to be anchored when start time is specified")
+		}
+		if task.TimeWindow.Start.Hour() != 8 || task.TimeWindow.Start.Minute() != 30 {
+			t.Errorf("expected start time 08:30, got %s", task.TimeWindow.Start.Format("15:04"))
+		}
+		dur := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+		if dur != 45 {
+			t.Errorf("expected duration 45, got %d", dur)
+		}
+	}
+
+	// Test de-anchored habit creation
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TitleInput.SetValue("Drink Water Float")
+	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.StartTimeInput.SetValue("") // Clear start time
+	m.Form.DurationInput.SetValue("30")
+	m.Form.RecurringDaysInput.SetValue("Mon")
+
+	m.SubmitForm()
+
+	tasks2 := database.GetTasks()
+	var deanchoredHabits []model.Task
+	for _, task := range tasks2 {
+		if task.Title == "Drink Water Float" {
+			deanchoredHabits = append(deanchoredHabits, task)
+		}
+	}
+
+	if len(deanchoredHabits) == 0 {
+		t.Fatalf("expected some de-anchored habit tasks to be created")
+	}
+
+	for _, task := range deanchoredHabits {
+		if model.IsTaskAnchored(task) {
+			t.Errorf("expected habit to be de-anchored when start time is cleared")
+		}
+		if !task.TimeWindow.Start.IsZero() {
+			t.Errorf("expected zero start time, got %s", task.TimeWindow.Start)
+		}
+	}
+
+	// Test editing a habit (anchoring it)
+	targetHabit := deanchoredHabits[0]
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TitleInput.SetValue("Drink Water Anchored")
+	m.Form.DescInput.SetValue("Stay hydrated")
+	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.StartTimeInput.SetValue("14:15")
+	m.Form.DurationInput.SetValue("15")
+	m.IsEditing = true
+	m.Form.IsEditing = true
+	m.EditingTaskUUID = targetHabit.UUID
+
+	m.SubmitForm()
+
+	// Since editing a recurring habit opens the confirmation modal, confirm "only this occurrence"
+	if !m.ConfirmOpen || m.ConfirmActionType != "edit_recurring" {
+		t.Fatalf("expected edit recurring confirmation modal to be open")
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	updatedTasks := database.GetTasks()
+	var foundUpdated bool
+	for _, task := range updatedTasks {
+		if task.UUID == targetHabit.UUID {
+			foundUpdated = true
+			if !model.IsTaskAnchored(task) {
+				t.Errorf("expected edited habit to be anchored")
+			}
+			if task.TimeWindow.Start.Hour() != 14 || task.TimeWindow.Start.Minute() != 15 {
+				t.Errorf("expected start time 14:15, got %s", task.TimeWindow.Start.Format("15:04"))
+			}
+			dur := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+			if dur != 15 {
+				t.Errorf("expected duration 15, got %d", dur)
+			}
+		}
+	}
+	if !foundUpdated {
+		t.Errorf("expected to find updated habit in DB")
+	}
+
+	// Test editing a habit (de-anchoring it)
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TitleInput.SetValue("Drink Water Float Again")
+	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.StartTimeInput.SetValue("") // Clear start time
+	m.Form.DurationInput.SetValue("20")
+	m.IsEditing = true
+	m.Form.IsEditing = true
+	m.EditingTaskUUID = targetHabit.UUID
+
+	m.SubmitForm()
+
+	// Confirm "only this occurrence" again
+	if !m.ConfirmOpen || m.ConfirmActionType != "edit_recurring" {
+		t.Fatalf("expected edit recurring confirmation modal to be open again")
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	updatedTasks2 := database.GetTasks()
+	for _, task := range updatedTasks2 {
+		if task.UUID == targetHabit.UUID {
+			if model.IsTaskAnchored(task) {
+				t.Errorf("expected edited habit to be de-anchored when start time is cleared")
+			}
+			if !task.TimeWindow.Start.IsZero() {
+				t.Errorf("expected zero start time, got %s", task.TimeWindow.Start)
+			}
+		}
+	}
+}
+
 
 
 

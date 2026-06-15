@@ -27,6 +27,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		m.ReviewOpen = false
 		m.DetailOpen = false
+		m.LofiPlayerOpen = false
 
 		m.StatusMsg = ""
 
@@ -49,6 +50,12 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Route based on open modal/state
+	if m.LofiPlayerOpen {
+		if handled, cmd := m.handleLofiPlayerKeys(msg); handled {
+			return m, cmd
+		}
+	}
+
 	if m.WarningOpen || m.AuthNoticeOpen || m.SessionExpiryPromptOpen || m.ConfirmOpen {
 		if handled, cmd := m.handleConfirmDialogKeys(msg); handled {
 			return m, cmd

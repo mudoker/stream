@@ -144,9 +144,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					t.TimeWindow.Start.Year() == now.Year() && t.TimeWindow.Start.Month() == now.Month() && t.TimeWindow.Start.Day() == now.Day() &&
 					t.TimeWindow.Start.Hour() == now.Hour() && t.TimeWindow.Start.Minute() == now.Minute() {
 
+					lastPrompted, exists := m.LastPromptedTimes[t.UUID]
+					if exists && lastPrompted.Year() == now.Year() && lastPrompted.Month() == now.Month() && lastPrompted.Day() == now.Day() &&
+						lastPrompted.Hour() == now.Hour() && lastPrompted.Minute() == now.Minute() {
+						continue
+					}
+
 					m.PromptTask = t
 					m.PromptSelectedIdx = 0
 					m.PromptOpen = true
+					m.LastPromptedTimes[t.UUID] = now
 					break
 				}
 			}
@@ -155,9 +162,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if t.SchedulingType == model.Reminder && t.LifecycleState == model.StateReady {
 						due := t.TimeWindow.Start
 						if !due.Before(now.Add(-5*time.Minute)) && due.Before(now.Add(1*time.Minute)) && m.PromptTask.UUID != t.UUID {
+							lastPrompted, exists := m.LastPromptedTimes[t.UUID]
+							if exists && now.Sub(lastPrompted) < 5*time.Minute {
+								continue
+							}
+
 							m.PromptTask = t
 							m.PromptSelectedIdx = 0
 							m.PromptOpen = true
+							m.LastPromptedTimes[t.UUID] = now
 							break
 						}
 					}

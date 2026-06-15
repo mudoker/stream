@@ -333,6 +333,11 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			m.StatusMsg = "No active focus session running."
 		}
 
+	case "music":
+		m.LofiPlayerOpen = true
+		m.LofiPlayerSelectedIndex = 0
+		m.StatusMsg = "Lofi Audio Player opened."
+
 	default:
 		m.StatusMsg = fmt.Sprintf("Unknown command: %s", cmdName)
 	}

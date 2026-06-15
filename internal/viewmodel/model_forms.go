@@ -109,7 +109,7 @@ func (f TaskForm) VisibleFields() []int {
 	}
 	fields = append(fields, 4)
 
-	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 4 {
+	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 3 || f.TaskTypeIdx == 4 {
 		fields = append(fields, 5, 6)
 	} else if f.TaskTypeIdx == 2 {
 		fields = append(fields, 5, 6)

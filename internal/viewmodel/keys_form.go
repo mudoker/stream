@@ -117,13 +117,13 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case 1:
 		m.Form.DescInput, cmd = m.Form.DescInput.Update(msg)
 	case 5:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
 			m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.DueDateInput, cmd = m.Form.DueDateInput.Update(msg)
 		}
 	case 6:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
 			m.Form.DurationInput, cmd = m.Form.DurationInput.Update(msg)
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
@@ -167,13 +167,13 @@ func (m *Model) focusFormFields() {
 	case 1:
 		m.Form.DescInput.Focus()
 	case 5:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
 			m.Form.StartTimeInput.Focus()
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.DueDateInput.Focus()
 		}
 	case 6:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
 			m.Form.DurationInput.Focus()
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.StartTimeInput.Focus()
@@ -219,17 +219,40 @@ func (m *Model) SubmitForm() {
 	spVal := SPOptions[m.Form.SPIdx]
 	taskType := m.Form.TaskTypeIdx
 
+	var isEdit = m.IsEditing
+	var existingTask model.Task
+	if isEdit {
+		for _, t := range m.Tasks {
+			if t.UUID == m.EditingTaskUUID {
+				existingTask = t
+				break
+			}
+		}
+	}
+
 	now := time.Now()
-	startTime := time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), 9, 0, 0, 0, now.Location())
+	baseDay := m.SelectedDay
+	if isEdit && !existingTask.TimeWindow.Start.IsZero() {
+		baseDay = existingTask.TimeWindow.Start
+	}
+
+	startTime := time.Date(baseDay.Year(), baseDay.Month(), baseDay.Day(), 9, 0, 0, 0, now.Location())
 	duration := 60
 
-	if taskType == 0 || taskType == 4 {
-		timeStr := m.Form.StartTimeInput.Value()
-		hour, min := ParseFlexibleTime(timeStr, 9, 0)
-		startTime = time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), hour, min, 0, 0, now.Location())
-		durStr := m.Form.DurationInput.Value()
-		if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
-			duration = d
+	if taskType == 0 || taskType == 3 || taskType == 4 {
+		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
+		if taskType == 3 && timeStr == "" {
+			durStr := m.Form.DurationInput.Value()
+			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+				duration = d
+			}
+		} else {
+			hour, min := ParseFlexibleTime(timeStr, 9, 0)
+			startTime = time.Date(baseDay.Year(), baseDay.Month(), baseDay.Day(), hour, min, 0, 0, now.Location())
+			durStr := m.Form.DurationInput.Value()
+			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+				duration = d
+			}
 		}
 	} else if taskType == 2 {
 		dateStr := m.Form.DueDateInput.Value()
@@ -237,7 +260,7 @@ func (m *Model) SubmitForm() {
 
 		dueDay, err := time.Parse("2006-01-02", strings.TrimSpace(dateStr))
 		if err != nil {
-			dueDay = m.SelectedDay
+			dueDay = baseDay
 		}
 
 		var hour, min, sec int
@@ -248,17 +271,6 @@ func (m *Model) SubmitForm() {
 			sec = 0
 		}
 		startTime = time.Date(dueDay.Year(), dueDay.Month(), dueDay.Day(), hour, min, sec, 0, now.Location())
-	}
-
-	var isEdit = m.IsEditing
-	var existingTask model.Task
-	if isEdit {
-		for _, t := range m.Tasks {
-			if t.UUID == m.EditingTaskUUID {
-				existingTask = t
-				break
-			}
-		}
 	}
 
 	tagsStr := m.Form.TagsInput.Value()
@@ -338,8 +350,15 @@ func (m *Model) SubmitForm() {
 	} else if taskType == 3 {
 		newTask.SchedulingType = model.Habit
 		newTask.StoryPoints = 0
-		// By default, a non-recurring habit starts on the shelf (zero TimeWindow)
-		newTask.TimeWindow = model.TimeWindow{}
+		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
+		if timeStr == "" {
+			newTask.TimeWindow = model.TimeWindow{}
+		} else {
+			newTask.TimeWindow = model.TimeWindow{
+				Start: startTime,
+				End:   startTime.Add(time.Duration(duration) * time.Minute),
+			}
+		}
 		if isEdit && existingTask.LifecycleState == model.StateCompleted {
 			newTask.LifecycleState = model.StateCompleted
 		} else {
@@ -420,19 +439,24 @@ func (m *Model) SubmitForm() {
 			parentUUID := uuid.New().String()
 			current := startTime
 			count := 0
+			timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
 			for !current.After(endDate) {
 				if days[current.Weekday()] {
 					instance := newTask
 					instance.UUID = uuid.New().String()
 					instance.RecurringParentUUID = parentUUID
-					instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), startTime.Hour(), startTime.Minute(), startTime.Second(), 0, startTime.Location())
 					
 					if instance.SchedulingType == model.Habit {
-						// A habit is a recurring task with TimeWindow set, so it is anchored by default
-						instance.TimeWindow.End = instance.TimeWindow.Start.Add(time.Duration(duration) * time.Minute)
+						if timeStr == "" {
+							instance.TimeWindow = model.TimeWindow{}
+						} else {
+							instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), startTime.Hour(), startTime.Minute(), startTime.Second(), 0, startTime.Location())
+							instance.TimeWindow.End = instance.TimeWindow.Start.Add(time.Duration(duration) * time.Minute)
+						}
 						instance.LifecycleState = model.StateReady
 					} else {
 						instance.SchedulingType = model.Anchored
+						instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), startTime.Hour(), startTime.Minute(), startTime.Second(), 0, startTime.Location())
 						instance.TimeWindow.End = instance.TimeWindow.Start.Add(time.Duration(duration) * time.Minute)
 						instance.LifecycleState = model.StateScheduled
 					}

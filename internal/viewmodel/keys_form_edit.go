@@ -60,8 +60,14 @@ func (m *Model) startEditMode(task model.Task) {
 		m.Form.DurationInput.SetValue("60")
 	} else if task.SchedulingType == model.Habit {
 		m.Form.TaskTypeIdx = 3
-		m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
-		m.Form.DurationInput.SetValue("60")
+		if !task.TimeWindow.Start.IsZero() {
+			m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
+			durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+			m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
+		} else {
+			m.Form.StartTimeInput.SetValue("")
+			m.Form.DurationInput.SetValue("60")
+		}
 	} else {
 		m.Form.TaskTypeIdx = 1
 		m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))

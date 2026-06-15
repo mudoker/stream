@@ -112,7 +112,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		fields = append(fields, renderDropdown(nextFieldNum(), "Story Points", spValStr, 3))
 	}
 	fields = append(fields, renderDropdown(nextFieldNum(), "Type", typeValStr, 4))
-	if f.TaskTypeIdx == 0 {
+	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 3 {
 		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
 	} else if f.TaskTypeIdx == 2 {

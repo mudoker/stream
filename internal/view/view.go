@@ -207,7 +207,7 @@ func (v *View) Render() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen {
+	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen || m.LofiPlayerOpen {
 		var modalStr string
 		switch {
 		case m.WarningOpen:
@@ -238,6 +238,8 @@ func (v *View) Render() string {
 			modalStr = modals.RenderHelpModal(m, v.Theme)
 		case m.DetailOpen:
 			modalStr = modals.RenderDetailModal(m, v.Theme)
+		case m.LofiPlayerOpen:
+			modalStr = modals.RenderLofiPlayerModal(m, v.Theme)
 		}
 
 		modalW := lipgloss.Width(modalStr)

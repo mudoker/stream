@@ -157,7 +157,7 @@ func getWeekViewLines(m *viewmodel.Model, t theme.Theme, colWidth int) ([][]stri
 		day := weekStart.AddDate(0, 0, i)
 		var dayTasks []model.Task
 		for _, task := range m.Tasks {
-			if task.SchedulingType == model.Anchored && viewmodel.SameDay(task.TimeWindow.Start, day) {
+			if model.IsTaskAnchored(task) && viewmodel.SameDay(task.TimeWindow.Start, day) {
 				dayTasks = append(dayTasks, task)
 			}
 		}

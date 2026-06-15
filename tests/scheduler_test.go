@@ -9,6 +9,7 @@ import (
 	"stream/internal/viewmodel"
 	"stream/internal/view/theme"
 	"stream/internal/view/components"
+	"stream/internal/view/pages"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -157,3 +158,92 @@ func TestRegressionOverlappingScheduleBorderIntegrity(t *testing.T) {
 		assertClosedRectangle(t, card, rect.Width, rect.Height)
 	}
 }
+
+func TestDayTimelineRenderingBorderIntegrity(t *testing.T) {
+	th := theme.NewTheme()
+	m := &viewmodel.Model{
+		Layout:       viewmodel.ComputeLayout(120, 40),
+		SelectedDay:  time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local),
+		TimelineHour: 14,
+	}
+
+	// Create adjacent/overlapping tasks that share boundary rows
+	// Task A ends at 14:00, Task C starts at 14:00.
+	// Task A overlaps with Task B (13:30 - 14:30), meaning column calculations are triggered.
+	// Task C starts at 14:00, ends at 15:00, and is non-overlapping in its later block.
+	tasks := []model.Task{
+		{UUID: "A", Title: "A", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 0, 0, 0, time.Local), End: time.Date(2026, 6, 6, 14, 0, 0, 0, time.Local)}},
+		{UUID: "B", Title: "B", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 13, 30, 0, 0, time.Local), End: time.Date(2026, 6, 6, 14, 30, 0, 0, time.Local)}},
+		{UUID: "C", Title: "C", SchedulingType: model.Anchored, Priority: model.P2, TimeWindow: model.TimeWindow{Start: time.Date(2026, 6, 6, 14, 0, 0, 0, time.Local), End: time.Date(2026, 6, 6, 15, 0, 0, 0, time.Local)}},
+	}
+	m.Tasks = tasks
+
+	rendered := pages.RenderDayTimeline(m, th, 30)
+
+	lines := strings.Split(rendered, "\n")
+	expectedWidth := m.Layout.TimelineW
+
+	t.Logf("Verifying all timeline lines match expected width %d", expectedWidth)
+
+	// Check timeline rows (header and separator are on first few lines, start checking from index 3)
+	for i := 3; i < len(lines); i++ {
+		line := stripAnsi(lines[i])
+		if line == "" {
+			continue
+		}
+		width := lipgloss.Width(line)
+		if width != expectedWidth {
+			t.Errorf("line %d has width %d, expected consistent width of %d. Line: %q", i, width, expectedWidth, line)
+		}
+	}
+}
+
+func TestDayTimelineSameBlockOverlappingTasksBorderIntegrity(t *testing.T) {
+	th := theme.NewTheme()
+	m := &viewmodel.Model{
+		Layout:       viewmodel.ComputeLayout(120, 40),
+		SelectedDay:  time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local),
+		TimelineHour: 10,
+	}
+
+	// Two tasks on the exact same block (10:00 - 11:30)
+	tasks := []model.Task{
+		{
+			UUID:           "task-same-1",
+			Title:          "Drink Water Float",
+			SchedulingType: model.Anchored,
+			Priority:       model.P1,
+			TimeWindow: model.TimeWindow{
+				Start: time.Date(2026, 6, 6, 10, 0, 0, 0, time.Local),
+				End:   time.Date(2026, 6, 6, 11, 30, 0, 0, time.Local),
+			},
+		},
+		{
+			UUID:           "task-same-2",
+			Title:          "Read Book",
+			SchedulingType: model.Anchored,
+			Priority:       model.P2,
+			TimeWindow: model.TimeWindow{
+				Start: time.Date(2026, 6, 6, 10, 0, 0, 0, time.Local),
+				End:   time.Date(2026, 6, 6, 11, 30, 0, 0, time.Local),
+			},
+		},
+	}
+	m.Tasks = tasks
+
+	rendered := pages.RenderDayTimeline(m, th, 30)
+	lines := strings.Split(rendered, "\n")
+	expectedWidth := m.Layout.TimelineW
+
+	for i := 3; i < len(lines); i++ {
+		line := stripAnsi(lines[i])
+		if line == "" {
+			continue
+		}
+		width := lipgloss.Width(line)
+		if width != expectedWidth {
+			t.Errorf("line %d has width %d, expected consistent width of %d. Line: %q", i, width, expectedWidth, line)
+		}
+	}
+}
+

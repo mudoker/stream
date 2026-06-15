@@ -160,7 +160,7 @@ func RenderMonthView(m *viewmodel.Model, t theme.Theme, height int) string {
 	var inspectorLines []string
 	var selectedDayTasks []model.Task
 	for _, task := range m.Tasks {
-		if task.SchedulingType == model.Anchored && viewmodel.SameDay(task.TimeWindow.Start, m.SelectedDay) {
+		if model.IsTaskAnchored(task) && viewmodel.SameDay(task.TimeWindow.Start, m.SelectedDay) {
 			selectedDayTasks = append(selectedDayTasks, task)
 		}
 	}

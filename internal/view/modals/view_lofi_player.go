@@ -25,7 +25,9 @@ func RenderLofiPlayerModal(m *viewmodel.Model, t theme.Theme) string {
 
 	// Status Line
 	var statusStr string
-	if isPlaying {
+	if !engine.IsInitialized() {
+		statusStr = lipgloss.NewStyle().Foreground(t.P1Color).Bold(true).Render("⏳ Loading audio samples...")
+	} else if isPlaying {
 		statusStr = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render("🔊 Chilling in Cozy Bar...")
 	} else {
 		statusStr = lipgloss.NewStyle().Foreground(t.Muted).Render("🔇 Lounge is Closed")
@@ -136,7 +138,15 @@ func RenderLofiPlayerModal(m *viewmodel.Model, t theme.Theme) string {
 	sb.WriteString("  " + lipgloss.NewStyle().Foreground(t.Muted).Bold(true).Render("AMBIENT ENVIRONMENT") + "\n")
 	ambientNames := []string{"Rain", "Thunder", "Campfire", "Jungle"}
 	for i, name := range ambientNames {
-		sb.WriteString(renderItemWithVol(6+i, name, ambientStates[i], ambientVols[i]) + "\n")
+		var state bool
+		var vol float64
+		if i < len(ambientStates) {
+			state = ambientStates[i]
+		}
+		if i < len(ambientVols) {
+			vol = ambientVols[i]
+		}
+		sb.WriteString(renderItemWithVol(6+i, name, state, vol) + "\n")
 	}
 	sb.WriteString("\n")
 
@@ -154,7 +164,15 @@ func RenderLofiPlayerModal(m *viewmodel.Model, t theme.Theme) string {
 		"Track 9: Underwater",
 	}
 	for i, name := range trackNames {
-		sb.WriteString(renderItemWithVol(10+i, name, trackStates[i], trackVols[i]) + "\n")
+		var state bool
+		var vol float64
+		if i < len(trackStates) {
+			state = trackStates[i]
+		}
+		if i < len(trackVols) {
+			vol = trackVols[i]
+		}
+		sb.WriteString(renderItemWithVol(10+i, name, state, vol) + "\n")
 	}
 
 	sb.WriteString("\n" + ModalSep(innerW) + "\n")

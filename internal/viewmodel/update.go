@@ -181,6 +181,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, tickCmd())
 		return m, tea.Batch(cmds...)
 
+	case UpdateCheckMsg:
+		if msg.Err == nil && len(msg.Commits) > 0 {
+			settings := m.DB.GetUserSettings()
+			if settings.UpdateSnoozedUntil.IsZero() || settings.UpdateSnoozedUntil.Before(time.Now()) {
+				m.UpdatePromptOpen = true
+				m.UpdateCommits = msg.Commits
+				m.UpdatePromptSelectedIdx = 0
+			}
+		}
+		return m, nil
+
 	case SyncLogMsg:
 		m.SyncLogs = append(m.SyncLogs, msg.Message)
 		if len(m.SyncLogs) > 5 {

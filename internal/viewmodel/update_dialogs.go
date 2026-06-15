@@ -5,6 +5,12 @@ import (
 )
 
 func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.UpdatePromptOpen {
+		if handled, cmd := m.HandleUpdatePromptKeys(msg); handled {
+			return m, cmd
+		}
+	}
+
 	if msg.String() == "esc" {
 		m.WarningOpen = false
 		m.WarningMsg = ""
@@ -20,6 +26,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.HelpScrollOffset = 0
 
 		m.AnchorPromptOpen = false
+		m.UpdatePromptOpen = false
 
 		if m.PromptOpen {
 			m.cancelPromptTask()

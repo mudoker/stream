@@ -387,3 +387,66 @@ func RenderSessionExpiryModal(m *viewmodel.Model, t theme.Theme) string {
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
 }
+
+func RenderUpdatePromptModal(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 52
+	var fields []string
+
+	title := lipgloss.NewStyle().Foreground(t.P1Color).Bold(true).Render("🚀  UPDATE AVAILABLE!")
+	fields = append(fields, title)
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+
+	msg := "A new version of the application is available. Pulling the latest changes is highly recommended to avoid missing features or database out-of-sync bugs."
+	wrappedMsg := lipgloss.NewStyle().Width(innerW - 4).Foreground(t.Fg).Render(msg)
+	fields = append(fields, wrappedMsg)
+	fields = append(fields, "")
+
+	if len(m.UpdateCommits) > 0 {
+		fields = append(fields, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("CHANGELOG:"))
+		maxCommits := 6
+		for i, commit := range m.UpdateCommits {
+			if i >= maxCommits {
+				remaining := len(m.UpdateCommits) - maxCommits
+				fields = append(fields, lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  • ... and %d more commits", remaining)))
+				break
+			}
+			commitStyle := lipgloss.NewStyle().Foreground(t.Fg)
+			fields = append(fields, fmt.Sprintf("  • %s", commitStyle.Render(commit)))
+		}
+		fields = append(fields, "")
+	}
+
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+
+	var updateBtn, snoozeBtn string
+	if m.UpdatePromptSelectedIdx == 0 {
+		updateBtn = lipgloss.NewStyle().
+			Background(t.SuccessColor).
+			Foreground(lipgloss.Color("#1e1e2e")).
+			Bold(true).
+			Render(" 🚀 Update & Restart ")
+	} else {
+		updateBtn = lipgloss.NewStyle().
+			Foreground(t.SuccessColor).
+			Render("  [ Update & Restart ] ")
+	}
+
+	if m.UpdatePromptSelectedIdx == 1 {
+		snoozeBtn = lipgloss.NewStyle().
+			Background(t.Accent).
+			Foreground(lipgloss.Color("#1e1e2e")).
+			Bold(true).
+			Render(" ⏳ Snooze 1 Hour ")
+	} else {
+		snoozeBtn = lipgloss.NewStyle().
+			Foreground(t.Muted).
+			Render("  [ Snooze 1 Hour ]  ")
+	}
+
+	fields = append(fields, fmt.Sprintf("    %s         %s", updateBtn, snoozeBtn))
+	fields = append(fields, "")
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
+}

@@ -207,7 +207,7 @@ func (v *View) Render() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen || m.LofiPlayerOpen {
+	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen || m.LofiPlayerOpen || m.UpdatePromptOpen {
 		var modalStr string
 		switch {
 		case m.WarningOpen:
@@ -220,6 +220,8 @@ func (v *View) Render() string {
 			modalStr = modals.RenderConfirmModal(m, v.Theme)
 		case m.AnchorPromptOpen:
 			modalStr = modals.RenderAnchorPromptModal(m, v.Theme)
+		case m.UpdatePromptOpen:
+			modalStr = modals.RenderUpdatePromptModal(m, v.Theme)
 		case m.CurrentMode == viewmodel.ModeForm:
 			modalStr = modals.RenderFormModal(m, v.Theme)
 		case m.CurrentMode == viewmodel.ModeWorkspaceForm:

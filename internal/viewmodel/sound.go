@@ -3,18 +3,12 @@ package viewmodel
 import (
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
 	"github.com/faiface/beep/vorbis"
-)
-
-var (
-	speakerMu          sync.Mutex
-	speakerInitialized = false
-	speakerSampleRate  beep.SampleRate
+	"stream/internal/viewmodel/lofi"
 )
 
 // PlaySound plays a sound once using the faiface/beep library.
@@ -52,17 +46,17 @@ func playOnce(soundName string) {
 	}
 	defer streamer.Close()
 
-	speakerMu.Lock()
-	if !speakerInitialized {
+	lofi.SpeakerMu.Lock()
+	if !lofi.SpeakerInitialized {
 		err = speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
 		if err == nil {
-			speakerInitialized = true
-			speakerSampleRate = format.SampleRate
+			lofi.SpeakerInitialized = true
+			lofi.SpeakerSampleRate = format.SampleRate
 		}
 	}
-	initialized := speakerInitialized
-	sampleRate := speakerSampleRate
-	speakerMu.Unlock()
+	initialized := lofi.SpeakerInitialized
+	sampleRate := lofi.SpeakerSampleRate
+	lofi.SpeakerMu.Unlock()
 
 	if !initialized {
 		// Fallback to terminal bell

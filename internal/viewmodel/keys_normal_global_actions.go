@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"stream/internal/model"
+	"stream/internal/viewmodel/lofi"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -183,6 +184,14 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		m.TimelineHour = time.Now().Hour()
 		m.ScrollOffset = 0
 		m.StatusMsg = "Jumped to today."
+		return true, nil
+	case "M":
+		lofi.GetLofiEngine().SetPlaying(true)
+		m.StatusMsg = "🔊 Lofi Engine started/resumed"
+		return true, nil
+	case "m":
+		lofi.GetLofiEngine().SetPlaying(false)
+		m.StatusMsg = "🔇 Lofi Engine stopped"
 		return true, nil
 	case "z":
 		task, exists := m.GetActiveTask()

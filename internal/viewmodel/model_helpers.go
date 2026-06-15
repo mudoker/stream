@@ -126,6 +126,7 @@ func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		textinput.Blink,
 		tickCmd(),
+		m.CheckForUpdatesCmd(),
 	)
 }
 

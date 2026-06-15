@@ -139,6 +139,10 @@ type Model struct {
 	SessionTimeRemainingSeconds int
 	SessionExpiryPromptOpen     bool
 	LastTodoShelfTaskUUID       string
+
+	UpdatePromptOpen        bool
+	UpdateCommits           []string
+	UpdatePromptSelectedIdx int
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {

@@ -125,6 +125,7 @@ type UserSettings struct {
 	GCalSyncMode             GCalSyncMode `json:"gcal_sync_mode,omitempty"`
 	GCalSyncIntervalSeconds  int          `json:"gcal_sync_interval_seconds,omitempty"`
 	GCalSyncIntervalMinutes  int          `json:"gcal_sync_interval_minutes,omitempty"` // legacy, migrated on load
+	UpdateSnoozedUntil       time.Time    `json:"update_snoozed_until,omitempty"`
 }
 
 func IsGCalSyncable(task Task) bool {

@@ -40,7 +40,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		m.ReviewOpen = false
 		m.DetailOpen = false
-		m.LofiPlayerOpen = false
+		m.JazzLoungeOpen = false
 
 		m.StatusMsg = ""
 
@@ -63,8 +63,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Route based on open modal/state
-	if m.LofiPlayerOpen {
-		if handled, cmd := m.handleLofiPlayerKeys(msg); handled {
+	if m.JazzLoungeOpen {
+		if handled, cmd := m.handleJazzLoungeKeys(msg); handled {
 			return m, cmd
 		}
 	}

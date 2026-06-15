@@ -88,8 +88,8 @@ type Model struct {
 	PromptTask        model.Task
 	PromptSelectedIdx int
 
-	LofiPlayerOpen          bool
-	LofiPlayerSelectedIndex int
+	JazzLoungeOpen          bool
+	JazzLoungeSelectedIndex int
 	LastPromptedTimes       map[string]time.Time
 
 	ReviewOpen           bool

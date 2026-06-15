@@ -2,12 +2,12 @@ package viewmodel
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"stream/internal/viewmodel/lofi"
+	"stream/internal/viewmodel/jazzlounge"
 )
 
-func (m *Model) handleLofiPlayerKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
+func (m *Model) handleJazzLoungeKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 	key := msg.String()
-	engine := lofi.GetLofiEngine()
+	engine := jazzlounge.GetJazzLoungeEngine()
 
 	// 19 Options:
 	// 0: Start / Stop Sound
@@ -24,21 +24,21 @@ func (m *Model) handleLofiPlayerKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 	switch key {
 	case "up", "k":
-		m.LofiPlayerSelectedIndex--
-		if m.LofiPlayerSelectedIndex < 0 {
-			m.LofiPlayerSelectedIndex = 18
+		m.JazzLoungeSelectedIndex--
+		if m.JazzLoungeSelectedIndex < 0 {
+			m.JazzLoungeSelectedIndex = 18
 		}
 		return true, nil
 
 	case "down", "j":
-		m.LofiPlayerSelectedIndex++
-		if m.LofiPlayerSelectedIndex > 18 {
-			m.LofiPlayerSelectedIndex = 0
+		m.JazzLoungeSelectedIndex++
+		if m.JazzLoungeSelectedIndex > 18 {
+			m.JazzLoungeSelectedIndex = 0
 		}
 		return true, nil
 
 	case "right", "l":
-		idx := m.LofiPlayerSelectedIndex
+		idx := m.JazzLoungeSelectedIndex
 		switch idx {
 		case 1:
 			_, _, _, _, _, _, _, masterVol, _, _, _ := engine.GetState()
@@ -64,7 +64,7 @@ func (m *Model) handleLofiPlayerKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 		return true, nil
 
 	case "left", "h":
-		idx := m.LofiPlayerSelectedIndex
+		idx := m.JazzLoungeSelectedIndex
 		switch idx {
 		case 1:
 			_, _, _, _, _, _, _, masterVol, _, _, _ := engine.GetState()
@@ -90,7 +90,7 @@ func (m *Model) handleLofiPlayerKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 		return true, nil
 
 	case "enter", " ":
-		idx := m.LofiPlayerSelectedIndex
+		idx := m.JazzLoungeSelectedIndex
 		switch idx {
 		case 0:
 			engine.SetPlaying(!engine.IsPlaying())
@@ -120,7 +120,7 @@ func (m *Model) handleLofiPlayerKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 		return true, nil
 
 	case "q", "esc":
-		m.LofiPlayerOpen = false
+		m.JazzLoungeOpen = false
 		m.StatusMsg = ""
 		return true, nil
 	}

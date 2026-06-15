@@ -334,9 +334,9 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		}
 
 	case "music":
-		m.LofiPlayerOpen = true
-		m.LofiPlayerSelectedIndex = 0
-		m.StatusMsg = "Lofi Audio Player opened."
+		m.JazzLoungeOpen = true
+		m.JazzLoungeSelectedIndex = 0
+		m.StatusMsg = "Jazz Lounge Player opened."
 
 	default:
 		m.StatusMsg = fmt.Sprintf("Unknown command: %s", cmdName)

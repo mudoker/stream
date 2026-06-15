@@ -6,13 +6,13 @@ import (
 
 	"stream/internal/view/theme"
 	"stream/internal/viewmodel"
-	"stream/internal/viewmodel/lofi"
+	"stream/internal/viewmodel/jazzlounge"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
-func RenderLofiPlayerModal(m *viewmodel.Model, t theme.Theme) string {
-	engine := lofi.GetLofiEngine()
+func RenderJazzLoungeModal(m *viewmodel.Model, t theme.Theme) string {
+	engine := jazzlounge.GetJazzLoungeEngine()
 	key, progression, activeChord, ambientStates, ambientVols, trackStates, trackVols, masterVol, pianoVol, synthVol, drumsVol := engine.GetState()
 	isPlaying := engine.IsPlaying()
 
@@ -55,7 +55,7 @@ func RenderLofiPlayerModal(m *viewmodel.Model, t theme.Theme) string {
 
 	// List of options helper
 	renderItem := func(idx int, label string, valStr string) string {
-		selected := m.LofiPlayerSelectedIndex == idx
+		selected := m.JazzLoungeSelectedIndex == idx
 		var line string
 		if selected {
 			indicator := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("┃")
@@ -84,7 +84,7 @@ func RenderLofiPlayerModal(m *viewmodel.Model, t theme.Theme) string {
 	}
 
 	renderItemWithVol := func(idx int, label string, isPlaying bool, level float64) string {
-		selected := m.LofiPlayerSelectedIndex == idx
+		selected := m.JazzLoungeSelectedIndex == idx
 		pct := int(level * 100)
 		if pct < 0 {
 			pct = 0

@@ -12,6 +12,12 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if msg.String() == "esc" {
+		if m.ConfirmOpen {
+			if handled, cmd := m.handleConfirmDialogKeys(msg); handled {
+				return m, cmd
+			}
+		}
+
 		m.WarningOpen = false
 		m.WarningMsg = ""
 

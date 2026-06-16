@@ -147,10 +147,36 @@ func (e *JazzLoungeEngine) init() {
 	e.macroEnergy = 0.5
 	e.personalities = InitDefaultPersonalities()
 	e.narrative = JazzNarrative{
-		NarrativeState:  "exposition",
-		RegisterRange:   0.5,
+		Mood:            "Introspective",
 		ActiveLeader:    "trumpet",
 		LeaderTicksLeft: 32,
+		PerceivedTempo:  0.4,
+		Forces: EmotionalForces{
+			Intimacy:     0.7,
+			Melancholy:   0.6,
+			Tension:      0.2,
+			Confidence:   0.5,
+			Nostalgia:    0.4,
+			Mystery:      0.5,
+			Anticipation: 0.3,
+			Warmth:       0.6,
+			Momentum:     0.3,
+		},
+		Taste: RandomHarmonicTaste(),
+		Obsession: EnsembleObsession{
+			Type: "none",
+		},
+		Register: RegisterArchitecture{
+			Width:  0.5,
+			Center: 0.5,
+		},
+		History: MetaMemory{
+			SoloistLeadTicks: 0,
+			PianoLeadTicks:   0,
+			SilenceTicks:     0,
+			TotalPhrases:     0,
+			LastRecalledAge:  0,
+		},
 	}
 	e.motifInventory = []ThematicMotif{}
 	e.masterVolLevel = 0.8
@@ -317,8 +343,8 @@ func (e *JazzLoungeEngine) run() {
 				}
 			} else {
 				// Drummer initiative: occasionally drive tension early
-				if e.narrative.NarrativeState == "development" && tickCount%16 == 0 && rand.Float64() < 0.20 {
-					e.narrative.AccumulatedTension += 2.0
+				if e.narrative.Forces.Tension > 0.3 && e.narrative.Forces.Tension < 0.7 && tickCount%16 == 0 && rand.Float64() < 0.20 {
+					e.narrative.Forces.Tension += 0.10
 					if !e.snareOff {
 						e.playDrumWithVol("snare", 0.45*e.drumsVolLevel)
 					}
@@ -550,10 +576,10 @@ func (e *JazzLoungeEngine) GenerateVoiceLedVoicing(chord JazzChord, keyPitch int
 	var candidates []int
 	lowBound := 52
 	highBound := 76
-	if e.narrative.RegisterRange < 0.4 {
+	if e.narrative.Register.Width < 0.4 {
 		lowBound = 56
 		highBound = 72
-	} else if e.narrative.RegisterRange > 0.8 {
+	} else if e.narrative.Register.Width > 0.8 {
 		lowBound = 48
 		highBound = 80
 	}
@@ -692,10 +718,10 @@ func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
 	// Keep bass note in a reasonable range (dynamically scaled)
 	lowLimit := 31
 	highLimit := 57
-	if e.narrative.RegisterRange < 0.4 {
+	if e.narrative.Register.Width < 0.4 {
 		lowLimit = 36
 		highLimit = 48
-	} else if e.narrative.RegisterRange > 0.8 {
+	} else if e.narrative.Register.Width > 0.8 {
 		lowLimit = 28
 		highLimit = 60
 	}
@@ -855,96 +881,198 @@ func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
 }
 
 func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
-	e.narrative.TicksSinceLastClimax++
-	e.narrative.TicksSinceLastSparse++
-
-	// 1. Accumulate tension based on harmonic state
-	chord := e.progression[e.progress]
-	if chord.Name == "7alt" || chord.Name == "7" {
-		e.narrative.AccumulatedTension += 0.20
-	} else if chord.Name == "maj9" || chord.Name == "maj7" {
-		// Release tension slowly
-		e.narrative.AccumulatedTension -= 0.12
+	// 1. Update Meta Memory Statistics
+	if e.isTransitioning {
+		e.narrative.History.SilenceTicks++
+	} else if e.narrative.ActiveLeader == "none" {
+		e.narrative.History.SilenceTicks++
+	} else if e.narrative.ActiveLeader == "piano" {
+		e.narrative.History.PianoLeadTicks++
+	} else {
+		e.narrative.History.SoloistLeadTicks++
 	}
 
-	// Tension from soloist activity
+	// 2. Modulate Persistent Ensemble Mood (Very Slow Shift)
+	if tickCount%400 == 0 {
+		moods := []string{"Introspective", "Romantic", "Weary", "Melancholic", "Nostalgic", "Elegant", "Playful", "Mysterious"}
+		e.narrative.Mood = moods[rand.Intn(len(moods))]
+	}
+
+	// 3. Update Interacting Emotional Forces
+	forces := &e.narrative.Forces
+	chord := e.progression[e.progress]
+
+	// Melancholy
+	if e.isMinor {
+		forces.Melancholy += 0.02
+	} else {
+		forces.Melancholy -= 0.015
+	}
+	if e.narrative.Mood == "Melancholic" || e.narrative.Mood == "Weary" {
+		forces.Melancholy += 0.03
+	}
+
+	// Tension
+	if chord.Name == "7alt" || chord.Name == "7" {
+		forces.Tension += 0.04
+	} else if chord.Name == "maj9" || chord.Name == "maj7" {
+		forces.Tension -= 0.035
+	}
 	if e.soloistPhraseActive {
 		sol := e.soloists[e.activeSoloistIdx]
-		e.narrative.AccumulatedTension += 0.10 * sol.PhraseEnergy
+		forces.Tension += 0.02 * sol.PhraseEnergy
 	} else {
-		e.narrative.AccumulatedTension -= 0.06
+		forces.Tension -= 0.015
 	}
 
-	if e.narrative.AccumulatedTension < 0 {
-		e.narrative.AccumulatedTension = 0
+	// Intimacy & Warmth
+	if e.narrative.ActiveLeader == "none" || e.isTransitioning {
+		forces.Intimacy += 0.03
+		forces.Warmth += 0.015
+	} else {
+		forces.Intimacy -= 0.02
 	}
-	if e.narrative.AccumulatedTension > 20.0 {
-		e.narrative.AccumulatedTension = 20.0
-	}
-
-	// 2. Narrative State Machine
-	switch e.narrative.NarrativeState {
-	case "exposition":
-		e.macroEnergy = 0.45
-		e.narrative.RegisterRange = 0.5
-		if e.narrative.TicksSinceLastClimax > 100 {
-			e.narrative.NarrativeState = "development"
-		}
-	case "development":
-		// Energy rises with accumulated tension
-		e.macroEnergy = 0.5 + (e.narrative.AccumulatedTension / 20.0) * 0.25
-		e.narrative.RegisterRange = 0.5 + (e.narrative.AccumulatedTension / 20.0) * 0.3
-		if e.narrative.AccumulatedTension > 10.0 && e.narrative.TicksSinceLastClimax > 180 {
-			e.narrative.NarrativeState = "climax"
-		}
-	case "climax":
-		e.macroEnergy = 0.85
-		e.narrative.RegisterRange = 0.95
-		// Climax lasts for a limited duration
-		if e.narrative.TicksSinceLastClimax > 220 || e.narrative.AccumulatedTension < 4.0 {
-			e.narrative.NarrativeState = "resolution"
-		}
-	case "resolution":
-		// Release tension quickly
-		e.narrative.AccumulatedTension *= 0.80
-		e.macroEnergy = 0.35
-		e.narrative.RegisterRange = 0.35
-		if e.narrative.AccumulatedTension < 1.5 {
-			e.narrative.NarrativeState = "stillness"
-			e.narrative.TicksSinceLastSparse = 0
-		}
-	case "stillness":
-		e.macroEnergy = 0.20
-		e.narrative.RegisterRange = 0.25
-		if e.narrative.TicksSinceLastSparse > 100 {
-			e.narrative.NarrativeState = "exposition"
-			e.narrative.TicksSinceLastClimax = 0
-		}
+	if forces.Tension > 0.6 {
+		forces.Intimacy -= 0.025
 	}
 
-	// 3. Ensemble Politics: Attention Leadership Migration
+	// Momentum
+	if e.soloistPhraseActive {
+		forces.Momentum += 0.025
+	} else {
+		forces.Momentum -= 0.02
+	}
+
+	// Mystery
+	if e.narrative.Taste.Style == "AmbiguousChromatic" {
+		forces.Mystery += 0.02
+	} else {
+		forces.Mystery -= 0.01
+	}
+	if e.narrative.Mood == "Mysterious" {
+		forces.Mystery += 0.025
+	}
+
+	// Clamp forces [0, 1]
+	clamp := func(v float64) float64 {
+		if v < 0.0 {
+			return 0.0
+		}
+		if v > 1.0 {
+			return 1.0
+		}
+		return v
+	}
+	forces.Melancholy = clamp(forces.Melancholy)
+	forces.Tension = clamp(forces.Tension)
+	forces.Intimacy = clamp(forces.Intimacy)
+	forces.Warmth = clamp(forces.Warmth)
+	forces.Momentum = clamp(forces.Momentum)
+	forces.Mystery = clamp(forces.Mystery)
+
+	// 4. Update Register Architecture (Center and Width)
+	// Center migrates slowly over long range
+	e.narrative.Register.Center = 0.5 + 0.2*math.Sin(float64(tickCount)/500.0)
+	if e.narrative.Mood == "Introspective" || e.narrative.Mood == "Weary" {
+		e.narrative.Register.Center -= 0.15 // Sinks lower
+	}
+	if e.narrative.Register.Center < 0.1 {
+		e.narrative.Register.Center = 0.1
+	}
+	if e.narrative.Register.Center > 0.9 {
+		e.narrative.Register.Center = 0.9
+	}
+
+	// Width responds to tension and intimacy
+	e.narrative.Register.Width = 0.3 + 0.65*forces.Tension - 0.25*forces.Intimacy
+	if e.narrative.Register.Width < 0.15 {
+		e.narrative.Register.Width = 0.15
+	}
+	if e.narrative.Register.Width > 1.0 {
+		e.narrative.Register.Width = 1.0
+	}
+
+	// 5. Manage Ensemble Politics (Leadership & Meta-Memory Pressures)
 	e.narrative.LeaderTicksLeft--
 	if e.narrative.LeaderTicksLeft <= 0 {
-		// Negotiate new leader
-		leaders := []string{"trumpet", "sax", "piano", "none"}
-		chosen := leaders[rand.Intn(len(leaders))]
+		// Calculate pressures to balance leadership
+		pianoPressure := 0.25
+		soloistPressure := 0.50
+		silencePressure := 0.25
+
+		// Avoid over-dominant soloist
+		if e.narrative.History.SoloistLeadTicks > e.narrative.History.PianoLeadTicks*2 {
+			pianoPressure += 0.2
+			soloistPressure -= 0.25
+		}
+		// Avoid perpetual clutter
+		if forces.Tension > 0.7 {
+			silencePressure += 0.3
+			soloistPressure -= 0.2
+		}
+
+		r := rand.Float64()
+		var chosen string
+		if r < pianoPressure {
+			chosen = "piano"
+		} else if r < pianoPressure+soloistPressure {
+			// Choose sax or trumpet
+			if rand.Float64() < 0.5 {
+				chosen = "sax"
+				e.activeSoloistIdx = 0
+			} else {
+				chosen = "trumpet"
+				e.activeSoloistIdx = 1
+			}
+		} else {
+			chosen = "none"
+		}
+
 		e.narrative.ActiveLeader = chosen
-		e.narrative.LeaderTicksLeft = 80 + rand.Intn(80) // 80 to 160 ticks
-		
-		// Align active soloist index to leader
-		if chosen == "sax" {
-			e.activeSoloistIdx = 0
-		} else if chosen == "trumpet" {
-			e.activeSoloistIdx = 1
+		e.narrative.LeaderTicksLeft = 80 + rand.Intn(80)
+	}
+
+	// 6. Obsessions & Fixations
+	if e.narrative.Obsession.Strength > 0 {
+		e.narrative.Obsession.Strength -= 0.003
+	} else {
+		if rand.Float64() < 0.02 {
+			types := []string{"interval", "rhythmic_gesture", "register_area"}
+			t := types[rand.Intn(len(types))]
+			obs := EnsembleObsession{
+				Type:     t,
+				Strength: 0.7 + 0.3*rand.Float64(),
+			}
+			if t == "interval" {
+				obs.IntervalVal = []int{3, 5, 7, 8, 9}[rand.Intn(5)] // minor 3rd, 4th, 5th, minor 6th, major 6th
+			} else if t == "rhythmic_gesture" {
+				obs.RhythmVal = []int{1, 3, 4}[rand.Intn(3)] // short swing, dotted swing, quarter notes
+			} else {
+				obs.RegisterCenter = 40.0 + 35.0*rand.Float64() // low, middle, high
+			}
+			e.narrative.Obsession = obs
 		}
 	}
 
-	// 4. Decay Motif Inventory Memories
+	// 7. Perceived Tempo & Macro Energy Mapping
+	// Controlled by tension, momentum, and brush activity
+	e.narrative.PerceivedTempo = 0.25 + 0.45*forces.Tension + 0.2*forces.Momentum
+	if forces.Intimacy > 0.6 {
+		e.narrative.PerceivedTempo -= 0.15
+	}
+	if e.narrative.PerceivedTempo < 0.1 {
+		e.narrative.PerceivedTempo = 0.1
+	}
+	if e.narrative.PerceivedTempo > 0.9 {
+		e.narrative.PerceivedTempo = 0.9
+	}
+	e.macroEnergy = e.narrative.PerceivedTempo
+
+	// 8. Decay Motif Inventory Memories
 	for i := len(e.motifInventory) - 1; i >= 0; i-- {
 		e.motifInventory[i].AgeTicks++
 		e.motifInventory[i].Importance -= 0.002
-		if e.motifInventory[i].Importance <= 0 || e.motifInventory[i].AgeTicks > 1200 { // 10 minutes max memory
-			// Remove memory
+		if e.motifInventory[i].Importance <= 0 || e.motifInventory[i].AgeTicks > 1200 {
 			e.motifInventory = append(e.motifInventory[:i], e.motifInventory[i+1:]...)
 		}
 	}

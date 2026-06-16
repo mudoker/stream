@@ -75,8 +75,15 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 
 	for _, t := range allTasks {
 		// Anchored habits (has start time) should not show on the todo shelf anymore
-		if t.SchedulingType == model.Habit && !t.TimeWindow.Start.IsZero() {
+		if t.SchedulingType == model.Habit && !t.TimeWindow.Start.IsZero() && !t.TimeWindow.End.IsZero() {
 			continue
+		}
+
+		// Filter un-anchored habits by the selectedDay if they are bound to a date
+		if t.SchedulingType == model.Habit && !t.TimeWindow.Start.IsZero() {
+			if !sameDay(t.TimeWindow.Start, selectedDay) {
+				continue
+			}
 		}
 
 		isDone := false

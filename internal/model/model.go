@@ -107,7 +107,7 @@ func (t *Task) SortingWeight() int {
 }
 
 func IsTaskAnchored(t Task) bool {
-	return t.SchedulingType == Anchored || t.SchedulingType == Event || (t.SchedulingType == Habit && !t.TimeWindow.Start.IsZero())
+	return t.SchedulingType == Anchored || t.SchedulingType == Event || (t.SchedulingType == Habit && !t.TimeWindow.Start.IsZero() && !t.TimeWindow.End.IsZero())
 }
 
 type GCalSyncMode string

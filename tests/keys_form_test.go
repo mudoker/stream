@@ -681,8 +681,11 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 		if model.IsTaskAnchored(task) {
 			t.Errorf("expected habit to be de-anchored when start time is cleared")
 		}
-		if !task.TimeWindow.Start.IsZero() {
-			t.Errorf("expected zero start time, got %s", task.TimeWindow.Start)
+		if task.TimeWindow.Start.IsZero() {
+			t.Errorf("expected scheduled start time, got zero")
+		}
+		if !task.TimeWindow.End.IsZero() {
+			t.Errorf("expected zero end time for de-anchored habit, got %s", task.TimeWindow.End)
 		}
 	}
 

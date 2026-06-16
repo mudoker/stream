@@ -98,8 +98,10 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				} else {
 					tasksToDelete := []string{}
 					for _, t := range m.Tasks {
-						if t.RecurringParentUUID == m.ConfirmTask.RecurringParentUUID && !t.TimeWindow.Start.Before(m.ConfirmTask.TimeWindow.Start) {
-							tasksToDelete = append(tasksToDelete, t.UUID)
+						if t.RecurringParentUUID == m.ConfirmTask.RecurringParentUUID {
+							if t.UUID == m.ConfirmTask.UUID || !t.TimeWindow.Start.Before(m.ConfirmTask.TimeWindow.Start) {
+								tasksToDelete = append(tasksToDelete, t.UUID)
+							}
 						}
 					}
 					m.AdjustSelectionBeforeDeletion(m.ConfirmTask.UUID)
@@ -144,26 +146,29 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					durationShift := m.PendingEditTask.TimeWindow.End.Sub(m.PendingEditTask.TimeWindow.Start)
 
 					for _, t := range m.Tasks {
-						if t.RecurringParentUUID == m.ConfirmTask.RecurringParentUUID && !t.TimeWindow.Start.Before(originalStart) {
-							t.Title = m.PendingEditTask.Title
-							t.Description = m.PendingEditTask.Description
-							t.Priority = m.PendingEditTask.Priority
-							t.StoryPoints = m.PendingEditTask.StoryPoints
-							t.Tags = m.PendingEditTask.Tags
-							t.Location = m.PendingEditTask.Location
-							t.CommuteBuffer = m.PendingEditTask.CommuteBuffer
-							t.UpdatedAt = time.Now()
+						if t.RecurringParentUUID == m.ConfirmTask.RecurringParentUUID {
+							isCurrent := t.UUID == m.ConfirmTask.UUID
+							if isCurrent || !t.TimeWindow.Start.Before(originalStart) {
+								t.Title = m.PendingEditTask.Title
+								t.Description = m.PendingEditTask.Description
+								t.Priority = m.PendingEditTask.Priority
+								t.StoryPoints = m.PendingEditTask.StoryPoints
+								t.Tags = m.PendingEditTask.Tags
+								t.Location = m.PendingEditTask.Location
+								t.CommuteBuffer = m.PendingEditTask.CommuteBuffer
+								t.UpdatedAt = time.Now()
 
-							if t.UUID == m.ConfirmTask.UUID {
-								t.TimeWindow = m.PendingEditTask.TimeWindow
-							} else {
-								if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event || t.SchedulingType == model.Habit {
-									t.TimeWindow.Start = t.TimeWindow.Start.Add(timeShift)
-									t.TimeWindow.End = t.TimeWindow.Start.Add(durationShift)
+								if isCurrent {
+									t.TimeWindow = m.PendingEditTask.TimeWindow
+								} else {
+									if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event || t.SchedulingType == model.Habit {
+										t.TimeWindow.Start = t.TimeWindow.Start.Add(timeShift)
+										t.TimeWindow.End = t.TimeWindow.Start.Add(durationShift)
+									}
 								}
-							}
 
-							m.DB.UpdateTask(t)
+								m.DB.UpdateTask(t)
+							}
 						}
 					}
 					m.refreshTasks()

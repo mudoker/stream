@@ -448,7 +448,9 @@ func (m *Model) SubmitForm() {
 					
 					if instance.SchedulingType == model.Habit {
 						if timeStr == "" {
-							instance.TimeWindow = model.TimeWindow{}
+							instance.TimeWindow = model.TimeWindow{
+								Start: time.Date(current.Year(), current.Month(), current.Day(), 0, 0, 0, 0, startTime.Location()),
+							}
 						} else {
 							instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), startTime.Hour(), startTime.Minute(), startTime.Second(), 0, startTime.Location())
 							instance.TimeWindow.End = instance.TimeWindow.Start.Add(time.Duration(duration) * time.Minute)

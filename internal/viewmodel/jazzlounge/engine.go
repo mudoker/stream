@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"sort"
+
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/effects"
 	"github.com/faiface/beep/speaker"
@@ -59,6 +61,13 @@ type JazzLoungeEngine struct {
 	lpf       *LowPassFilter
 	masterVol *effects.Volume
 	noiseCtrl *beep.Ctrl
+
+	lastPianoVoicing       []int
+	lastBassNote           int
+	chordDurationRemaining int
+	chordTickCount         int
+	macroEnergy            float64
+	sharedMotifNotes       []int
 }
 
 var (
@@ -132,6 +141,7 @@ func (e *JazzLoungeEngine) init() {
 
 	// Default Slow Jazz Settings
 	e.bpm = 65.0
+	e.macroEnergy = 0.5
 	e.masterVolLevel = 0.8
 	e.pianoVolLevel = 0.5
 	e.synthVolLevel = 0.6
@@ -212,27 +222,55 @@ func (e *JazzLoungeEngine) run() {
 			e.mu.Lock()
 
 			// 1. Play Chords (comping style)
-			// Choose comping patterns dynamically based on soloist activity
-			if tickCount%16 == 0 {
+			// Choose comping patterns dynamically based on soloist activity and chord duration
+			if e.chordDurationRemaining <= 0 {
+				e.nextChord()
+				chord := e.progression[e.progress]
+				duration := chord.Duration
+				if e.macroEnergy < 0.4 {
+					duration *= 2
+				}
+				e.chordDurationRemaining = duration
+				e.chordTickCount = 0
+
 				if e.isTransitioning {
-					// Single sustained chord on transition
 					e.activeCompingPattern = []int{0}
 				} else if e.soloistPhraseActive {
-					// Sparse comping when soloist is active
-					sparsePatterns := [][]int{{0}, {0, 8}}
-					e.activeCompingPattern = sparsePatterns[rand.Intn(len(sparsePatterns))]
+					// Sparse comping when soloist is active to give them room to speak
+					if chord.Duration >= 32 {
+						sparsePatterns := [][]int{{0}, {0, 16}, {0, 8}}
+						e.activeCompingPattern = sparsePatterns[rand.Intn(len(sparsePatterns))]
+					} else if chord.Duration == 16 {
+						sparsePatterns := [][]int{{0}, {0, 8}}
+						e.activeCompingPattern = sparsePatterns[rand.Intn(len(sparsePatterns))]
+					} else {
+						e.activeCompingPattern = []int{0}
+					}
 				} else {
 					// Active comping fills when soloist is breathing/pausing
-					activePatterns := [][]int{{0, 3}, {0, 6, 10}, {2, 6, 12}, {3, 11}}
-					e.activeCompingPattern = activePatterns[rand.Intn(len(activePatterns))]
+					if chord.Duration >= 32 {
+						activePatterns := [][]int{
+							{0, 6, 14, 22},
+							{0, 12, 24},
+							{2, 8, 16, 26},
+							{0, 8, 16, 24},
+						}
+						e.activeCompingPattern = activePatterns[rand.Intn(len(activePatterns))]
+					} else if chord.Duration == 16 {
+						activePatterns := [][]int{{0, 3}, {0, 6, 10}, {2, 6, 12}, {3, 11}}
+						e.activeCompingPattern = activePatterns[rand.Intn(len(activePatterns))]
+					} else if chord.Duration == 8 {
+						activePatterns := [][]int{{0, 4}, {2, 6}}
+						e.activeCompingPattern = activePatterns[rand.Intn(len(activePatterns))]
+					} else {
+						e.activeCompingPattern = []int{0}
+					}
 				}
-				e.nextChord()
 			}
 
-			chordTick := tickCount % 16
 			for _, hitTick := range e.activeCompingPattern {
-				if hitTick == chordTick {
-					e.playChordHit(chordTick == 0)
+				if hitTick == e.chordTickCount {
+					e.playChordHit(e.chordTickCount == 0)
 					break
 				}
 			}
@@ -251,30 +289,8 @@ func (e *JazzLoungeEngine) run() {
 			}
 
 			// 2b. Walking Bass Line (plays on every other tick for quarter-note pulse)
-			if tickCount%2 == 0 && !e.isTransitioning {
-				chord := e.progression[e.progress]
-				kp := keyToPitch(e.key)
-				bassRoot := 36 + kp + chord.RootOffset // C2 range
-				// Walking bass: root, 5th, chromatic approach to next root
-				bassStep := (tickCount / 2) % 4
-				var bassNote int
-				switch bassStep {
-				case 0:
-					bassNote = bassRoot // Root
-				case 1:
-					bassNote = bassRoot + 7 // 5th
-				case 2:
-					bassNote = bassRoot + 5 // 4th (passing tone)
-				case 3:
-					// Chromatic approach to next chord root
-					nextIdx := (e.progress + 1) % len(e.progression)
-					nextRoot := 36 + kp + e.progression[nextIdx].RootOffset
-					if nextRoot > bassRoot {
-						bassNote = nextRoot - 1 // approach from below
-					} else {
-						bassNote = nextRoot + 1 // approach from above
-					}
-				}
+			if tickCount%2 == 0 {
+				bassNote := e.walkBassLine(tickCount)
 				e.playPianoNoteWithVol(bassNote, e.pianoVolLevel*0.38)
 			}
 
@@ -286,58 +302,97 @@ func (e *JazzLoungeEngine) run() {
 					e.playDrumWithVol("hat", 0.3*e.drumsVolLevel)
 				}
 			} else {
+				// Get soloist energy
+				energy := 0.0
+				hasActiveSoloist := e.soloistPhraseActive
+				if hasActiveSoloist {
+					energy = e.soloists[e.activeSoloistIdx].PhraseEnergy
+				}
+
 				step32 := tickCount % 32
-				if step32 >= 28 {
-					// Snare roll drum fill on last bar of 4-bar section
-					e.playDrumWithVol("snare", (0.2+0.35*rand.Float64())*e.drumsVolLevel)
+				
+				// Only play roll fills if energy is high at the end of a section
+				if step32 >= 28 && hasActiveSoloist && energy > 0.6 {
+					// Snare roll drum fill on last bar of 4-bar section when energy is high
+					e.playDrumWithVol("snare", (0.15+0.4*energy)*e.drumsVolLevel)
 					if step32 == 31 {
 						// Anticipate downbeat with a kick hit
-						e.playDrumWithVol("kick", 0.55*e.drumsVolLevel)
+						e.playDrumWithVol("kick", (0.4+0.3*energy)*e.drumsVolLevel)
 					}
-				} else if step32 == 0 && tickCount > 0 {
-					// Landing crash accent at the start of next section
-					e.playDrumWithVol("snare", 0.7*e.drumsVolLevel)
-					e.playDrumWithVol("kick", 0.85*e.drumsVolLevel)
+				} else if step32 == 0 && tickCount > 0 && hasActiveSoloist && energy > 0.5 {
+					// Landing crash accent at the start of next section only if active and energetic
+					e.playDrumWithVol("snare", (0.5+0.35*energy)*e.drumsVolLevel)
+					e.playDrumWithVol("kick", (0.6+0.3*energy)*e.drumsVolLevel)
 					if !e.hatOff {
-						e.playDrumWithVol("hat", 0.8*e.drumsVolLevel)
+						e.playDrumWithVol("hat", (0.6+0.25*energy)*e.drumsVolLevel)
 					}
 				} else {
-					// Standard drum pattern
-					if !e.hatOff {
-						step := tickCount % 8
-						// Classic jazz ride swing: 1  .  2  da 3  .  4  da
-						if step == 0 || step == 2 || step == 3 || step == 4 || step == 6 || step == 7 {
-							volFactor := 0.45
-							if step == 0 || step == 3 || step == 4 || step == 7 {
-								volFactor = 0.65 // Accent on downbeats
+					// Standard drum patterns based on soloist presence and energy
+					step := tickCount % 8
+					
+					if !hasActiveSoloist || energy < 0.25 {
+						// Very laid back, minimal timekeeping (restraint)
+						// Hat: hi-hat chick pedal on beats 2 and 4 (ticks 2 and 6)
+						if !e.hatOff {
+							if step == 2 || step == 6 {
+								e.playDrumWithVol("hat", 0.3*e.drumsVolLevel)
+							} else if (step == 0 || step == 4) && rand.Float64() < 0.3 {
+								// Very soft tap on 1 and 3
+								e.playDrumWithVol("hat", 0.15*e.drumsVolLevel)
 							}
-							e.playDrumWithVol("hat", volFactor*e.drumsVolLevel)
 						}
-					}
+						
+						// Kick: almost completely silent, rare soft feather on downbeat
+						if !e.kickOff {
+							if step == 0 && rand.Float64() < 0.15 {
+								e.playDrumWithVol("kick", 0.2*e.drumsVolLevel)
+							}
+						}
+						
+						// Snare: extremely rare soft rimclick / ghost note
+						if !e.snareOff {
+							if (step == 2 || step == 6) && rand.Float64() < 0.1 {
+								e.playDrumWithVol("snare", 0.25*e.drumsVolLevel)
+							}
+						}
+					} else {
+						// Active soloist, drums support and dynamic matching
+						// Ride swing: 1  .  2  da 3  .  4  da
+						if !e.hatOff {
+							if step == 0 || step == 2 || step == 3 || step == 4 || step == 6 || step == 7 {
+								volFactor := 0.35 + 0.15*energy
+								if step == 0 || step == 3 || step == 4 || step == 7 {
+									volFactor += 0.2 // Accent on downbeats
+								}
+								e.playDrumWithVol("hat", volFactor*e.drumsVolLevel)
+							}
+						}
 
-					if !e.kickOff {
-						step := tickCount % 8
-						// Soft feathering kick on beats 1 and 3 (ticks 0 and 4)
-						if (step == 0 || step == 4) && rand.Float64() < 0.9 {
-							e.playDrumWithVol("kick", 0.35*e.drumsVolLevel)
+						// Kick: feathering kick on beats 1 and 3 (ticks 0 and 4)
+						if !e.kickOff {
+							if (step == 0 || step == 4) && rand.Float64() < (0.3+0.6*energy) {
+								e.playDrumWithVol("kick", (0.2+0.2*energy)*e.drumsVolLevel)
+							}
 						}
-					}
 
-					if !e.snareOff {
-						step := tickCount % 8
-						// Soft snare rimshot on beats 2 and 4 (ticks 2 and 6)
-						if (step == 2 || step == 6) && rand.Float64() < 0.8 {
-							e.playDrumWithVol("snare", 0.48*e.drumsVolLevel)
-						}
-						// Sneak in occasional soft snare ghost notes on swung offbeats
-						if (step == 1 || step == 3 || step == 5 || step == 7) && rand.Float64() < 0.15 {
-							e.playDrumWithVol("snare", 0.12*e.drumsVolLevel)
+						// Snare: rimshot on beats 2 and 4, ghost notes on offbeats
+						if !e.snareOff {
+							if (step == 2 || step == 6) && rand.Float64() < (0.2+0.6*energy) {
+								e.playDrumWithVol("snare", (0.3+0.25*energy)*e.drumsVolLevel)
+							}
+							// Ghost notes
+							if (step == 1 || step == 3 || step == 5 || step == 7) && rand.Float64() < (0.05+0.2*energy) {
+								e.playDrumWithVol("snare", 0.1*e.drumsVolLevel)
+							}
 						}
 					}
 				}
 			}
 
 			tickCount++
+			e.chordTickCount++
+			e.chordDurationRemaining--
+			e.macroEnergy = 0.5 + 0.3*math.Sin(float64(tickCount)/400.0)
 			bpm := e.bpm
 			e.mu.Unlock()
 
@@ -364,6 +419,13 @@ func (e *JazzLoungeEngine) generateProgression() {
 	e.scale = getJazzScale(e.key, e.isMinor)
 
 	e.progress = 0
+	e.sharedMotifNotes = nil
+	if len(e.progression) > 0 {
+		e.chordDurationRemaining = e.progression[0].Duration
+	} else {
+		e.chordDurationRemaining = 16
+	}
+	e.chordTickCount = 0
 	e.scalePos = len(e.scale) / 2
 	keyPitch := keyToPitch(e.key)
 	for i := range e.soloists {
@@ -461,20 +523,267 @@ func (e *JazzLoungeEngine) autoDJTransition() {
 	}()
 }
 
+func (e *JazzLoungeEngine) GenerateVoiceLedVoicing(chord JazzChord, keyPitch int, size int) []int {
+	rootMIDI := 48 + keyPitch + chord.RootOffset
+	var candidates []int
+	for _, interval := range chord.Intervals {
+		note := rootMIDI + interval
+		for note < 52 {
+			note += 12
+		}
+		for note > 76 {
+			note -= 12
+		}
+		candidates = append(candidates, note)
+		if note-12 >= 52 {
+			candidates = append(candidates, note-12)
+		}
+		if note+12 <= 76 {
+			candidates = append(candidates, note+12)
+		}
+	}
+
+	uniqueMap := make(map[int]bool)
+	var uniqueCandidates []int
+	for _, c := range candidates {
+		if !uniqueMap[c] {
+			uniqueMap[c] = true
+			uniqueCandidates = append(uniqueCandidates, c)
+		}
+	}
+	candidates = uniqueCandidates
+
+	if len(e.lastPianoVoicing) == 0 {
+		sort.Ints(candidates)
+		var voicing []int
+		if len(candidates) >= size {
+			voicing = candidates[:size]
+		} else {
+			voicing = candidates
+		}
+		e.lastPianoVoicing = voicing
+		return voicing
+	}
+
+	var bestVoicing []int
+	bestDist := 999999
+
+	var search func(start int, current []int)
+	search = func(start int, current []int) {
+		if len(current) == size {
+			dist := 0
+			sortedCurrent := make([]int, size)
+			copy(sortedCurrent, current)
+			sort.Ints(sortedCurrent)
+			
+			for i := 0; i < size; i++ {
+				d := int(math.Abs(float64(sortedCurrent[i] - e.lastPianoVoicing[i])))
+				dist += d
+				if i > 0 && sortedCurrent[i] == sortedCurrent[i-1] {
+					dist += 1000
+				}
+			}
+			if dist < bestDist {
+				bestDist = dist
+				bestVoicing = sortedCurrent
+			}
+			return
+		}
+		for i := start; i < len(candidates); i++ {
+			search(i+1, append(current, candidates[i]))
+		}
+	}
+
+	search(0, []int{})
+
+	if len(bestVoicing) == 0 {
+		sort.Ints(candidates)
+		if len(candidates) >= size {
+			bestVoicing = candidates[:size]
+		} else {
+			bestVoicing = candidates
+		}
+	}
+
+	e.lastPianoVoicing = bestVoicing
+	return bestVoicing
+}
+
 func (e *JazzLoungeEngine) playChordHit(isDownbeat bool) {
 	chord := e.progression[e.progress]
 	keyPitch := keyToPitch(e.key)
-	rootMIDI := 48 + keyPitch + chord.RootOffset
-	voicing := chord.GenerateVoicing(4)
+	voicing := e.GenerateVoiceLedVoicing(chord, keyPitch, 4)
 
-	vol := e.pianoVolLevel * 0.42
+	vol := e.pianoVolLevel * 0.35 // Slightly lower to sit perfectly in the nocturnal aesthetic
 	if !isDownbeat {
-		vol *= 0.7 // Comping hits are slightly softer
+		vol *= 0.65 // Comping hits are slightly softer
 	}
 
-	for _, pitch := range voicing {
-		e.playPianoNoteWithVol(rootMIDI+pitch, vol)
+	for _, noteMIDI := range voicing {
+		e.playPianoNoteWithVol(noteMIDI, vol)
 	}
+}
+
+func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
+	kp := keyToPitch(e.key)
+	chord := e.progression[e.progress]
+	
+	// Default base octave is C2 (36 + kp)
+	bassRoot := 36 + kp + chord.RootOffset
+	
+	// Keep bass note in a reasonable range: MIDI 31 to 57
+	clampNote := func(note int) int {
+		for note < 31 {
+			note += 12
+		}
+		for note > 57 {
+			note -= 12
+		}
+		return note
+	}
+
+	// 1. Pedal Point during Transitions or very quiet moments
+	isPedalPoint := e.isTransitioning
+	if !isPedalPoint && !e.soloistPhraseActive && rand.Float64() < 0.25 {
+		isPedalPoint = true
+	}
+
+	if isPedalPoint {
+		// Drone on tonic (36 + kp) or dominant (43 + kp)
+		pedalTonic := clampNote(36 + kp)
+		pedalDominant := clampNote(43 + kp)
+		beatIdx := e.chordTickCount / 2
+		if beatIdx%4 == 0 || beatIdx%4 == 2 {
+			e.lastBassNote = pedalTonic
+			return pedalTonic
+		} else {
+			// On beats 2 & 4, either repeat tonic, drop down an octave, or play dominant
+			if rand.Float64() < 0.5 {
+				e.lastBassNote = pedalDominant
+				return pedalDominant
+			}
+			e.lastBassNote = pedalTonic
+			return pedalTonic
+		}
+	}
+
+	beatIdx := e.chordTickCount / 2
+	totalBeats := chord.Duration / 2
+	if totalBeats <= 0 {
+		totalBeats = 8
+	}
+
+	// 2. Downbeat of a chord change: play root or inversion
+	if beatIdx == 0 {
+		if e.lastBassNote == 0 || rand.Float64() < 0.75 {
+			note := clampNote(bassRoot)
+			e.lastBassNote = note
+			return note
+		} else {
+			// Play the 3rd or 5th of the chord (smooth step-wise transition)
+			intervals := []int{3, 4, 7} // minor/major 3rd, 5th
+			var bestNote int
+			bestDist := 999
+			for _, inv := range intervals {
+				candidate := clampNote(bassRoot + inv)
+				dist := int(math.Abs(float64(candidate - e.lastBassNote)))
+				if dist < bestDist {
+					bestDist = dist
+					bestNote = candidate
+				}
+			}
+			e.lastBassNote = bestNote
+			return bestNote
+		}
+	}
+
+	nextIdx := (e.progress + 1) % len(e.progression)
+	nextChord := e.progression[nextIdx]
+	nextRoot := clampNote(36 + kp + nextChord.RootOffset)
+
+	// 3. Last beat: Chromatic or dominant approach note to the next chord root
+	if beatIdx == totalBeats-1 {
+		var approachNote int
+		if rand.Float64() < 0.6 {
+			// Chromatic approach (half step above or below next root)
+			if e.lastBassNote < nextRoot {
+				approachNote = nextRoot - 1
+			} else {
+				approachNote = nextRoot + 1
+			}
+		} else {
+			// Dominant approach (fifth above next root)
+			approachNote = nextRoot + 7
+		}
+		note := clampNote(approachNote)
+		e.lastBassNote = note
+		return note
+	}
+
+	// 4. Intermediate beats: walk step-wise with contrary motion bias
+	// Find active soloist's direction to apply contrary motion
+	soloistDir := 0
+	if e.soloistPhraseActive {
+		sol := e.soloists[e.activeSoloistIdx]
+		soloistDir = sol.MelodyDir // +1 or -1
+	}
+
+	// Generate step candidates
+	candidates := []int{
+		e.lastBassNote + 1, e.lastBassNote - 1, // half step
+		e.lastBassNote + 2, e.lastBassNote - 2, // whole step
+		e.lastBassNote + 3, e.lastBassNote - 3, // minor third
+		e.lastBassNote + 4, e.lastBassNote - 4, // major third
+		e.lastBassNote + 5, e.lastBassNote - 5, // perfect fourth
+	}
+
+	var bestNote int = clampNote(bassRoot + 7) // fallback
+	bestScore := -9999.0
+
+	for _, cand := range candidates {
+		candClamped := clampNote(cand)
+		score := 0.0
+
+		// Avoid repeating the last note unless we want dynamic pedal rhythm (handled elsewhere)
+		if candClamped == e.lastBassNote {
+			score -= 5.0
+		}
+
+		// Keep steps small (prefer 1 or 2 semitones)
+		stepDist := int(math.Abs(float64(candClamped - e.lastBassNote)))
+		if stepDist <= 2 {
+			score += 3.0
+		} else if stepDist <= 4 {
+			score += 1.0
+		} else if stepDist > 5 {
+			score -= 3.0
+		}
+
+		// Prefer chord tones
+		if isChordTone(candClamped, chord, kp) {
+			score += 2.0
+		}
+
+		// Contrary motion: if soloist is ascending, prefer descending bass
+		movementDir := 1
+		if candClamped < e.lastBassNote {
+			movementDir = -1
+		}
+		if soloistDir != 0 && movementDir == -soloistDir {
+			score += 1.5
+		}
+
+		// Add subtle variation
+		score += rand.Float64() * 0.5
+
+		if score > bestScore {
+			bestScore = score
+			bestNote = candClamped
+		}
+	}
+
+	e.lastBassNote = bestNote
+	return bestNote
 }
 
 func (e *JazzLoungeEngine) playMelody() {

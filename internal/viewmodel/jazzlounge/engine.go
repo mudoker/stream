@@ -217,7 +217,7 @@ func (e *JazzLoungeEngine) init() {
 
 	e.mixer = &beep.Mixer{}
 	e.lpf = &LowPassFilter{Streamer: e.mixer, Cutoff: 2200, Fs: float64(e.speakerRate)}
-	e.masterVol = &effects.Volume{Streamer: e.lpf, Base: 2, Volume: linearToVolumeExponent(e.masterVolLevel)}
+	e.masterVol = &effects.Volume{Streamer: e.lpf, Base: 2, Volume: linearToVolumeExponent(e.masterVolLevel * 3.5)}
 
 	// Soft tape hiss / white noise
 	noiseStr := WhiteNoiseStreamer{}
@@ -1322,7 +1322,7 @@ func (e *JazzLoungeEngine) SetMasterVolume(level float64) {
 	}
 	e.masterVolLevel = level
 	if e.masterVol != nil {
-		e.masterVol.Volume = linearToVolumeExponent(level)
+		e.masterVol.Volume = linearToVolumeExponent(level * 3.5)
 	}
 }
 

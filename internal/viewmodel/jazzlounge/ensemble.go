@@ -115,14 +115,14 @@ func InitDefaultPersonalities() MusicianPersonalities {
 			MelodicDirBias: []int{-1, 0, 1}[rand.Intn(3)],
 		},
 		Piano: PianistPersonality{
-			UpperExtensionBias: rand.Float64() < 0.75,
-			SparsityBias:       0.4 + rand.Float64()*0.4,
+			UpperExtensionBias: rand.Float64() < 0.85, // almost always use extensions for richness
+			SparsityBias:       0.20 + rand.Float64()*0.25, // lower sparsity = more activity
 		},
 		Bass: BassistPersonality{
 			StepwiseBias: 0.5 + rand.Float64()*0.4,
 		},
 		Drums: DrummerPersonality{
-			BrushActivity: 0.3 + rand.Float64()*0.4,
+			BrushActivity: 0.55 + rand.Float64()*0.25, // warm, engaged drummer floor
 		},
 	}
 }

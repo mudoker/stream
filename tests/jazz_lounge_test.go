@@ -29,14 +29,14 @@ func TestJazzLoungeEngineVolumeAdjustmentsAndState(t *testing.T) {
 	if masterVol != 0.8 {
 		t.Errorf("Expected default master volume 0.8, got %f", masterVol)
 	}
-	if pianoVol != 0.5 {
-		t.Errorf("Expected default piano volume 0.5, got %f", pianoVol)
+	if pianoVol != 0.55 {
+		t.Errorf("Expected default piano volume 0.55, got %f", pianoVol)
 	}
-	if synthVol != 0.6 {
-		t.Errorf("Expected default synth volume 0.6, got %f", synthVol)
+	if synthVol != 0.72 {
+		t.Errorf("Expected default synth volume 0.72, got %f", synthVol)
 	}
-	if drumsVol != 0.4 {
-		t.Errorf("Expected default drums volume 0.4, got %f", drumsVol)
+	if drumsVol != 0.52 {
+		t.Errorf("Expected default drums volume 0.52, got %f", drumsVol)
 	}
 
 	// Test volume setting

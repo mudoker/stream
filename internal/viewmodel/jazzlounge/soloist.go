@@ -175,50 +175,50 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 			nextSolIdx := (e.activeSoloistIdx + 1) % len(e.soloists)
 			e.activeSoloistIdx = nextSolIdx
 
-			// Elongated breathing space
-			s.PauseTicks = rand.Intn(16) + 16
+			// Shorter breathing space for continuous romantic energy
+			s.PauseTicks = rand.Intn(8) + 6
 			if e.macroEnergy < 0.4 {
-				s.PauseTicks += rand.Intn(12) + 12
+				s.PauseTicks += rand.Intn(6) + 4
 			}
 			s.Motif = nil
 			s.MotifNotes = nil
 
-			// Next soloist takes a moment to respond
-			e.soloists[nextSolIdx].PauseTicks = rand.Intn(8) + 8
+			// Next soloist takes a short moment to respond
+			e.soloists[nextSolIdx].PauseTicks = rand.Intn(6) + 4
 			if e.macroEnergy < 0.4 {
-				e.soloists[nextSolIdx].PauseTicks += rand.Intn(6) + 6
+				e.soloists[nextSolIdx].PauseTicks += rand.Intn(4) + 2
 			}
 			e.soloists[nextSolIdx].Motif = nil
 			e.soloists[nextSolIdx].MotifNotes = nil
 			return
 		}
 
-		// Decide: play or rest? (Higher rest probability to project confidence and space)
-		if rand.Float64() < 0.45 {
-			s.PauseTicks = rand.Intn(12) + 12
+		// Decide: play or rest? (Romantic lounge — keep playing, rare complete rest)
+		if rand.Float64() < 0.15 {
+			s.PauseTicks = rand.Intn(8) + 6
 			nextSolIdx := (e.activeSoloistIdx + 1) % len(e.soloists)
 			e.activeSoloistIdx = nextSolIdx
-			e.soloists[nextSolIdx].PauseTicks = rand.Intn(6) + 6
+			e.soloists[nextSolIdx].PauseTicks = rand.Intn(4) + 4
 			return
 		}
 
-		// Start a new phrase with asymmetrical length distributions (restraint/narrative)
+		// Start a new phrase with lyrical length bias (romantic lounge needs longer melodic statements)
 		e.soloistPhraseActive = true
-		
-		// Vary phrase length profiles to avoid constant 4-bar/8-bar symmetry
+
+		// Phrase length profiles: strongly bias toward medium and extended lyrical phrases
 		lenProfile := rand.Float64()
-		if lenProfile < 0.15 {
-			// A short, conversational exclamation (2-4 notes)
-			s.PhraseTicks = rand.Intn(6) + 6
-			s.PhraseLength = rand.Intn(3) + 2
-		} else if lenProfile < 0.85 {
-			// Standard medium phrase
-			s.PhraseTicks = rand.Intn(16) + 12
-			s.PhraseLength = rand.Intn(6) + 5
+		if lenProfile < 0.05 {
+			// Rare short exclamation (3-5 notes)
+			s.PhraseTicks = rand.Intn(6) + 8
+			s.PhraseLength = rand.Intn(3) + 3
+		} else if lenProfile < 0.65 {
+			// Standard medium lyrical phrase — core of the performance
+			s.PhraseTicks = rand.Intn(16) + 16
+			s.PhraseLength = rand.Intn(6) + 7
 		} else {
-			// An extended, expressive statement (up to 40 ticks, 12-16 notes)
-			s.PhraseTicks = rand.Intn(16) + 24
-			s.PhraseLength = rand.Intn(5) + 12
+			// Extended expressive statement — memorable, humable arc (up to 50 ticks, 14-20 notes)
+			s.PhraseTicks = rand.Intn(20) + 30
+			s.PhraseLength = rand.Intn(7) + 14
 		}
 
 		s.Motif = PhraseMotifs[rand.Intn(len(PhraseMotifs))]
@@ -350,13 +350,13 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 
 	s.PhraseTicks--
 
-	// Swing feel: higher play probability on downbeats, lower at low macro energy
-	playProb := 0.20
+	// Swing feel: higher play probability on downbeats; keep ensemble vitally active
+	playProb := 0.32
 	if tickCount%2 == 0 {
-		playProb = 0.55
+		playProb = 0.70
 	}
 	if e.macroEnergy < 0.4 {
-		playProb *= 0.7 // scale down to make it more sparse/laid back
+		playProb *= 0.85 // slightly more laid back at low energy, never truly silent
 	}
 	if rand.Float64() > playProb {
 		return
@@ -365,13 +365,13 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 	// === NOTE GENERATION ===
 	isChordChange := (tickCount % 16 == 0)
 
-	// Update phrase energy arc: builds to climax at 60-70%, then resolves
+	// Update phrase energy arc: builds to climax at 50-55%, then resolves gracefully
 	if s.PhraseLength > 0 {
 		progress := float64(s.NoteCount) / float64(s.PhraseLength)
-		if progress < 0.65 {
-			s.PhraseEnergy = progress / 0.65 // build up
+		if progress < 0.55 {
+			s.PhraseEnergy = progress / 0.55 // build up faster
 		} else {
-			s.PhraseEnergy = 1.0 - (progress-0.65)/0.35 // wind down
+			s.PhraseEnergy = 1.0 - (progress-0.55)/0.45 // sustained climax then resolve
 		}
 		if s.PhraseEnergy < 0 {
 			s.PhraseEnergy = 0
@@ -538,22 +538,23 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 
 	s.PauseTicks = stepTicks
 
-	// Dynamic velocity based on phrase arc
-	baseVel := 0.45 + 0.40*s.PhraseEnergy
-	// Add slight randomness for human feel
-	vel := baseVel + (rand.Float64()-0.5)*0.12
-	if vel < 0.25 {
-		vel = 0.25
+	// Dynamic velocity — confident, warm, projected
+	// Base is 0.55 (audible, present) with up to +0.35 at phrase peak
+	baseVel := 0.55 + 0.35*s.PhraseEnergy
+	// Add subtle randomness for human feel
+	vel := baseVel + (rand.Float64()-0.5)*0.10
+	if vel < 0.38 {
+		vel = 0.38
 	}
-	if vel > 0.95 {
-		vel = 0.95
+	if vel > 0.98 {
+		vel = 0.98
 	}
 
 	freq := midiToFreq(nextNote)
 	voice := &SynthVoice{
 		SampleRate: e.speakerRate,
 		Frequency:  freq,
-		Amplitude:  e.synthVolLevel * 0.55,
+		Amplitude:  e.synthVolLevel * 0.72, // project confidence and personality
 		Velocity:   vel,
 		VoiceType:  s.Type,
 		Duration:   duration,

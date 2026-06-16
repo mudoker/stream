@@ -170,30 +170,30 @@ func (e *JazzLoungeEngine) init() {
 	e.macroEnergy = 0.5
 	e.personalities = InitDefaultPersonalities()
 	e.narrative = JazzNarrative{
-		Mood:             "Introspective",
-		ActiveChapter:    "SoloSpotlight",
-		ChapterTicksLeft: 160,
+		Mood:             "Romantic",
+		ActiveChapter:    "RomanticRendezvous",
+		ChapterTicksLeft: 200,
 		ActiveLeader:     "trumpet",
 		LeaderTicksLeft:  32,
-		PerceivedTempo:   0.4,
+		PerceivedTempo:   0.5,
 		Forces: EmotionalForces{
-			Intimacy:     0.7,
-			Melancholy:   0.6,
-			Tension:      0.2,
-			Confidence:   0.5,
-			Nostalgia:    0.4,
-			Mystery:      0.5,
-			Anticipation: 0.3,
-			Warmth:       0.6,
-			Momentum:     0.3,
+			Intimacy:     0.70,
+			Melancholy:   0.20,
+			Tension:      0.15,
+			Confidence:   0.75,
+			Nostalgia:    0.35,
+			Mystery:      0.25,
+			Anticipation: 0.50,
+			Warmth:       0.85,
+			Momentum:     0.55,
 		},
 		Taste: RandomHarmonicTaste(),
 		Obsession: EnsembleObsession{
 			Type: "none",
 		},
 		Register: RegisterArchitecture{
-			Width:  0.5,
-			Center: 0.5,
+			Width:  0.60,
+			Center: 0.55,
 		},
 		History: MetaMemory{
 			SoloistLeadTicks: 0,
@@ -205,9 +205,9 @@ func (e *JazzLoungeEngine) init() {
 	}
 	e.motifInventory = []ThematicMotif{}
 	e.masterVolLevel = 0.8
-	e.pianoVolLevel = 0.5
-	e.synthVolLevel = 0.6
-	e.drumsVolLevel = 0.4
+	e.pianoVolLevel = 0.55
+	e.synthVolLevel = 0.72
+	e.drumsVolLevel = 0.52
 
 	e.soloists = []*Soloist{
 		{Type: "sax", LastMIDINote: 69},
@@ -326,15 +326,15 @@ func (e *JazzLoungeEngine) run() {
 						e.activeCompingPattern = []int{0}
 					}
 				} else {
-					// A soloist is leading: play supporting sparse comping
+					// A soloist is leading: play warm, supportive comping — lush but not intrusive
 					if chord.Duration >= 32 {
-						sparsePatterns := [][]int{{0}, {0, 16}, {0, 8}}
-						e.activeCompingPattern = sparsePatterns[rand.Intn(len(sparsePatterns))]
+						supportPatterns := [][]int{{0, 8, 16}, {0, 12, 20}, {0, 8, 24}, {4, 12, 24}}
+						e.activeCompingPattern = supportPatterns[rand.Intn(len(supportPatterns))]
 					} else if chord.Duration == 16 {
-						sparsePatterns := [][]int{{0}, {0, 8}}
-						e.activeCompingPattern = sparsePatterns[rand.Intn(len(sparsePatterns))]
+						supportPatterns := [][]int{{0, 6}, {0, 8}, {2, 8}, {0, 4, 10}}
+						e.activeCompingPattern = supportPatterns[rand.Intn(len(supportPatterns))]
 					} else {
-						e.activeCompingPattern = []int{0}
+						e.activeCompingPattern = []int{0, 4}
 					}
 				}
 			}
@@ -364,9 +364,9 @@ func (e *JazzLoungeEngine) run() {
 				isStillness := e.narrative.ActiveChapter == "StillnessAtmosphere"
 				if !isStillness || tickCount%4 == 0 {
 					bassNote := e.walkBassLine(tickCount)
-					vol := 0.72
+					vol := 0.78
 					if isStillness {
-						vol = 0.45
+						vol = 0.52
 					}
 					e.playBassNoteWithVol(bassNote, vol)
 				}
@@ -385,20 +385,24 @@ func (e *JazzLoungeEngine) run() {
 					e.playDrumWithVol("hat", 0.35*e.drumsVolLevel)
 				}
 			} else if e.narrative.ActiveChapter == "RomanticRendezvous" {
-				// Romantic Rendezvous: active warm brush sweeps on every beat, conversational snare/kick
+				// Romantic Rendezvous: warm flowing brush sweeps on every step with energetic swing
 				step := tickCount % 8
 				if !e.hatOff {
-					volFactor := 0.65 + 0.15*rand.Float64()
+					// Flowing ride pattern: 1 da 2 da 3 da 4 da (all steps with accent on beats)
+					volFactor := 0.55 + 0.20*rand.Float64()
+					if step == 0 || step == 4 {
+						volFactor = 0.80 + 0.10*rand.Float64() // Strong downbeats
+					}
 					e.playDrumWithVol("hat", volFactor*e.drumsVolLevel)
 				}
-				if !e.kickOff && (step == 0 || step == 4) && rand.Float64() < 0.6 {
-					e.playDrumWithVol("kick", 0.55*e.drumsVolLevel)
+				if !e.kickOff && (step == 0 || step == 4) && rand.Float64() < 0.70 {
+					e.playDrumWithVol("kick", 0.62*e.drumsVolLevel)
 				}
 				if !e.snareOff {
-					if (step == 2 || step == 6) && rand.Float64() < 0.5 {
-						e.playDrumWithVol("snare", 0.70*e.drumsVolLevel)
-					} else if rand.Float64() < 0.25 {
-						e.playDrumWithVol("snare", 0.35*e.drumsVolLevel)
+					if (step == 2 || step == 6) && rand.Float64() < 0.65 {
+						e.playDrumWithVol("snare", 0.75*e.drumsVolLevel)
+					} else if rand.Float64() < 0.30 {
+						e.playDrumWithVol("snare", 0.38*e.drumsVolLevel)
 					}
 				}
 			} else if e.narrative.ActiveChapter == "BassSoliloquy" {
@@ -428,45 +432,50 @@ func (e *JazzLoungeEngine) run() {
 				// Only play roll fills if energy is high at the end of a section
 				if step32 >= 28 && hasActiveSoloist && energy > 0.6 {
 					// Snare roll drum fill on last bar of 4-bar section when energy is high
-					e.playDrumWithVol("snare", (0.45+0.4*energy)*e.drumsVolLevel)
+					e.playDrumWithVol("snare", (0.50+0.40*energy)*e.drumsVolLevel)
 					if step32 == 31 {
 						// Anticipate downbeat with a kick hit
-						e.playDrumWithVol("kick", (0.75+0.25*energy)*e.drumsVolLevel)
+						e.playDrumWithVol("kick", (0.80+0.20*energy)*e.drumsVolLevel)
 					}
 				} else if step32 == 0 && tickCount > 0 && hasActiveSoloist && energy > 0.5 {
-					// Landing crash accent at the start of next section only if active and energetic
-					e.playDrumWithVol("snare", (0.85+0.15*energy)*e.drumsVolLevel)
-					e.playDrumWithVol("kick", (0.90+0.10*energy)*e.drumsVolLevel)
+					// Landing crash accent at the start of next section
+					e.playDrumWithVol("snare", (0.88+0.12*energy)*e.drumsVolLevel)
+					e.playDrumWithVol("kick", (0.92+0.08*energy)*e.drumsVolLevel)
 					if !e.hatOff {
-						e.playDrumWithVol("hat", (0.85+0.15*energy)*e.drumsVolLevel)
+						e.playDrumWithVol("hat", (0.88+0.12*energy)*e.drumsVolLevel)
 					}
 				} else {
 					// Standard drum patterns based on soloist presence and energy
 					step := tickCount % 8
 					
 					if !hasActiveSoloist || energy < 0.25 {
-						// Very laid back, minimal timekeeping (restraint)
-						// Hat: hi-hat chick pedal on beats 2 and 4 (ticks 2 and 6)
+						// Laid back but not dead: warm timekeeping
+						// Hat: hi-hat on beats 2 and 4 plus soft taps on 1 and 3
 						if !e.hatOff {
 							if step == 2 || step == 6 {
-								e.playDrumWithVol("hat", 0.7*e.drumsVolLevel)
-							} else if (step == 0 || step == 4) && rand.Float64() < 0.3 {
-								// Very soft tap on 1 and 3
-								e.playDrumWithVol("hat", 0.45*e.drumsVolLevel)
+								e.playDrumWithVol("hat", 0.72*e.drumsVolLevel)
+							} else if (step == 0 || step == 4) && rand.Float64() < 0.45 {
+								// Warmer tap on 1 and 3
+								e.playDrumWithVol("hat", 0.52*e.drumsVolLevel)
+							} else if (step == 1 || step == 3 || step == 5 || step == 7) && rand.Float64() < 0.20 {
+								// Subtle off-beat presence
+								e.playDrumWithVol("hat", 0.35*e.drumsVolLevel)
 							}
 						}
-						
-						// Kick: almost completely silent, rare soft feather on downbeat
+
+						// Kick: soft feathering on downbeats, more present than before
 						if !e.kickOff {
-							if step == 0 && rand.Float64() < 0.15 {
-								e.playDrumWithVol("kick", 0.6*e.drumsVolLevel)
+							if step == 0 && rand.Float64() < 0.30 {
+								e.playDrumWithVol("kick", 0.62*e.drumsVolLevel)
+							} else if step == 4 && rand.Float64() < 0.15 {
+								e.playDrumWithVol("kick", 0.50*e.drumsVolLevel)
 							}
 						}
-						
-						// Snare: extremely rare soft rimclick / ghost note
+
+						// Snare: gentle ghost note presence
 						if !e.snareOff {
-							if (step == 2 || step == 6) && rand.Float64() < 0.1 {
-								e.playDrumWithVol("snare", 0.65*e.drumsVolLevel)
+							if (step == 2 || step == 6) && rand.Float64() < 0.22 {
+								e.playDrumWithVol("snare", 0.58*e.drumsVolLevel)
 							}
 						}
 					} else {
@@ -569,11 +578,11 @@ func (e *JazzLoungeEngine) nextChord() {
 		nextProgress = 0
 	}
 
-	nextKickOff := rand.Float64() < 0.15
-	nextSnareOff := rand.Float64() < 0.2
-	nextHatOff := rand.Float64() < 0.25
-	nextMelodyDensity := rand.Float64()*0.3 + 0.2
-	nextMelodyOff := rand.Float64() < 0.25
+	nextKickOff := rand.Float64() < 0.07  // rare kick dropout
+	nextSnareOff := rand.Float64() < 0.08 // rare snare dropout
+	nextHatOff := rand.Float64() < 0.08   // rare hat dropout
+	nextMelodyDensity := rand.Float64()*0.25 + 0.50 // melody density: 0.50–0.75 (rich floor)
+	nextMelodyOff := rand.Float64() < 0.08 // rarely silence melody
 
 	if e.progress == len(e.progression)/2 {
 		e.progress = nextProgress
@@ -608,11 +617,11 @@ func (e *JazzLoungeEngine) autoDJTransition() {
 
 	e.generateProgression()
 
-	e.melodyDensity = 0.2 + rand.Float64()*0.4
-	e.kickOff = rand.Float64() < 0.15
-	e.snareOff = rand.Float64() < 0.2
-	e.hatOff = rand.Float64() < 0.25
-	e.melodyOff = rand.Float64() < 0.25
+	e.melodyDensity = 0.45 + rand.Float64()*0.30 // 0.45-0.75 density after transition
+	e.kickOff = rand.Float64() < 0.07
+	e.snareOff = rand.Float64() < 0.08
+	e.hatOff = rand.Float64() < 0.08
+	e.melodyOff = rand.Float64() < 0.08
 
 	// Cozy lowpass filter sweep transition
 	go func() {
@@ -737,8 +746,9 @@ func (e *JazzLoungeEngine) playChordHit(isDownbeat bool) {
 	chord := e.progression[e.progress]
 	keyPitch := keyToPitch(e.key)
 
-	// 15% chance to play a thematic motif echo instead of a block chord on offbeats
-	if !isDownbeat && len(e.motifInventory) > 0 && rand.Float64() < 0.15 {
+	// 20% chance to play a thematic motif echo instead of block chord on offbeats
+	// This creates melodic commentary from the piano even during accompaniment
+	if !isDownbeat && len(e.motifInventory) > 0 && rand.Float64() < 0.25 {
 		// Find highest importance motif
 		bestIdx := 0
 		bestImportance := -999.0
@@ -750,27 +760,44 @@ func (e *JazzLoungeEngine) playChordHit(isDownbeat bool) {
 		}
 		motif := e.motifInventory[bestIdx]
 		if len(motif.Notes) > 0 {
-			// Echo the first note of the motif in the piano register
+			// Echo the first note of the motif in the upper piano register (decorative fill)
 			note := motif.Notes[0]
-			for note < 52 {
+			for note < 56 {
 				note += 12
 			}
-			for note > 76 {
+			for note > 80 {
 				note -= 12
 			}
-			e.playPianoNoteWithVol(note, e.pianoVolLevel*0.32)
+			e.playPianoNoteWithVol(note, e.pianoVolLevel*0.42)
 			return
 		}
 	}
 
 	voicing := e.GenerateVoiceLedVoicing(chord, keyPitch, 4)
-	vol := e.pianoVolLevel * 0.82
+	vol := e.pianoVolLevel * 0.88
 	if !isDownbeat {
-		vol *= 0.72
+		vol *= 0.78
 	}
 
 	for _, noteMIDI := range voicing {
 		e.playPianoNoteWithVol(noteMIDI, vol)
+	}
+
+	// After chord hit, occasionally add a decorative upper-register fill or passing tone
+	// This makes the piano feel alive and elegant even during accompaniment
+	if rand.Float64() < 0.28 {
+		// Pick a chord extension or passing tone in the upper register
+		kp := keyToPitch(e.key)
+		chordRoot := 60 + kp + chord.RootOffset
+		ext := []int{14, 16, 21, 9}[rand.Intn(4)] // 9th, major 9th, 13th, 6th
+		fillNote := chordRoot + ext
+		for fillNote > 84 {
+			fillNote -= 12
+		}
+		for fillNote < 64 {
+			fillNote += 12
+		}
+		e.playPianoNoteWithVol(fillNote, e.pianoVolLevel*0.38)
 	}
 }
 
@@ -813,8 +840,8 @@ func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
 
 	// 1. Pedal Point during Transitions or very quiet moments
 	isPedalPoint := e.isTransitioning || e.narrative.ActiveChapter == "StillnessAtmosphere"
-	if !isPedalPoint && !e.soloistPhraseActive && rand.Float64() < 0.25 {
-		isPedalPoint = true
+	if !isPedalPoint && !e.soloistPhraseActive && rand.Float64() < 0.12 {
+		isPedalPoint = true // Bass walks 88% of the time when no soloist is active
 	}
 
 	if isPedalPoint {
@@ -961,17 +988,17 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 	if e.narrative.ChapterTicksLeft <= 0 {
 		var next string
 		r := rand.Float64()
-		if r < 0.40 {
+		if r < 0.48 {
 			next = "RomanticRendezvous"
-		} else if r < 0.65 {
+		} else if r < 0.76 {
 			next = "SoloSpotlight"
-		} else if r < 0.80 {
+		} else if r < 0.88 {
 			next = "PianoInterlude"
-		} else if r < 0.90 {
+		} else if r < 0.94 {
 			next = "IntimateNocturne"
-		} else if r < 0.95 {
+		} else if r < 0.97 {
 			next = "BassSoliloquy"
-		} else if r < 0.98 {
+		} else if r < 0.99 {
 			next = "StillnessAtmosphere"
 		} else {
 			next = "NocturnalSuspense"
@@ -986,7 +1013,7 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 		}
 
 		e.narrative.ActiveChapter = next
-		e.narrative.ChapterTicksLeft = 200 + rand.Intn(200) // 200 to 400 ticks per chapter
+		e.narrative.ChapterTicksLeft = 160 + rand.Intn(160) // 160-320 ticks per chapter
 	}
 
 	// 1. Update Meta Memory Statistics
@@ -1002,7 +1029,8 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 
 	// 2. Modulate Persistent Ensemble Mood (Very Slow Shift)
 	if tickCount%400 == 0 {
-		moods := []string{"Introspective", "Romantic", "Weary", "Melancholic", "Nostalgic", "Elegant", "Playful", "Mysterious"}
+		// Romantic lounge mood palette: warmth-forward, mystery-reduced
+		moods := []string{"Romantic", "Romantic", "Elegant", "Playful", "Nostalgic", "Introspective", "Elegant", "Mysterious"}
 		e.narrative.Mood = moods[rand.Intn(len(moods))]
 	}
 
@@ -1010,14 +1038,18 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 	forces := &e.narrative.Forces
 	chord := e.progression[e.progress]
 
-	// Melancholy
+	// Melancholy: minor tonality raises it slightly, but warmth actively counters it
 	if e.isMinor {
-		forces.Melancholy += 0.02
+		forces.Melancholy += 0.012
 	} else {
-		forces.Melancholy -= 0.015
+		forces.Melancholy -= 0.025 // Major key actively dissolves melancholy
 	}
 	if e.narrative.Mood == "Melancholic" || e.narrative.Mood == "Weary" {
-		forces.Melancholy += 0.03
+		forces.Melancholy += 0.015
+	}
+	// Warmth actively reduces melancholy — romance over isolation
+	if forces.Warmth > 0.6 {
+		forces.Melancholy -= 0.020
 	}
 
 	// Tension
@@ -1033,15 +1065,16 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 		forces.Tension -= 0.015
 	}
 
-	// Intimacy & Warmth
+	// Intimacy & Warmth: social engagement sustains warmth even during active playing
 	if e.narrative.ActiveLeader == "none" || e.isTransitioning {
-		forces.Intimacy += 0.03
-		forces.Warmth += 0.015
+		forces.Intimacy += 0.02
+		forces.Warmth += 0.025 // Warmth rises during quiet moments
 	} else {
-		forces.Intimacy -= 0.02
+		forces.Intimacy -= 0.015
+		forces.Warmth += 0.012 // Warmth also rises during active playing in romantic context
 	}
 	if forces.Tension > 0.6 {
-		forces.Intimacy -= 0.025
+		forces.Intimacy -= 0.018
 	}
 
 	// Momentum
@@ -1104,19 +1137,22 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 	e.narrative.LeaderTicksLeft--
 	if e.narrative.LeaderTicksLeft <= 0 {
 		// Calculate pressures to balance leadership
-		pianoPressure := 0.25
-		soloistPressure := 0.50
-		silencePressure := 0.25
+		pianoPressure := 0.22
+		soloistPressure := 0.55
+		silencePressure := 0.15 // Romantic lounge: ensemble almost always actively plays
+		warmthBonus := forces.Warmth * 0.08
+		soloistPressure += warmthBonus
+		silencePressure -= warmthBonus * 0.5
 
 		// Avoid over-dominant soloist
 		if e.narrative.History.SoloistLeadTicks > e.narrative.History.PianoLeadTicks*2 {
-			pianoPressure += 0.2
-			soloistPressure -= 0.25
+			pianoPressure += 0.15
+			soloistPressure -= 0.15
 		}
 		// Avoid perpetual clutter
 		if forces.Tension > 0.7 {
-			silencePressure += 0.3
-			soloistPressure -= 0.2
+			silencePressure += 0.20
+			soloistPressure -= 0.15
 		}
 
 		r := rand.Float64()
@@ -1137,7 +1173,7 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 		}
 
 		e.narrative.ActiveLeader = chosen
-		e.narrative.LeaderTicksLeft = 80 + rand.Intn(80)
+		e.narrative.LeaderTicksLeft = 60 + rand.Intn(60) // 60-120 ticks per leader slot
 	}
 
 	// Chapter Overrides of Leader, Register, and Emotional Forces
@@ -1212,17 +1248,20 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 		}
 	}
 
-	// 7. Perceived Tempo & Macro Energy Mapping
-	// Controlled by tension, momentum, and brush activity
-	e.narrative.PerceivedTempo = 0.25 + 0.45*forces.Tension + 0.2*forces.Momentum
+	// 7. Perceived Tempo & Macro Energy
+	// Warmer, more romantic energy floor — ensemble always has vitality
+	e.narrative.PerceivedTempo = 0.35 + 0.35*forces.Tension + 0.20*forces.Momentum
+	if forces.Warmth > 0.6 {
+		e.narrative.PerceivedTempo += 0.08 // Warmth adds buoyancy, not heaviness
+	}
 	if forces.Intimacy > 0.6 {
-		e.narrative.PerceivedTempo -= 0.15
+		e.narrative.PerceivedTempo -= 0.10 // Intimacy still mellows tempo
 	}
-	if e.narrative.PerceivedTempo < 0.1 {
-		e.narrative.PerceivedTempo = 0.1
+	if e.narrative.PerceivedTempo < 0.18 {
+		e.narrative.PerceivedTempo = 0.18
 	}
-	if e.narrative.PerceivedTempo > 0.9 {
-		e.narrative.PerceivedTempo = 0.9
+	if e.narrative.PerceivedTempo > 0.90 {
+		e.narrative.PerceivedTempo = 0.90
 	}
 	e.macroEnergy = e.narrative.PerceivedTempo
 
@@ -1360,7 +1399,7 @@ func (e *JazzLoungeEngine) FindClosestSample(midiNote int, volume float64) (*Sam
 	bestMIDI := 0
 
 	samples := e.pianoSamplesV1
-	if volume >= 0.45 {
+	if volume >= 0.35 { // v3 (rich) samples used broadly for warm lounge piano tone
 		if len(e.pianoSamplesV3) > 0 {
 			samples = e.pianoSamplesV3
 		}

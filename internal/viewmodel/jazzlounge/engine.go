@@ -170,10 +170,12 @@ func (e *JazzLoungeEngine) init() {
 	e.macroEnergy = 0.5
 	e.personalities = InitDefaultPersonalities()
 	e.narrative = JazzNarrative{
-		Mood:            "Introspective",
-		ActiveLeader:    "trumpet",
-		LeaderTicksLeft: 32,
-		PerceivedTempo:  0.4,
+		Mood:             "Introspective",
+		ActiveChapter:    "SoloSpotlight",
+		ChapterTicksLeft: 160,
+		ActiveLeader:     "trumpet",
+		LeaderTicksLeft:  32,
+		PerceivedTempo:   0.4,
 		Forces: EmotionalForces{
 			Intimacy:     0.7,
 			Melancholy:   0.6,
@@ -287,13 +289,19 @@ func (e *JazzLoungeEngine) run() {
 				e.nextChord()
 				chord := e.progression[e.progress]
 				duration := chord.Duration
-				if e.macroEnergy < 0.4 {
+				if e.narrative.ActiveChapter == "IntimateNocturne" || e.narrative.ActiveChapter == "BassSoliloquy" {
+					duration *= 2
+				} else if e.narrative.ActiveChapter == "StillnessAtmosphere" {
+					duration *= 4
+				} else if e.macroEnergy < 0.4 {
 					duration *= 2
 				}
 				e.chordDurationRemaining = duration
 				e.chordTickCount = 0
 
 				if e.isTransitioning {
+					e.activeCompingPattern = []int{0}
+				} else if e.narrative.ActiveChapter == "StillnessAtmosphere" || e.narrative.ActiveChapter == "BassSoliloquy" {
 					e.activeCompingPattern = []int{0}
 				} else if e.narrative.ActiveLeader == "none" {
 					// Extremely sparse comping when no one leads (restraint)
@@ -353,8 +361,15 @@ func (e *JazzLoungeEngine) run() {
 
 			// 2b. Walking Bass Line (plays on every other tick for quarter-note pulse)
 			if tickCount%2 == 0 {
-				bassNote := e.walkBassLine(tickCount)
-				e.playBassNoteWithVol(bassNote, 0.72)
+				isStillness := e.narrative.ActiveChapter == "StillnessAtmosphere"
+				if !isStillness || tickCount%4 == 0 {
+					bassNote := e.walkBassLine(tickCount)
+					vol := 0.72
+					if isStillness {
+						vol = 0.45
+					}
+					e.playBassNoteWithVol(bassNote, vol)
+				}
 			}
 
 			// 3. Jazz Drums Sequence (Swung Ride, Soft feathering Kick, Soft Snare rimshot & ghost notes)
@@ -363,6 +378,17 @@ func (e *JazzLoungeEngine) run() {
 				// Play only soft ride cymbal (hat) on beat 1 and 3 during lowpass DJ sweep transitions
 				if (step == 0 || step == 4) && !e.hatOff {
 					e.playDrumWithVol("hat", 0.7*e.drumsVolLevel)
+				}
+			} else if e.narrative.ActiveChapter == "StillnessAtmosphere" {
+				// Ethereal stillness: drummer only plays soft brush sweeps (hat) on beat 1 (tickCount % 8 == 0)
+				if tickCount%8 == 0 && !e.hatOff {
+					e.playDrumWithVol("hat", 0.35*e.drumsVolLevel)
+				}
+			} else if e.narrative.ActiveChapter == "BassSoliloquy" {
+				// Bass spotlight: drummer only plays soft brush sweeps (hat) on beats 2 and 4 (tickCount % 4 == 2)
+				step := tickCount % 8
+				if (step == 2 || step == 6) && !e.hatOff {
+					e.playDrumWithVol("hat", 0.40*e.drumsVolLevel)
 				}
 			} else {
 				// Drummer initiative: occasionally drive tension early
@@ -741,7 +767,10 @@ func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
 	// Keep bass note in a reasonable range (dynamically scaled)
 	lowLimit := 31
 	highLimit := 57
-	if e.narrative.Register.Width < 0.4 {
+	if e.narrative.ActiveChapter == "BassSoliloquy" {
+		lowLimit = 41
+		highLimit = 67 // Tenor register for bass melodic spotlight
+	} else if e.narrative.Register.Width < 0.4 {
 		lowLimit = 36
 		highLimit = 48
 	} else if e.narrative.Register.Width > 0.8 {
@@ -759,8 +788,14 @@ func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
 		return note
 	}
 
+	// Dynamic melodic step movement during BassSoliloquy
+	if e.narrative.ActiveChapter == "BassSoliloquy" && e.lastBassNote > 0 && rand.Float64() < 0.50 {
+		step := []int{-2, -1, 1, 2, 3}[rand.Intn(5)]
+		return clampNote(e.lastBassNote + step)
+	}
+
 	// 1. Pedal Point during Transitions or very quiet moments
-	isPedalPoint := e.isTransitioning
+	isPedalPoint := e.isTransitioning || e.narrative.ActiveChapter == "StillnessAtmosphere"
 	if !isPedalPoint && !e.soloistPhraseActive && rand.Float64() < 0.25 {
 		isPedalPoint = true
 	}
@@ -904,6 +939,18 @@ func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
 }
 
 func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
+	// Chapter Ticks Management
+	e.narrative.ChapterTicksLeft--
+	if e.narrative.ChapterTicksLeft <= 0 {
+		chapters := []string{"IntimateNocturne", "SoloSpotlight", "PianoInterlude", "BassSoliloquy", "StillnessAtmosphere", "NocturnalSuspense"}
+		next := e.narrative.ActiveChapter
+		for next == e.narrative.ActiveChapter {
+			next = chapters[rand.Intn(len(chapters))]
+		}
+		e.narrative.ActiveChapter = next
+		e.narrative.ChapterTicksLeft = 200 + rand.Intn(200) // 200 to 400 ticks per chapter
+	}
+
 	// 1. Update Meta Memory Statistics
 	if e.isTransitioning {
 		e.narrative.History.SilenceTicks++
@@ -1053,6 +1100,43 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 
 		e.narrative.ActiveLeader = chosen
 		e.narrative.LeaderTicksLeft = 80 + rand.Intn(80)
+	}
+
+	// Chapter Overrides of Leader, Register, and Emotional Forces
+	switch e.narrative.ActiveChapter {
+	case "IntimateNocturne":
+		e.narrative.ActiveLeader = "piano"
+		e.narrative.Register.Center = 0.30
+		e.narrative.Register.Width = 0.25
+		forces.Intimacy = 0.85
+		forces.Tension = 0.15
+		forces.Momentum = 0.10
+	case "StillnessAtmosphere":
+		e.narrative.ActiveLeader = "none"
+		e.narrative.Register.Center = 0.45
+		e.narrative.Register.Width = 0.18
+		forces.Intimacy = 0.95
+		forces.Tension = 0.05
+		forces.Momentum = 0.05
+	case "BassSoliloquy":
+		e.narrative.ActiveLeader = "bass"
+		e.narrative.Register.Center = 0.38
+		e.narrative.Register.Width = 0.30
+		forces.Intimacy = 0.75
+		forces.Tension = 0.20
+		forces.Momentum = 0.30
+	case "PianoInterlude":
+		e.narrative.ActiveLeader = "piano"
+		e.narrative.Register.Center = 0.65
+		e.narrative.Register.Width = 0.70
+		forces.Intimacy = 0.50
+	case "NocturnalSuspense":
+		e.narrative.ActiveLeader = "none"
+		e.narrative.Register.Center = 0.68
+		e.narrative.Register.Width = 0.35
+		forces.Tension = 0.75
+		forces.Intimacy = 0.30
+		forces.Mystery = 0.85
 	}
 
 	// 6. Obsessions & Fixations

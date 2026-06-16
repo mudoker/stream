@@ -154,9 +154,13 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 							t.CommuteBuffer = m.PendingEditTask.CommuteBuffer
 							t.UpdatedAt = time.Now()
 
-							if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event || t.SchedulingType == model.Habit {
-								t.TimeWindow.Start = t.TimeWindow.Start.Add(timeShift)
-								t.TimeWindow.End = t.TimeWindow.Start.Add(durationShift)
+							if t.UUID == m.ConfirmTask.UUID {
+								t.TimeWindow = m.PendingEditTask.TimeWindow
+							} else {
+								if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event || t.SchedulingType == model.Habit {
+									t.TimeWindow.Start = t.TimeWindow.Start.Add(timeShift)
+									t.TimeWindow.End = t.TimeWindow.Start.Add(durationShift)
+								}
 							}
 
 							m.DB.UpdateTask(t)

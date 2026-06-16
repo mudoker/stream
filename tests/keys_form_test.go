@@ -774,16 +774,17 @@ func TestPartialTaskAnchoring(t *testing.T) {
 
 	m := viewmodel.NewModel(database, syncEngine)
 
-	// Create a floating task with 3 Story Points (135 mins)
+	// Create a floating task with an explicit estimated duration of 135 mins
 	task := model.Task{
-		UUID:           "gym-session-123",
-		WorkspaceUUID:  m.ActiveWorkspaceUUID,
-		Title:          "Gym session",
-		SchedulingType: model.Floating,
-		StoryPoints:    3,
-		LifecycleState: model.StateReady,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
+		UUID:                  "gym-session-123",
+		WorkspaceUUID:         m.ActiveWorkspaceUUID,
+		Title:                 "Gym session",
+		SchedulingType:        model.Floating,
+		StoryPoints:           3, // complexity = 3, unrelated to duration
+		EstimatedDurationMins: 135,
+		LifecycleState:        model.StateReady,
+		CreatedAt:             time.Now(),
+		UpdatedAt:             time.Now(),
 	}
 	database.AddTask(task)
 	m.RefreshTasks()
@@ -799,7 +800,7 @@ func TestPartialTaskAnchoring(t *testing.T) {
 		t.Fatalf("expected anchor prompt to be open")
 	}
 
-	// Change time to 09:00 and duration to 45 mins (1 SP)
+	// Schedule only 45 mins of the 135-min task
 	m.AnchorTimeInput.SetValue("09:00")
 	m.AnchorDurationInput.SetValue("45")
 
@@ -821,27 +822,24 @@ func TestPartialTaskAnchoring(t *testing.T) {
 		}
 	}
 
-	// Verify original task is anchored with 1 SP (45 mins)
+	// Verify original task is anchored with correct time window
 	if originalTask.SchedulingType != model.Anchored {
 		t.Errorf("expected original task to be anchored, got %s", originalTask.SchedulingType)
-	}
-	if originalTask.StoryPoints != 1 {
-		t.Errorf("expected original task to have 1 SP, got %d", originalTask.StoryPoints)
 	}
 	expectedEnd := originalTask.TimeWindow.Start.Add(45 * time.Minute)
 	if !originalTask.TimeWindow.End.Equal(expectedEnd) {
 		t.Errorf("expected end time %s, got %s", expectedEnd, originalTask.TimeWindow.End)
 	}
 
-	// Verify remaining task is floating with 2 SP (90 mins)
+	// Verify remaining task is floating with 90 mins duration
 	if !foundRemaining {
 		t.Fatalf("expected remaining task to be created")
 	}
 	if remainingTask.SchedulingType != model.Floating {
 		t.Errorf("expected remaining task to be floating, got %s", remainingTask.SchedulingType)
 	}
-	if remainingTask.StoryPoints != 2 {
-		t.Errorf("expected remaining task to have 2 SP, got %d", remainingTask.StoryPoints)
+	if remainingTask.EstimatedDurationMins != 90 {
+		t.Errorf("expected remaining task EstimatedDurationMins=90, got %d", remainingTask.EstimatedDurationMins)
 	}
 }
 

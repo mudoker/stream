@@ -72,7 +72,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 				m.AnchorTimeInput.Focus()
 
 				m.AnchorDurationInput = textinput.New()
-				defaultDur := task.StoryPoints * 45
+				defaultDur := task.EstimatedDurationMins
 				if defaultDur <= 0 {
 					defaultDur = 60
 				}

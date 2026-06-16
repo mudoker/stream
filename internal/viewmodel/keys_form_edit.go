@@ -71,7 +71,11 @@ func (m *Model) startEditMode(task model.Task) {
 	} else {
 		m.Form.TaskTypeIdx = 1
 		m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
-		m.Form.DurationInput.SetValue("60")
+		if task.EstimatedDurationMins > 0 {
+			m.Form.DurationInput.SetValue(fmt.Sprintf("%d", task.EstimatedDurationMins))
+		} else {
+			m.Form.DurationInput.SetValue("60")
+		}
 	}
 
 	m.Form.TagsInput.SetValue(strings.Join(task.Tags, ", "))

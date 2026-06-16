@@ -85,7 +85,8 @@ type Task struct {
 	Tags             []string         `json:"tags,omitempty"`
 	Notes            string           `json:"notes,omitempty"`
 	CompletedDates   []string         `json:"completed_dates,omitempty"`
-	RecurringParentUUID string        `json:"recurring_parent_uuid,omitempty"`
+	RecurringParentUUID   string           `json:"recurring_parent_uuid,omitempty"`
+	EstimatedDurationMins int              `json:"estimated_duration_mins,omitempty"` // explicit duration for floating tasks
 }
 
 // SortingWeight computes the priority execution weight: (Priority Value * 1000) + Story Points

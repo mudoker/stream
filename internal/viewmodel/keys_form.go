@@ -123,7 +123,7 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.DueDateInput, cmd = m.Form.DueDateInput.Update(msg)
 		}
 	case 6:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 1 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
 			m.Form.DurationInput, cmd = m.Form.DurationInput.Update(msg)
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
@@ -173,7 +173,7 @@ func (m *Model) focusFormFields() {
 			m.Form.DueDateInput.Focus()
 		}
 	case 6:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 1 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
 			m.Form.DurationInput.Focus()
 		} else if m.Form.TaskTypeIdx == 2 {
 			m.Form.StartTimeInput.Focus()
@@ -366,6 +366,10 @@ func (m *Model) SubmitForm() {
 		}
 	} else {
 		newTask.SchedulingType = model.Floating
+		durStr := m.Form.DurationInput.Value()
+		if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+			newTask.EstimatedDurationMins = d
+		}
 		if isEdit && existingTask.LifecycleState == model.StateCompleted {
 			newTask.LifecycleState = model.StateCompleted
 		} else {

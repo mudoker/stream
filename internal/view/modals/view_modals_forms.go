@@ -115,6 +115,8 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 3 {
 		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
+	} else if f.TaskTypeIdx == 1 {
+		fields = append(fields, renderField(nextFieldNum(), "Est. Duration (min)", f.DurationInput.View(), 6))
 	} else if f.TaskTypeIdx == 2 {
 		fields = append(fields, renderField(nextFieldNum(), "Due Date", f.DueDateInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), 6))

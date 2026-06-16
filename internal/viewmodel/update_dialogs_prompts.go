@@ -2,7 +2,6 @@ package viewmodel
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"time"
 
@@ -40,18 +39,16 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			t := m.AnchorPromptTask
 
 			// Partial task anchoring logic
-			if t.SchedulingType == model.Floating && t.StoryPoints > 0 {
-				originalMins := t.StoryPoints * 45
+			if t.SchedulingType == model.Floating && t.EstimatedDurationMins > 0 {
+				originalMins := t.EstimatedDurationMins
 				if durationMins < originalMins {
 					remainingMins := originalMins - durationMins
-					anchoredSP := roundToNearestSP(durationMins)
-					remainingSP := roundToNearestSP(remainingMins)
 
 					// Spawn remaining task
 					remainingTask := t
 					remainingTask.UUID = uuid.New().String()
 					remainingTask.Title = t.Title + " (remaining)"
-					remainingTask.StoryPoints = remainingSP
+					remainingTask.EstimatedDurationMins = remainingMins
 					remainingTask.CreatedAt = time.Now()
 					remainingTask.UpdatedAt = time.Now()
 
@@ -60,9 +57,6 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					} else {
 						m.Tasks = append(m.Tasks, remainingTask)
 					}
-
-					// Adjust original task StoryPoints
-					t.StoryPoints = anchoredSP
 				}
 			}
 
@@ -201,24 +195,4 @@ func (m *Model) cancelPromptTask() {
 		}
 	}
 	m.PromptOpen = false
-}
-
-func roundToNearestSP(minutes int) int {
-	spOptions := []int{0, 1, 2, 3, 5, 8, 13}
-	targetSP := float64(minutes) / 45.0
-
-	bestSP := 0
-	minDiff := 999.0
-	for _, sp := range spOptions {
-		diff := math.Abs(float64(sp) - targetSP)
-		if diff < minDiff {
-			minDiff = diff
-			bestSP = sp
-		}
-	}
-	// If remaining minutes are non-trivial, ensure at least 1 SP
-	if minutes >= 15 && bestSP == 0 {
-		bestSP = 1
-	}
-	return bestSP
 }

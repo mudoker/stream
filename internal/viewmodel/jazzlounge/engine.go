@@ -68,6 +68,9 @@ type JazzLoungeEngine struct {
 	chordTickCount         int
 	macroEnergy            float64
 	sharedMotifNotes       []int
+	narrative              JazzNarrative
+	personalities          MusicianPersonalities
+	motifInventory         []ThematicMotif
 }
 
 var (
@@ -142,6 +145,14 @@ func (e *JazzLoungeEngine) init() {
 	// Default Slow Jazz Settings
 	e.bpm = 65.0
 	e.macroEnergy = 0.5
+	e.personalities = InitDefaultPersonalities()
+	e.narrative = JazzNarrative{
+		NarrativeState:  "exposition",
+		RegisterRange:   0.5,
+		ActiveLeader:    "trumpet",
+		LeaderTicksLeft: 32,
+	}
+	e.motifInventory = []ThematicMotif{}
 	e.masterVolLevel = 0.8
 	e.pianoVolLevel = 0.5
 	e.synthVolLevel = 0.6
@@ -235,19 +246,11 @@ func (e *JazzLoungeEngine) run() {
 
 				if e.isTransitioning {
 					e.activeCompingPattern = []int{0}
-				} else if e.soloistPhraseActive {
-					// Sparse comping when soloist is active to give them room to speak
-					if chord.Duration >= 32 {
-						sparsePatterns := [][]int{{0}, {0, 16}, {0, 8}}
-						e.activeCompingPattern = sparsePatterns[rand.Intn(len(sparsePatterns))]
-					} else if chord.Duration == 16 {
-						sparsePatterns := [][]int{{0}, {0, 8}}
-						e.activeCompingPattern = sparsePatterns[rand.Intn(len(sparsePatterns))]
-					} else {
-						e.activeCompingPattern = []int{0}
-					}
-				} else {
-					// Active comping fills when soloist is breathing/pausing
+				} else if e.narrative.ActiveLeader == "none" {
+					// Extremely sparse comping when no one leads (restraint)
+					e.activeCompingPattern = []int{0}
+				} else if e.narrative.ActiveLeader == "piano" {
+					// Pianist is leading: active comping storytelling
 					if chord.Duration >= 32 {
 						activePatterns := [][]int{
 							{0, 6, 14, 22},
@@ -262,6 +265,17 @@ func (e *JazzLoungeEngine) run() {
 					} else if chord.Duration == 8 {
 						activePatterns := [][]int{{0, 4}, {2, 6}}
 						e.activeCompingPattern = activePatterns[rand.Intn(len(activePatterns))]
+					} else {
+						e.activeCompingPattern = []int{0}
+					}
+				} else {
+					// A soloist is leading: play supporting sparse comping
+					if chord.Duration >= 32 {
+						sparsePatterns := [][]int{{0}, {0, 16}, {0, 8}}
+						e.activeCompingPattern = sparsePatterns[rand.Intn(len(sparsePatterns))]
+					} else if chord.Duration == 16 {
+						sparsePatterns := [][]int{{0}, {0, 8}}
+						e.activeCompingPattern = sparsePatterns[rand.Intn(len(sparsePatterns))]
 					} else {
 						e.activeCompingPattern = []int{0}
 					}
@@ -283,8 +297,8 @@ func (e *JazzLoungeEngine) run() {
 				}
 			}
 
-			// Run the active soloist if we are not transitioning
-			if !e.isTransitioning {
+			// Run the active soloist if we are not transitioning and a soloist is the leader
+			if !e.isTransitioning && (e.narrative.ActiveLeader == "sax" || e.narrative.ActiveLeader == "trumpet") {
 				e.processSoloist(e.soloists[e.activeSoloistIdx], tickCount)
 			}
 
@@ -302,6 +316,14 @@ func (e *JazzLoungeEngine) run() {
 					e.playDrumWithVol("hat", 0.3*e.drumsVolLevel)
 				}
 			} else {
+				// Drummer initiative: occasionally drive tension early
+				if e.narrative.NarrativeState == "development" && tickCount%16 == 0 && rand.Float64() < 0.20 {
+					e.narrative.AccumulatedTension += 2.0
+					if !e.snareOff {
+						e.playDrumWithVol("snare", 0.45*e.drumsVolLevel)
+					}
+				}
+
 				// Get soloist energy
 				energy := 0.0
 				hasActiveSoloist := e.soloistPhraseActive
@@ -392,7 +414,7 @@ func (e *JazzLoungeEngine) run() {
 			tickCount++
 			e.chordTickCount++
 			e.chordDurationRemaining--
-			e.macroEnergy = 0.5 + 0.3*math.Sin(float64(tickCount)/400.0)
+			e.updateNarrative(tickCount)
 			bpm := e.bpm
 			e.mu.Unlock()
 
@@ -526,19 +548,29 @@ func (e *JazzLoungeEngine) autoDJTransition() {
 func (e *JazzLoungeEngine) GenerateVoiceLedVoicing(chord JazzChord, keyPitch int, size int) []int {
 	rootMIDI := 48 + keyPitch + chord.RootOffset
 	var candidates []int
+	lowBound := 52
+	highBound := 76
+	if e.narrative.RegisterRange < 0.4 {
+		lowBound = 56
+		highBound = 72
+	} else if e.narrative.RegisterRange > 0.8 {
+		lowBound = 48
+		highBound = 80
+	}
+
 	for _, interval := range chord.Intervals {
 		note := rootMIDI + interval
-		for note < 52 {
+		for note < lowBound {
 			note += 12
 		}
-		for note > 76 {
+		for note > highBound {
 			note -= 12
 		}
 		candidates = append(candidates, note)
-		if note-12 >= 52 {
+		if note-12 >= lowBound {
 			candidates = append(candidates, note-12)
 		}
-		if note+12 <= 76 {
+		if note+12 <= highBound {
 			candidates = append(candidates, note+12)
 		}
 	}
@@ -612,8 +644,34 @@ func (e *JazzLoungeEngine) GenerateVoiceLedVoicing(chord JazzChord, keyPitch int
 func (e *JazzLoungeEngine) playChordHit(isDownbeat bool) {
 	chord := e.progression[e.progress]
 	keyPitch := keyToPitch(e.key)
-	voicing := e.GenerateVoiceLedVoicing(chord, keyPitch, 4)
 
+	// 15% chance to play a thematic motif echo instead of a block chord on offbeats
+	if !isDownbeat && len(e.motifInventory) > 0 && rand.Float64() < 0.15 {
+		// Find highest importance motif
+		bestIdx := 0
+		bestImportance := -999.0
+		for idx, m := range e.motifInventory {
+			if m.Importance > bestImportance {
+				bestImportance = m.Importance
+				bestIdx = idx
+			}
+		}
+		motif := e.motifInventory[bestIdx]
+		if len(motif.Notes) > 0 {
+			// Echo the first note of the motif in the piano register
+			note := motif.Notes[0]
+			for note < 52 {
+				note += 12
+			}
+			for note > 76 {
+				note -= 12
+			}
+			e.playPianoNoteWithVol(note, e.pianoVolLevel*0.32)
+			return
+		}
+	}
+
+	voicing := e.GenerateVoiceLedVoicing(chord, keyPitch, 4)
 	vol := e.pianoVolLevel * 0.35 // Slightly lower to sit perfectly in the nocturnal aesthetic
 	if !isDownbeat {
 		vol *= 0.65 // Comping hits are slightly softer
@@ -631,12 +689,22 @@ func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
 	// Default base octave is C2 (36 + kp)
 	bassRoot := 36 + kp + chord.RootOffset
 	
-	// Keep bass note in a reasonable range: MIDI 31 to 57
+	// Keep bass note in a reasonable range (dynamically scaled)
+	lowLimit := 31
+	highLimit := 57
+	if e.narrative.RegisterRange < 0.4 {
+		lowLimit = 36
+		highLimit = 48
+	} else if e.narrative.RegisterRange > 0.8 {
+		lowLimit = 28
+		highLimit = 60
+	}
+
 	clampNote := func(note int) int {
-		for note < 31 {
+		for note < lowLimit {
 			note += 12
 		}
-		for note > 57 {
+		for note > highLimit {
 			note -= 12
 		}
 		return note
@@ -784,6 +852,102 @@ func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
 
 	e.lastBassNote = bestNote
 	return bestNote
+}
+
+func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
+	e.narrative.TicksSinceLastClimax++
+	e.narrative.TicksSinceLastSparse++
+
+	// 1. Accumulate tension based on harmonic state
+	chord := e.progression[e.progress]
+	if chord.Name == "7alt" || chord.Name == "7" {
+		e.narrative.AccumulatedTension += 0.20
+	} else if chord.Name == "maj9" || chord.Name == "maj7" {
+		// Release tension slowly
+		e.narrative.AccumulatedTension -= 0.12
+	}
+
+	// Tension from soloist activity
+	if e.soloistPhraseActive {
+		sol := e.soloists[e.activeSoloistIdx]
+		e.narrative.AccumulatedTension += 0.10 * sol.PhraseEnergy
+	} else {
+		e.narrative.AccumulatedTension -= 0.06
+	}
+
+	if e.narrative.AccumulatedTension < 0 {
+		e.narrative.AccumulatedTension = 0
+	}
+	if e.narrative.AccumulatedTension > 20.0 {
+		e.narrative.AccumulatedTension = 20.0
+	}
+
+	// 2. Narrative State Machine
+	switch e.narrative.NarrativeState {
+	case "exposition":
+		e.macroEnergy = 0.45
+		e.narrative.RegisterRange = 0.5
+		if e.narrative.TicksSinceLastClimax > 100 {
+			e.narrative.NarrativeState = "development"
+		}
+	case "development":
+		// Energy rises with accumulated tension
+		e.macroEnergy = 0.5 + (e.narrative.AccumulatedTension / 20.0) * 0.25
+		e.narrative.RegisterRange = 0.5 + (e.narrative.AccumulatedTension / 20.0) * 0.3
+		if e.narrative.AccumulatedTension > 10.0 && e.narrative.TicksSinceLastClimax > 180 {
+			e.narrative.NarrativeState = "climax"
+		}
+	case "climax":
+		e.macroEnergy = 0.85
+		e.narrative.RegisterRange = 0.95
+		// Climax lasts for a limited duration
+		if e.narrative.TicksSinceLastClimax > 220 || e.narrative.AccumulatedTension < 4.0 {
+			e.narrative.NarrativeState = "resolution"
+		}
+	case "resolution":
+		// Release tension quickly
+		e.narrative.AccumulatedTension *= 0.80
+		e.macroEnergy = 0.35
+		e.narrative.RegisterRange = 0.35
+		if e.narrative.AccumulatedTension < 1.5 {
+			e.narrative.NarrativeState = "stillness"
+			e.narrative.TicksSinceLastSparse = 0
+		}
+	case "stillness":
+		e.macroEnergy = 0.20
+		e.narrative.RegisterRange = 0.25
+		if e.narrative.TicksSinceLastSparse > 100 {
+			e.narrative.NarrativeState = "exposition"
+			e.narrative.TicksSinceLastClimax = 0
+		}
+	}
+
+	// 3. Ensemble Politics: Attention Leadership Migration
+	e.narrative.LeaderTicksLeft--
+	if e.narrative.LeaderTicksLeft <= 0 {
+		// Negotiate new leader
+		leaders := []string{"trumpet", "sax", "piano", "none"}
+		chosen := leaders[rand.Intn(len(leaders))]
+		e.narrative.ActiveLeader = chosen
+		e.narrative.LeaderTicksLeft = 80 + rand.Intn(80) // 80 to 160 ticks
+		
+		// Align active soloist index to leader
+		if chosen == "sax" {
+			e.activeSoloistIdx = 0
+		} else if chosen == "trumpet" {
+			e.activeSoloistIdx = 1
+		}
+	}
+
+	// 4. Decay Motif Inventory Memories
+	for i := len(e.motifInventory) - 1; i >= 0; i-- {
+		e.motifInventory[i].AgeTicks++
+		e.motifInventory[i].Importance -= 0.002
+		if e.motifInventory[i].Importance <= 0 || e.motifInventory[i].AgeTicks > 1200 { // 10 minutes max memory
+			// Remove memory
+			e.motifInventory = append(e.motifInventory[:i], e.motifInventory[i+1:]...)
+		}
+	}
 }
 
 func (e *JazzLoungeEngine) playMelody() {

@@ -761,6 +761,91 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 	}
 }
 
+func TestPartialTaskAnchoring(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+
+	// Create a floating task with 3 Story Points (135 mins)
+	task := model.Task{
+		UUID:           "gym-session-123",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		Title:          "Gym session",
+		SchedulingType: model.Floating,
+		StoryPoints:    3,
+		LifecycleState: model.StateReady,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+	database.AddTask(task)
+	m.RefreshTasks()
+
+	// Select it
+	m.SelectedTaskUUID = "gym-session-123"
+	m.CurrentView = viewmodel.DayView
+	m.TodoShelfFocus = true
+
+	// Press 'a' to open the anchor prompt
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	if !m.AnchorPromptOpen {
+		t.Fatalf("expected anchor prompt to be open")
+	}
+
+	// Change time to 09:00 and duration to 45 mins (1 SP)
+	m.AnchorTimeInput.SetValue("09:00")
+	m.AnchorDurationInput.SetValue("45")
+
+	// Press enter to confirm anchoring and trigger splitting
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Retrieve tasks and check state
+	tasks := database.GetTasks()
+	var originalTask model.Task
+	var remainingTask model.Task
+	var foundRemaining bool
+
+	for _, task := range tasks {
+		if task.UUID == "gym-session-123" {
+			originalTask = task
+		} else if strings.Contains(task.Title, "remaining") {
+			remainingTask = task
+			foundRemaining = true
+		}
+	}
+
+	// Verify original task is anchored with 1 SP (45 mins)
+	if originalTask.SchedulingType != model.Anchored {
+		t.Errorf("expected original task to be anchored, got %s", originalTask.SchedulingType)
+	}
+	if originalTask.StoryPoints != 1 {
+		t.Errorf("expected original task to have 1 SP, got %d", originalTask.StoryPoints)
+	}
+	expectedEnd := originalTask.TimeWindow.Start.Add(45 * time.Minute)
+	if !originalTask.TimeWindow.End.Equal(expectedEnd) {
+		t.Errorf("expected end time %s, got %s", expectedEnd, originalTask.TimeWindow.End)
+	}
+
+	// Verify remaining task is floating with 2 SP (90 mins)
+	if !foundRemaining {
+		t.Fatalf("expected remaining task to be created")
+	}
+	if remainingTask.SchedulingType != model.Floating {
+		t.Errorf("expected remaining task to be floating, got %s", remainingTask.SchedulingType)
+	}
+	if remainingTask.StoryPoints != 2 {
+		t.Errorf("expected remaining task to have 2 SP, got %d", remainingTask.StoryPoints)
+	}
+}
+
+
 
 
 

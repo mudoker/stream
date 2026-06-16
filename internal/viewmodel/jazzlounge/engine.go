@@ -362,14 +362,14 @@ func (e *JazzLoungeEngine) run() {
 				step := tickCount % 8
 				// Play only soft ride cymbal (hat) on beat 1 and 3 during lowpass DJ sweep transitions
 				if (step == 0 || step == 4) && !e.hatOff {
-					e.playDrumWithVol("hat", 0.3*e.drumsVolLevel)
+					e.playDrumWithVol("hat", 0.7*e.drumsVolLevel)
 				}
 			} else {
 				// Drummer initiative: occasionally drive tension early
 				if e.narrative.Forces.Tension > 0.3 && e.narrative.Forces.Tension < 0.7 && tickCount%16 == 0 && rand.Float64() < 0.20 {
 					e.narrative.Forces.Tension += 0.10
 					if !e.snareOff {
-						e.playDrumWithVol("snare", 0.45*e.drumsVolLevel)
+						e.playDrumWithVol("snare", 0.85*e.drumsVolLevel)
 					}
 				}
 
@@ -385,17 +385,17 @@ func (e *JazzLoungeEngine) run() {
 				// Only play roll fills if energy is high at the end of a section
 				if step32 >= 28 && hasActiveSoloist && energy > 0.6 {
 					// Snare roll drum fill on last bar of 4-bar section when energy is high
-					e.playDrumWithVol("snare", (0.15+0.4*energy)*e.drumsVolLevel)
+					e.playDrumWithVol("snare", (0.45+0.4*energy)*e.drumsVolLevel)
 					if step32 == 31 {
 						// Anticipate downbeat with a kick hit
-						e.playDrumWithVol("kick", (0.4+0.3*energy)*e.drumsVolLevel)
+						e.playDrumWithVol("kick", (0.75+0.25*energy)*e.drumsVolLevel)
 					}
 				} else if step32 == 0 && tickCount > 0 && hasActiveSoloist && energy > 0.5 {
 					// Landing crash accent at the start of next section only if active and energetic
-					e.playDrumWithVol("snare", (0.5+0.35*energy)*e.drumsVolLevel)
-					e.playDrumWithVol("kick", (0.6+0.3*energy)*e.drumsVolLevel)
+					e.playDrumWithVol("snare", (0.85+0.15*energy)*e.drumsVolLevel)
+					e.playDrumWithVol("kick", (0.90+0.10*energy)*e.drumsVolLevel)
 					if !e.hatOff {
-						e.playDrumWithVol("hat", (0.6+0.25*energy)*e.drumsVolLevel)
+						e.playDrumWithVol("hat", (0.85+0.15*energy)*e.drumsVolLevel)
 					}
 				} else {
 					// Standard drum patterns based on soloist presence and energy
@@ -406,24 +406,24 @@ func (e *JazzLoungeEngine) run() {
 						// Hat: hi-hat chick pedal on beats 2 and 4 (ticks 2 and 6)
 						if !e.hatOff {
 							if step == 2 || step == 6 {
-								e.playDrumWithVol("hat", 0.3*e.drumsVolLevel)
+								e.playDrumWithVol("hat", 0.7*e.drumsVolLevel)
 							} else if (step == 0 || step == 4) && rand.Float64() < 0.3 {
 								// Very soft tap on 1 and 3
-								e.playDrumWithVol("hat", 0.15*e.drumsVolLevel)
+								e.playDrumWithVol("hat", 0.45*e.drumsVolLevel)
 							}
 						}
 						
 						// Kick: almost completely silent, rare soft feather on downbeat
 						if !e.kickOff {
 							if step == 0 && rand.Float64() < 0.15 {
-								e.playDrumWithVol("kick", 0.2*e.drumsVolLevel)
+								e.playDrumWithVol("kick", 0.6*e.drumsVolLevel)
 							}
 						}
 						
 						// Snare: extremely rare soft rimclick / ghost note
 						if !e.snareOff {
 							if (step == 2 || step == 6) && rand.Float64() < 0.1 {
-								e.playDrumWithVol("snare", 0.25*e.drumsVolLevel)
+								e.playDrumWithVol("snare", 0.65*e.drumsVolLevel)
 							}
 						}
 					} else {
@@ -431,7 +431,7 @@ func (e *JazzLoungeEngine) run() {
 						// Ride swing: 1  .  2  da 3  .  4  da
 						if !e.hatOff {
 							if step == 0 || step == 2 || step == 3 || step == 4 || step == 6 || step == 7 {
-								volFactor := 0.35 + 0.15*energy
+								volFactor := 0.65 + 0.25*energy
 								if step == 0 || step == 3 || step == 4 || step == 7 {
 									volFactor += 0.2 // Accent on downbeats
 								}
@@ -442,18 +442,18 @@ func (e *JazzLoungeEngine) run() {
 						// Kick: feathering kick on beats 1 and 3 (ticks 0 and 4)
 						if !e.kickOff {
 							if (step == 0 || step == 4) && rand.Float64() < (0.3+0.6*energy) {
-								e.playDrumWithVol("kick", (0.2+0.2*energy)*e.drumsVolLevel)
+								e.playDrumWithVol("kick", (0.55+0.25*energy)*e.drumsVolLevel)
 							}
 						}
 
 						// Snare: rimshot on beats 2 and 4, ghost notes on offbeats
 						if !e.snareOff {
 							if (step == 2 || step == 6) && rand.Float64() < (0.2+0.6*energy) {
-								e.playDrumWithVol("snare", (0.3+0.25*energy)*e.drumsVolLevel)
+								e.playDrumWithVol("snare", (0.70+0.20*energy)*e.drumsVolLevel)
 							}
 							// Ghost notes
 							if (step == 1 || step == 3 || step == 5 || step == 7) && rand.Float64() < (0.05+0.2*energy) {
-								e.playDrumWithVol("snare", 0.1*e.drumsVolLevel)
+								e.playDrumWithVol("snare", 0.35*e.drumsVolLevel)
 							}
 						}
 					}
@@ -721,9 +721,9 @@ func (e *JazzLoungeEngine) playChordHit(isDownbeat bool) {
 	}
 
 	voicing := e.GenerateVoiceLedVoicing(chord, keyPitch, 4)
-	vol := e.pianoVolLevel * 0.35 // Slightly lower to sit perfectly in the nocturnal aesthetic
+	vol := e.pianoVolLevel * 0.82
 	if !isDownbeat {
-		vol *= 0.65 // Comping hits are slightly softer
+		vol *= 0.72
 	}
 
 	for _, noteMIDI := range voicing {
@@ -1154,7 +1154,7 @@ func (e *JazzLoungeEngine) playBassNoteWithVol(midiNote int, volume float64) {
 	voice := &BassVoice{
 		SampleRate: e.speakerRate,
 		Frequency:  freq,
-		Amplitude:  e.pianoVolLevel * 0.44, // relative balance
+		Amplitude:  e.pianoVolLevel * 0.95, // relative balance
 		Duration:   duration,
 		Velocity:   volume,
 	}

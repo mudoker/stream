@@ -539,7 +539,7 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 	voice := &SynthVoice{
 		SampleRate: e.speakerRate,
 		Frequency:  freq,
-		Amplitude:  e.synthVolLevel * 0.16,
+		Amplitude:  e.synthVolLevel * 0.55,
 		Velocity:   vel,
 		VoiceType:  s.Type,
 		Duration:   duration,

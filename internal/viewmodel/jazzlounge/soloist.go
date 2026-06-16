@@ -177,13 +177,28 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 			return
 		}
 
-		// Start a new phrase
+		// Start a new phrase with asymmetrical length distributions (restraint/narrative)
 		e.soloistPhraseActive = true
-		s.PhraseTicks = rand.Intn(20) + 10 // 10-30 ticks
+		
+		// Vary phrase length profiles to avoid constant 4-bar/8-bar symmetry
+		lenProfile := rand.Float64()
+		if lenProfile < 0.15 {
+			// A short, conversational exclamation (2-4 notes)
+			s.PhraseTicks = rand.Intn(6) + 6
+			s.PhraseLength = rand.Intn(3) + 2
+		} else if lenProfile < 0.85 {
+			// Standard medium phrase
+			s.PhraseTicks = rand.Intn(16) + 12
+			s.PhraseLength = rand.Intn(6) + 5
+		} else {
+			// An extended, expressive statement (up to 40 ticks, 12-16 notes)
+			s.PhraseTicks = rand.Intn(16) + 24
+			s.PhraseLength = rand.Intn(5) + 12
+		}
+
 		s.Motif = PhraseMotifs[rand.Intn(len(PhraseMotifs))]
 		s.MotifIdx = 0
 		s.NoteCount = 0
-		s.PhraseLength = rand.Intn(8) + 5 // 5-12 notes in the phrase
 		s.PhraseEnergy = 0.0
 
 		// Choose improvisation strategy
@@ -299,11 +314,42 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 			if len(s.MotifNotes) > 0 {
 				nextNote = s.MotifNotes[s.MotifNoteIdx%len(s.MotifNotes)]
 				s.MotifNoteIdx++
-				// Sequence the motif: shift it when we loop
+				// Sequence the motif with dynamic transformations when we loop it
 				if s.MotifNoteIdx%len(s.MotifNotes) == 0 {
-					shift := rand.Intn(5) - 2 // -2 to +2
-					for j := range s.MotifNotes {
-						s.MotifNotes[j] += shift
+					rVal := rand.Float64()
+					if rVal < 0.40 {
+						// 1. Transposition
+						shift := rand.Intn(5) - 2 // -2 to +2
+						for j := range s.MotifNotes {
+							s.MotifNotes[j] += shift
+						}
+					} else if rVal < 0.60 {
+						// 2. Octave Register Shift (shift octave up or down, clamped to range)
+						shift := 12
+						if rand.Float64() < 0.5 {
+							shift = -12
+						}
+						for j := range s.MotifNotes {
+							note := s.MotifNotes[j] + shift
+							if note >= lowBound && note <= highBound {
+								s.MotifNotes[j] = note
+							}
+						}
+					} else if rVal < 0.80 {
+						// 3. Melodic Inversion (mirror intervals around the starting note)
+						startNote := s.MotifNotes[0]
+						for j := 1; j < len(s.MotifNotes); j++ {
+							diff := s.MotifNotes[j] - startNote
+							inverted := startNote - diff
+							if inverted >= lowBound && inverted <= highBound {
+								s.MotifNotes[j] = inverted
+							}
+						}
+					} else {
+						// 4. Fragmentation: truncate the motif slightly to develop it
+						if len(s.MotifNotes) > 2 {
+							s.MotifNotes = s.MotifNotes[:len(s.MotifNotes)-1]
+						}
 					}
 				}
 			} else {
@@ -364,6 +410,14 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 	if len(s.Motif) > 0 {
 		stepTicks = s.Motif[s.MotifIdx%len(s.Motif)]
 		s.MotifIdx++
+		// Rhythmic displacement variation: shift duration subtly
+		if s.ImprovState == 2 && rand.Float64() < 0.25 {
+			displacement := rand.Intn(3) - 1 // -1, 0, or 1
+			stepTicks += displacement
+			if stepTicks < 1 {
+				stepTicks = 1
+			}
+		}
 	} else {
 		stepTicks = 2
 	}

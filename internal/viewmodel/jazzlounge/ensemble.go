@@ -64,6 +64,8 @@ type MetaMemory struct {
 // JazzNarrative combines the emotional system, active mood, politics, and register configs.
 type JazzNarrative struct {
 	Mood                 string // "Introspective", "Romantic", "Weary", "Melancholic", "Nostalgic", "Elegant", "Playful", "Mysterious"
+	ActiveChapter        string // "IntimateNocturne", "SoloSpotlight", "PianoInterlude", "BassSoliloquy", "StillnessAtmosphere", "NocturnalSuspense"
+	ChapterTicksLeft     int
 	ActiveLeader         string // "sax", "trumpet", "piano", "bass", "none"
 	LeaderTicksLeft      int
 	PerceivedTempo       float64 // perceived speed: 0.0 (very slow) to 1.0 (faster/urgent)

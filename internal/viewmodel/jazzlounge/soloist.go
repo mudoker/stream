@@ -121,6 +121,20 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 		return
 	}
 
+	// Chapter-specific Soloist Constraints
+	switch e.narrative.ActiveChapter {
+	case "IntimateNocturne", "PianoInterlude", "BassSoliloquy", "StillnessAtmosphere":
+		// These chapters aggressively silence horn soloists to focus on piano, bass, or atmosphere
+		s.PauseTicks = 8
+		return
+	case "NocturnalSuspense":
+		// Only play extremely sparse, single-note mystery swells occasionally
+		if rand.Float64() < 0.85 {
+			s.PauseTicks = 16
+			return
+		}
+	}
+
 	keyPitch := keyToPitch(e.key)
 	chord := e.progression[e.progress]
 

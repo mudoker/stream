@@ -4,24 +4,75 @@ import (
 	"math/rand"
 )
 
-// ThematicMotif represents a long-term musical memory.
+// ThematicMotif represents a long-term musical memory with character details.
 type ThematicMotif struct {
 	Notes            []int
 	Rhythm           []int
+	Contour          []int   // Direction profile: +1 (up), -1 (down), 0 (same)
+	EmotionalQuality string  // "melancholic", "warm", "tense", "mysterious"
 	Importance       float64
 	SourceInstrument string
 	AgeTicks         int
 }
 
-// JazzNarrative manages emotional velocity, accumulated tension, and register space.
+// EmotionalForces represents interacting narrative values rather than a linear track.
+type EmotionalForces struct {
+	Intimacy     float64
+	Melancholy   float64
+	Tension      float64
+	Confidence   float64
+	Nostalgia    float64
+	Mystery      float64
+	Anticipation float64
+	Warmth       float64
+	Momentum     float64
+}
+
+// HarmonicTaste defines the session's persistent harmonic character.
+type HarmonicTaste struct {
+	Style              string  // "ConsonantClassic", "DarkModal", "AmbiguousChromatic", "BackdoorDominant"
+	NoirChordsBias     float64
+	PedalToneBias      float64
+	ChromaticBias      float64
+	SubstitutionChance float64
+}
+
+// EnsembleObsession defines temporary fixation topics.
+type EnsembleObsession struct {
+	Type           string  // "none", "interval", "rhythmic_gesture", "register_area", "harmonic_color"
+	IntervalVal    int     // e.g. 8 for minor 6th
+	RhythmVal      int     // e.g. 1 for staccato eighths
+	RegisterCenter float64 // MIDI pitch target
+	Strength       float64 // 0.0 to 1.0 (decays over time)
+}
+
+// RegisterArchitecture determines how vertical space expands, contracts, and migrates.
+type RegisterArchitecture struct {
+	Width  float64 // Spread: 0.0 (narrow/intimate) to 1.0 (wide/climax)
+	Center float64 // Height: 0.0 (deep bass) to 1.0 (crystalline high)
+}
+
+// MetaMemory collects execution statistics to generate stylistic adjustments (pressures).
+type MetaMemory struct {
+	SoloistLeadTicks int
+	PianoLeadTicks   int
+	SilenceTicks     int
+	TotalPhrases     int
+	LastRecalledAge  int
+}
+
+// JazzNarrative combines the emotional system, active mood, politics, and register configs.
 type JazzNarrative struct {
-	TicksSinceLastClimax int
-	TicksSinceLastSparse int
-	AccumulatedTension   float64
-	NarrativeState       string  // "exposition", "development", "climax", "resolution", "stillness"
-	RegisterRange        float64 // 0.0 (narrow) to 1.0 (wide)
-	ActiveLeader         string  // "sax", "trumpet", "piano", "bass", "none"
+	Mood                 string // "Introspective", "Romantic", "Weary", "Melancholic", "Nostalgic", "Elegant", "Playful", "Mysterious"
+	ActiveLeader         string // "sax", "trumpet", "piano", "bass", "none"
 	LeaderTicksLeft      int
+	PerceivedTempo       float64 // perceived speed: 0.0 (very slow) to 1.0 (faster/urgent)
+	
+	Forces               EmotionalForces
+	Taste                HarmonicTaste
+	Obsession            EnsembleObsession
+	Register             RegisterArchitecture
+	History              MetaMemory
 }
 
 // MusicianPersonalities holds persistent behavioral preferences for the ensemble.
@@ -72,4 +123,35 @@ func InitDefaultPersonalities() MusicianPersonalities {
 			BrushActivity: 0.3 + rand.Float64()*0.4,
 		},
 	}
+}
+
+// RandomHarmonicTaste selects a dynamic harmonic preference for the session.
+func RandomHarmonicTaste() HarmonicTaste {
+	styles := []string{"ConsonantClassic", "DarkModal", "AmbiguousChromatic", "BackdoorDominant"}
+	style := styles[rand.Intn(len(styles))]
+	
+	taste := HarmonicTaste{Style: style}
+	switch style {
+	case "ConsonantClassic":
+		taste.NoirChordsBias = 0.25
+		taste.PedalToneBias = 0.3
+		taste.ChromaticBias = 0.2
+		taste.SubstitutionChance = 0.15
+	case "DarkModal":
+		taste.NoirChordsBias = 0.85
+		taste.PedalToneBias = 0.65
+		taste.ChromaticBias = 0.4
+		taste.SubstitutionChance = 0.35
+	case "AmbiguousChromatic":
+		taste.NoirChordsBias = 0.5
+		taste.PedalToneBias = 0.2
+		taste.ChromaticBias = 0.9
+		taste.SubstitutionChance = 0.6
+	case "BackdoorDominant":
+		taste.NoirChordsBias = 0.4
+		taste.PedalToneBias = 0.4
+		taste.ChromaticBias = 0.5
+		taste.SubstitutionChance = 0.7
+	}
+	return taste
 }

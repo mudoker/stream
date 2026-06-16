@@ -150,22 +150,30 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 			nextSolIdx := (e.activeSoloistIdx + 1) % len(e.soloists)
 			e.activeSoloistIdx = nextSolIdx
 
-			s.PauseTicks = rand.Intn(12) + 10
+			// Elongated breathing space
+			s.PauseTicks = rand.Intn(16) + 16
+			if e.macroEnergy < 0.4 {
+				s.PauseTicks += rand.Intn(12) + 12
+			}
 			s.Motif = nil
 			s.MotifNotes = nil
 
-			e.soloists[nextSolIdx].PauseTicks = rand.Intn(4) + 3
+			// Next soloist takes a moment to respond
+			e.soloists[nextSolIdx].PauseTicks = rand.Intn(8) + 8
+			if e.macroEnergy < 0.4 {
+				e.soloists[nextSolIdx].PauseTicks += rand.Intn(6) + 6
+			}
 			e.soloists[nextSolIdx].Motif = nil
 			e.soloists[nextSolIdx].MotifNotes = nil
 			return
 		}
 
-		// Decide: play or rest?
-		if rand.Float64() < 0.30 {
-			s.PauseTicks = rand.Intn(8) + 4
+		// Decide: play or rest? (Higher rest probability to project confidence and space)
+		if rand.Float64() < 0.45 {
+			s.PauseTicks = rand.Intn(12) + 12
 			nextSolIdx := (e.activeSoloistIdx + 1) % len(e.soloists)
 			e.activeSoloistIdx = nextSolIdx
-			e.soloists[nextSolIdx].PauseTicks = rand.Intn(3) + 2
+			e.soloists[nextSolIdx].PauseTicks = rand.Intn(6) + 6
 			return
 		}
 
@@ -203,9 +211,35 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 		// Snap starting note to nearest chord tone
 		s.LastMIDINote = findNearestChordTone(s.LastMIDINote, chord, keyPitch, lowBound, highBound)
 
-		// Pre-generate motif if needed
+		// Pre-generate motif if needed (Ensemble Motif Memory)
 		if s.ImprovState == 2 {
-			s.MotifNotes = generateMotifNotes(s.LastMIDINote, chord, keyPitch, s.MelodyDir)
+			if len(e.sharedMotifNotes) > 0 && rand.Float64() < 0.60 {
+				// Recall and vary the shared ensemble motif
+				motifLen := len(e.sharedMotifNotes)
+				s.MotifNotes = make([]int, motifLen)
+				// Transpose the motif to start near the soloist's LastMIDINote
+				transposeShift := s.LastMIDINote - e.sharedMotifNotes[0]
+				for idx, val := range e.sharedMotifNotes {
+					note := val + transposeShift
+					// Apply subtle interval variations (restraint/development)
+					if idx > 0 && rand.Float64() < 0.25 {
+						note += rand.Intn(3) - 1 // Shift up or down a step
+					}
+					// Clamp to instrument bounds
+					if note < lowBound {
+						note = lowBound
+					}
+					if note > highBound {
+						note = highBound
+					}
+					s.MotifNotes[idx] = note
+				}
+			} else {
+				// Generate a new motif and save it to the shared ensemble memory
+				s.MotifNotes = generateMotifNotes(s.LastMIDINote, chord, keyPitch, s.MelodyDir)
+				e.sharedMotifNotes = make([]int, len(s.MotifNotes))
+				copy(e.sharedMotifNotes, s.MotifNotes)
+			}
 			s.MotifNoteIdx = 0
 		}
 
@@ -214,10 +248,13 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 
 	s.PhraseTicks--
 
-	// Swing feel: higher play probability on downbeats
-	playProb := 0.30
+	// Swing feel: higher play probability on downbeats, lower at low macro energy
+	playProb := 0.20
 	if tickCount%2 == 0 {
-		playProb = 0.70
+		playProb = 0.55
+	}
+	if e.macroEnergy < 0.4 {
+		playProb *= 0.7 // scale down to make it more sparse/laid back
 	}
 	if rand.Float64() > playProb {
 		return

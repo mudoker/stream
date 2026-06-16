@@ -241,3 +241,128 @@ func (v *SynthVoice) Stream(samples [][2]float64) (n int, ok bool) {
 func (v *SynthVoice) Err() error {
 	return nil
 }
+
+// BassVoice simulates an acoustic upright double bass using physical modeling with wood body resonance, attack slap noise, and pitch drift.
+type BassVoice struct {
+	SampleRate beep.SampleRate
+	Frequency  float64
+	Amplitude  float64
+	Time       float64
+	Duration   float64
+	Velocity   float64
+
+	// Resonator filter state
+	z1 float64
+	z2 float64
+
+	// Body bandpass filter state
+	bpZ1 float64
+	bpZ2 float64
+
+	initialized bool
+	noiseSeed   float64
+}
+
+func (v *BassVoice) Stream(samples [][2]float64) (n int, ok bool) {
+	fs := float64(v.SampleRate)
+	if fs <= 0 {
+		fs = 44100
+	}
+
+	if !v.initialized {
+		v.noiseSeed = rand.Float64() * 500.0
+		if v.Velocity <= 0 {
+			v.Velocity = 0.75
+		}
+		v.initialized = true
+	}
+
+	for i := range samples {
+		if v.Time >= v.Duration {
+			return i, false
+		}
+
+		// 1. ADSR Envelope: Fast attack, natural decay
+		var env float64
+		attack := 0.015
+		release := 0.25
+		decay := v.Duration - attack - release
+		if decay < 0.1 {
+			decay = 0.1
+		}
+
+		if v.Time < attack {
+			env = v.Time / attack
+		} else if v.Time < attack+decay {
+			t := (v.Time - attack) / decay
+			env = 1.0 - 0.7*t // decays to 30% sustain level
+		} else if v.Time > v.Duration-release {
+			t := (v.Duration - v.Time) / release
+			env = 0.3 * t * t
+		} else {
+			env = 0.3
+		}
+
+		// 2. Pitch Drift (subtle pitch instability)
+		drift := 0.002 * math.Sin(2.0*math.Pi*2.8*v.Time+v.noiseSeed)
+		freq := v.Frequency * (1.0 + drift)
+
+		// 3. Excitation: Pluck Slap (brief burst of high-passed noise at the start)
+		var pluck float64
+		if v.Time < 0.04 {
+			// Noise burst
+			rawNoise := rand.Float64()*2.0 - 1.0
+			pluck = rawNoise * 0.18 * (1.0 - v.Time/0.04)
+		}
+
+		// Harmonics generation (string texture)
+		phase := 2.0 * math.Pi * freq * v.Time
+		fundamental := math.Sin(phase)
+		harm2 := 0.28 * math.Sin(phase*2.0)
+		harm3 := 0.12 * math.Sin(phase*3.0)
+
+		rawString := fundamental + harm2 + harm3 + pluck
+
+		// 4. Wood Body Resonance Bandpass Filter (tuned to 110Hz with Q = 2.0)
+		bpFreq := 110.0
+		bpQ := 2.0
+		omega := 2.0 * math.Pi * bpFreq / fs
+		sn := math.Sin(omega)
+		cs := math.Cos(omega)
+		alpha := sn / (2.0 * bpQ)
+
+		b0 := alpha
+		b1 := 0.0
+		b2 := -alpha
+		a0 := 1.0 + alpha
+		a1 := -2.0 * cs
+		a2 := 1.0 - alpha
+
+		// Normalize coefficients
+		nb0 := b0 / a0
+		nb1 := b1 / a0
+		nb2 := b2 / a0
+		na1 := a1 / a0
+		na2 := a2 / a0
+
+		// Biquad bandpass filter step
+		filteredBody := nb0*rawString + v.bpZ1
+		v.bpZ1 = nb1*rawString - na1*filteredBody + v.bpZ2
+		v.bpZ2 = nb2*rawString - na2*filteredBody
+
+		// Combine clean and resonance-filtered signals for dynamic woodiness
+		output := 0.35*rawString + 0.65*filteredBody
+
+		// 5. Envelope gain scaling
+		gain := env * v.Amplitude * v.Velocity
+		samples[i][0] = output * gain
+		samples[i][1] = output * gain
+
+		v.Time += 1.0 / fs
+	}
+	return len(samples), true
+}
+
+func (v *BassVoice) Err() error {
+	return nil
+}

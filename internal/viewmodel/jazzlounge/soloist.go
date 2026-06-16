@@ -544,5 +544,24 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 		VoiceType:  s.Type,
 		Duration:   duration,
 	}
-	e.mixer.Add(voice)
+
+	// Humanization delay (0 - 10ms)
+	delayMs := rand.Float64() * 10.0
+	delaySamples := int((delayMs / 1000.0) * float64(e.speakerRate))
+
+	// Spatial positioning: Soloists sit center-stage
+	panL := 0.70
+	panR := 0.70
+	if e.narrative.ActiveLeader == s.Type {
+		// Active leader stands forward in the center mix
+		panL = 0.80
+		panR = 0.80
+	}
+
+	// Early reflection (reflection delay = 20ms, gain = 0.30)
+	reflectDelaySamples := int(0.020 * float64(e.speakerRate))
+	reflectGain := 0.30 - 0.10*e.narrative.Forces.Intimacy
+
+	spatial := NewSpatialHumanizedStreamer(voice, delaySamples, panL, panR, reflectDelaySamples, reflectGain)
+	e.mixer.Add(spatial)
 }

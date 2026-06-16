@@ -125,11 +125,22 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 	chord := e.progression[e.progress]
 
 	// Instrument range in MIDI
+	// Instrument range in MIDI (dynamically scaled by RegisterRange)
 	var lowBound, highBound int
 	if s.Type == "sax" {
-		lowBound, highBound = 49, 77 // Db3 to F5 (alto sax range)
+		lowBound, highBound = 49, 77
+		if e.narrative.RegisterRange < 0.4 {
+			lowBound, highBound = 54, 70 // Contracted/Intimate
+		} else if e.narrative.RegisterRange > 0.8 {
+			lowBound, highBound = 44, 82 // Expanded/Tense
+		}
 	} else {
-		lowBound, highBound = 55, 84 // G3 to C6 (trumpet range)
+		lowBound, highBound = 55, 84
+		if e.narrative.RegisterRange < 0.4 {
+			lowBound, highBound = 60, 75 // Contracted/Intimate
+		} else if e.narrative.RegisterRange > 0.8 {
+			lowBound, highBound = 50, 89 // Expanded/Tense
+		}
 	}
 
 	// Chord anticipation: look ahead at next chord 1-2 ticks early
@@ -226,15 +237,30 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 		// Snap starting note to nearest chord tone
 		s.LastMIDINote = findNearestChordTone(s.LastMIDINote, chord, keyPitch, lowBound, highBound)
 
-		// Pre-generate motif if needed (Ensemble Motif Memory)
+		// Pre-generate motif if needed (Long-Term Ensemble Motif Memory)
 		if s.ImprovState == 2 {
-			if len(e.sharedMotifNotes) > 0 && rand.Float64() < 0.60 {
-				// Recall and vary the shared ensemble motif
-				motifLen := len(e.sharedMotifNotes)
+			recalled := false
+			if len(e.motifInventory) > 0 && rand.Float64() < 0.60 {
+				// Recall a motif from the long-term memory inventory
+				bestIdx := 0
+				bestImportance := -999.0
+				for idx, m := range e.motifInventory {
+					if m.Importance > bestImportance {
+						bestImportance = m.Importance
+						bestIdx = idx
+					}
+				}
+				
+				// Fetch and increase importance due to reinforcement
+				m := &e.motifInventory[bestIdx]
+				m.Importance += 0.35
+				recalled = true
+
+				motifLen := len(m.Notes)
 				s.MotifNotes = make([]int, motifLen)
 				// Transpose the motif to start near the soloist's LastMIDINote
-				transposeShift := s.LastMIDINote - e.sharedMotifNotes[0]
-				for idx, val := range e.sharedMotifNotes {
+				transposeShift := s.LastMIDINote - m.Notes[0]
+				for idx, val := range m.Notes {
 					note := val + transposeShift
 					// Apply subtle interval variations (restraint/development)
 					if idx > 0 && rand.Float64() < 0.25 {
@@ -249,11 +275,26 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 					}
 					s.MotifNotes[idx] = note
 				}
-			} else {
-				// Generate a new motif and save it to the shared ensemble memory
+				
+				// Sync to short-term conversational motif
+				e.sharedMotifNotes = make([]int, len(s.MotifNotes))
+				copy(e.sharedMotifNotes, s.MotifNotes)
+			}
+			
+			if !recalled {
+				// Generate a new motif, save to short-term and long-term memory
 				s.MotifNotes = generateMotifNotes(s.LastMIDINote, chord, keyPitch, s.MelodyDir)
 				e.sharedMotifNotes = make([]int, len(s.MotifNotes))
 				copy(e.sharedMotifNotes, s.MotifNotes)
+
+				// Register in long-term motif inventory
+				newTheme := ThematicMotif{
+					Notes:            append([]int{}, s.MotifNotes...),
+					Importance:       1.0,
+					SourceInstrument: s.Type,
+					AgeTicks:         0,
+				}
+				e.motifInventory = append(e.motifInventory, newTheme)
 			}
 			s.MotifNoteIdx = 0
 		}

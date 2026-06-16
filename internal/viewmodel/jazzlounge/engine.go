@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,6 +25,8 @@ type JazzLoungeEngine struct {
 	assetsPath           string
 	speakerRate          beep.SampleRate
 	pianoSamples         map[int]*Sample
+	pianoSamplesV1       map[int]*Sample
+	pianoSamplesV3       map[int]*Sample
 	drumSamples          map[string]*Sample
 	ambientSounds        []AmbientSound
 	tracks               []Track
@@ -82,6 +85,8 @@ func GetJazzLoungeEngine() *JazzLoungeEngine {
 	jazzLoungeEngineOnce.Do(func() {
 		jazzLoungeEngineInstance = &JazzLoungeEngine{
 			pianoSamples:     make(map[int]*Sample),
+			pianoSamplesV1:   make(map[int]*Sample),
+			pianoSamplesV3:   make(map[int]*Sample),
 			drumSamples:      make(map[string]*Sample),
 			stopChan:         make(chan struct{}),
 			key:              "C",
@@ -109,16 +114,34 @@ func (e *JazzLoungeEngine) init() {
 	// Load Piano Samples
 	if !isTestRun() {
 		for note, midi := range SampleMIDIMap {
-			fn := getPianoFilenameShared(note)
-			path := filepath.Join(e.assetsPath, "PianoSamples", fn)
-			buf, format, err := loadSampleShared(path)
-			if err == nil {
-				e.pianoSamples[midi] = &Sample{
-					Name:   note,
-					Buffer: buf,
-					Format: format,
+			name := strings.ReplaceAll(note, "#", "sharp")
+			
+			// Load v1 (Soft)
+			fn1 := name + "v1.mp3"
+			path1 := filepath.Join(e.assetsPath, "PianoSamples", fn1)
+			buf1, format1, err1 := loadSampleShared(path1)
+			if err1 == nil {
+				e.pianoSamplesV1[midi] = &Sample{
+					Name:   note + "v1",
+					Buffer: buf1,
+					Format: format1,
+				}
+				// Populate main map for fallback compatibility
+				e.pianoSamples[midi] = e.pianoSamplesV1[midi]
+			}
+
+			// Load v3 (Loud)
+			fn3 := name + "v3.mp3"
+			path3 := filepath.Join(e.assetsPath, "PianoSamples", fn3)
+			buf3, format3, err3 := loadSampleShared(path3)
+			if err3 == nil {
+				e.pianoSamplesV3[midi] = &Sample{
+					Name:   note + "v3",
+					Buffer: buf3,
+					Format: format3,
 				}
 			}
+
 			time.Sleep(15 * time.Millisecond) // Yield CPU to keep TUI responsive
 		}
 
@@ -331,7 +354,7 @@ func (e *JazzLoungeEngine) run() {
 			// 2b. Walking Bass Line (plays on every other tick for quarter-note pulse)
 			if tickCount%2 == 0 {
 				bassNote := e.walkBassLine(tickCount)
-				e.playPianoNoteWithVol(bassNote, e.pianoVolLevel*0.38)
+				e.playBassNoteWithVol(bassNote, 0.72)
 			}
 
 			// 3. Jazz Drums Sequence (Swung Ride, Soft feathering Kick, Soft Snare rimshot & ghost notes)
@@ -1087,7 +1110,7 @@ func (e *JazzLoungeEngine) playNote(midiNote int) {
 }
 
 func (e *JazzLoungeEngine) playPianoNoteWithVol(midiNote int, volume float64) {
-	sample, dist := e.FindClosestSample(midiNote)
+	sample, dist := e.FindClosestSample(midiNote, volume)
 	if sample == nil {
 		return
 	}
@@ -1101,7 +1124,55 @@ func (e *JazzLoungeEngine) playPianoNoteWithVol(midiNote int, volume float64) {
 		Base:     2,
 		Volume:   linearToVolumeExponent(volume),
 	}
-	e.mixer.Add(volStreamer)
+
+	// Humanization delay (0 - 10ms)
+	delayMs := 1.0 + rand.Float64()*9.0
+	delaySamples := int((delayMs / 1000.0) * float64(e.speakerRate))
+
+	// Spatial: Piano is placed wide-left (PanL = 0.85, PanR = 0.35)
+	panL := 0.85
+	panR := 0.35
+
+	// Dynamic mix adjustment if pianist is leading
+	if e.narrative.ActiveLeader == "piano" {
+		panL = 0.90
+		panR = 0.45
+	}
+
+	// Early reflection (reflection delay = 22ms, gain = 0.38)
+	reflectDelaySamples := int(0.022 * float64(e.speakerRate))
+	reflectGain := 0.38 - 0.15*e.narrative.Forces.Intimacy // dry-up if highly intimate
+
+	spatial := NewSpatialHumanizedStreamer(volStreamer, delaySamples, panL, panR, reflectDelaySamples, reflectGain)
+	e.mixer.Add(spatial)
+}
+
+func (e *JazzLoungeEngine) playBassNoteWithVol(midiNote int, volume float64) {
+	freq := midiToFreq(midiNote)
+	duration := 1.6 + rand.Float64()*0.8 // long natural decay for double bass
+
+	voice := &BassVoice{
+		SampleRate: e.speakerRate,
+		Frequency:  freq,
+		Amplitude:  e.pianoVolLevel * 0.44, // relative balance
+		Duration:   duration,
+		Velocity:   volume,
+	}
+
+	// Humanization delay (0 - 9ms)
+	delayMs := rand.Float64() * 9.0
+	delaySamples := int((delayMs / 1000.0) * float64(e.speakerRate))
+
+	// Spatial positioning: Bass is center-low, slightly left (PanL = 0.72, PanR = 0.68)
+	panL := 0.72
+	panR := 0.68
+
+	// Early reflection (reflection delay = 15ms, gain = 0.28)
+	reflectDelaySamples := int(0.015 * float64(e.speakerRate))
+	reflectGain := 0.28 - 0.10*e.narrative.Forces.Intimacy
+
+	spatial := NewSpatialHumanizedStreamer(voice, delaySamples, panL, panR, reflectDelaySamples, reflectGain)
+	e.mixer.Add(spatial)
 }
 
 func (e *JazzLoungeEngine) playDrum(name string) {
@@ -1121,15 +1192,50 @@ func (e *JazzLoungeEngine) playDrumWithVol(name string, volume float64) {
 		Base:     2,
 		Volume:   linearToVolumeExponent(volume),
 	}
-	e.mixer.Add(volStreamer)
+
+	// Humanization delay (0 - 8ms)
+	delayMs := rand.Float64() * 8.0
+	delaySamples := int((delayMs / 1000.0) * float64(e.speakerRate))
+
+	// Spatial positioning:
+	// Kick: center (PanL = 0.70, PanR = 0.70)
+	// Snare: slightly left (PanL = 0.65, PanR = 0.55)
+	// Hat/Cymbal: slightly right (PanL = 0.40, PanR = 0.80)
+	panL := 0.70
+	panR := 0.70
+	if name == "snare" {
+		panL = 0.65
+		panR = 0.55
+	} else if name == "hat" {
+		panL = 0.40
+		panR = 0.80
+	}
+
+	// Early reflection (reflection delay = 25ms, gain = 0.32)
+	reflectDelaySamples := int(0.025 * float64(e.speakerRate))
+	reflectGain := 0.32 - 0.12*e.narrative.Forces.Intimacy
+
+	spatial := NewSpatialHumanizedStreamer(volStreamer, delaySamples, panL, panR, reflectDelaySamples, reflectGain)
+	e.mixer.Add(spatial)
 }
 
-func (e *JazzLoungeEngine) FindClosestSample(midiNote int) (*Sample, int) {
+func (e *JazzLoungeEngine) FindClosestSample(midiNote int, volume float64) (*Sample, int) {
 	minDiff := 999
 	var bestSample *Sample
 	bestMIDI := 0
 
-	for midi, sample := range e.pianoSamples {
+	samples := e.pianoSamplesV1
+	if volume >= 0.45 {
+		if len(e.pianoSamplesV3) > 0 {
+			samples = e.pianoSamplesV3
+		}
+	}
+	if len(samples) == 0 {
+		// Fallback to pianoSamples
+		samples = e.pianoSamples
+	}
+
+	for midi, sample := range samples {
 		diff := int(math.Abs(float64(midiNote - midi)))
 		if diff < minDiff {
 			minDiff = diff

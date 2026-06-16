@@ -125,20 +125,20 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 	chord := e.progression[e.progress]
 
 	// Instrument range in MIDI
-	// Instrument range in MIDI (dynamically scaled by RegisterRange)
+	// Instrument range in MIDI (dynamically scaled by Register.Width)
 	var lowBound, highBound int
 	if s.Type == "sax" {
 		lowBound, highBound = 49, 77
-		if e.narrative.RegisterRange < 0.4 {
+		if e.narrative.Register.Width < 0.4 {
 			lowBound, highBound = 54, 70 // Contracted/Intimate
-		} else if e.narrative.RegisterRange > 0.8 {
+		} else if e.narrative.Register.Width > 0.8 {
 			lowBound, highBound = 44, 82 // Expanded/Tense
 		}
 	} else {
 		lowBound, highBound = 55, 84
-		if e.narrative.RegisterRange < 0.4 {
+		if e.narrative.Register.Width < 0.4 {
 			lowBound, highBound = 60, 75 // Contracted/Intimate
-		} else if e.narrative.RegisterRange > 0.8 {
+		} else if e.narrative.Register.Width > 0.8 {
 			lowBound, highBound = 50, 89 // Expanded/Tense
 		}
 	}
@@ -237,7 +237,7 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 		// Snap starting note to nearest chord tone
 		s.LastMIDINote = findNearestChordTone(s.LastMIDINote, chord, keyPitch, lowBound, highBound)
 
-		// Pre-generate motif if needed (Long-Term Ensemble Motif Memory)
+		// Pre-generate motif if needed (Long-Term Ensemble Motif Memory & Character Preservation)
 		if s.ImprovState == 2 {
 			recalled := false
 			if len(e.motifInventory) > 0 && rand.Float64() < 0.60 {
@@ -256,24 +256,37 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 				m.Importance += 0.35
 				recalled = true
 
-				motifLen := len(m.Notes)
-				s.MotifNotes = make([]int, motifLen)
-				// Transpose the motif to start near the soloist's LastMIDINote
-				transposeShift := s.LastMIDINote - m.Notes[0]
-				for idx, val := range m.Notes {
-					note := val + transposeShift
-					// Apply subtle interval variations (restraint/development)
-					if idx > 0 && rand.Float64() < 0.25 {
-						note += rand.Intn(3) - 1 // Shift up or down a step
+				if len(m.Contour) > 0 && rand.Float64() < 0.40 {
+					// Character-driven recall: preserve contour character, regenerate chord tones
+					s.MotifNotes = make([]int, len(m.Contour)+1)
+					s.MotifNotes[0] = s.LastMIDINote
+					for idx, dir := range m.Contour {
+						step := 1
+						if rand.Float64() < 0.3 {
+							step = 2
+						}
+						note := s.MotifNotes[idx] + dir*step
+						note = findNearestChordTone(note, chord, keyPitch, lowBound, highBound)
+						s.MotifNotes[idx+1] = note
 					}
-					// Clamp to instrument bounds
-					if note < lowBound {
-						note = lowBound
+				} else {
+					// Literal transposition recall
+					motifLen := len(m.Notes)
+					s.MotifNotes = make([]int, motifLen)
+					transposeShift := s.LastMIDINote - m.Notes[0]
+					for idx, val := range m.Notes {
+						note := val + transposeShift
+						if idx > 0 && rand.Float64() < 0.25 {
+							note += rand.Intn(3) - 1 // Shift up or down a step
+						}
+						if note < lowBound {
+							note = lowBound
+						}
+						if note > highBound {
+							note = highBound
+						}
+						s.MotifNotes[idx] = note
 					}
-					if note > highBound {
-						note = highBound
-					}
-					s.MotifNotes[idx] = note
 				}
 				
 				// Sync to short-term conversational motif
@@ -287,9 +300,28 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 				e.sharedMotifNotes = make([]int, len(s.MotifNotes))
 				copy(e.sharedMotifNotes, s.MotifNotes)
 
+				// Calculate contour directions
+				contour := make([]int, len(s.MotifNotes)-1)
+				for j := 0; j < len(s.MotifNotes)-1; j++ {
+					diff := s.MotifNotes[j+1] - s.MotifNotes[j]
+					if diff > 0 {
+						contour[j] = 1
+					} else if diff < 0 {
+						contour[j] = -1
+					} else {
+						contour[j] = 0
+					}
+				}
+
+				// Copy rhythm ticks
+				rhythm := append([]int{}, s.Motif...)
+
 				// Register in long-term motif inventory
 				newTheme := ThematicMotif{
 					Notes:            append([]int{}, s.MotifNotes...),
+					Rhythm:           rhythm,
+					Contour:          contour,
+					EmotionalQuality: e.narrative.Mood,
 					Importance:       1.0,
 					SourceInstrument: s.Type,
 					AgeTicks:         0,
@@ -408,10 +440,13 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 			if rand.Float64() < 0.15 {
 				s.MelodyDir = -s.MelodyDir
 			}
-			// Step by 1 or 2 semitones with bias toward scale tones
+			// Step by 1 or 2 semitones with bias toward scale tones (modulated by interval obsession)
 			stepSize := 1
 			if rand.Float64() < 0.4 {
 				stepSize = 2
+			}
+			if e.narrative.Obsession.Strength > 0 && e.narrative.Obsession.Type == "interval" && rand.Float64() < (0.4*e.narrative.Obsession.Strength) {
+				stepSize = e.narrative.Obsession.IntervalVal
 			}
 			nextNote = s.LastMIDINote + s.MelodyDir*stepSize
 
@@ -461,6 +496,13 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 		}
 	} else {
 		stepTicks = 2
+	}
+
+	// Apply rhythmic obsession
+	if e.narrative.Obsession.Strength > 0 && e.narrative.Obsession.Type == "rhythmic_gesture" && rand.Float64() < (0.5 * e.narrative.Obsession.Strength) {
+		if e.narrative.Obsession.RhythmVal > 0 {
+			stepTicks = e.narrative.Obsession.RhythmVal
+		}
 	}
 
 	// Articulation

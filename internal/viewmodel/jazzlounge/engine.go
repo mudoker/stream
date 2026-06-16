@@ -384,6 +384,23 @@ func (e *JazzLoungeEngine) run() {
 				if tickCount%8 == 0 && !e.hatOff {
 					e.playDrumWithVol("hat", 0.35*e.drumsVolLevel)
 				}
+			} else if e.narrative.ActiveChapter == "RomanticRendezvous" {
+				// Romantic Rendezvous: active warm brush sweeps on every beat, conversational snare/kick
+				step := tickCount % 8
+				if !e.hatOff {
+					volFactor := 0.65 + 0.15*rand.Float64()
+					e.playDrumWithVol("hat", volFactor*e.drumsVolLevel)
+				}
+				if !e.kickOff && (step == 0 || step == 4) && rand.Float64() < 0.6 {
+					e.playDrumWithVol("kick", 0.55*e.drumsVolLevel)
+				}
+				if !e.snareOff {
+					if (step == 2 || step == 6) && rand.Float64() < 0.5 {
+						e.playDrumWithVol("snare", 0.70*e.drumsVolLevel)
+					} else if rand.Float64() < 0.25 {
+						e.playDrumWithVol("snare", 0.35*e.drumsVolLevel)
+					}
+				}
 			} else if e.narrative.ActiveChapter == "BassSoliloquy" {
 				// Bass spotlight: drummer only plays soft brush sweeps (hat) on beats 2 and 4 (tickCount % 4 == 2)
 				step := tickCount % 8
@@ -942,11 +959,32 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 	// Chapter Ticks Management
 	e.narrative.ChapterTicksLeft--
 	if e.narrative.ChapterTicksLeft <= 0 {
-		chapters := []string{"IntimateNocturne", "SoloSpotlight", "PianoInterlude", "BassSoliloquy", "StillnessAtmosphere", "NocturnalSuspense"}
-		next := e.narrative.ActiveChapter
-		for next == e.narrative.ActiveChapter {
-			next = chapters[rand.Intn(len(chapters))]
+		var next string
+		r := rand.Float64()
+		if r < 0.40 {
+			next = "RomanticRendezvous"
+		} else if r < 0.65 {
+			next = "SoloSpotlight"
+		} else if r < 0.80 {
+			next = "PianoInterlude"
+		} else if r < 0.90 {
+			next = "IntimateNocturne"
+		} else if r < 0.95 {
+			next = "BassSoliloquy"
+		} else if r < 0.98 {
+			next = "StillnessAtmosphere"
+		} else {
+			next = "NocturnalSuspense"
 		}
+
+		if next == e.narrative.ActiveChapter {
+			if rand.Float64() < 0.5 {
+				next = "RomanticRendezvous"
+			} else {
+				next = "SoloSpotlight"
+			}
+		}
+
 		e.narrative.ActiveChapter = next
 		e.narrative.ChapterTicksLeft = 200 + rand.Intn(200) // 200 to 400 ticks per chapter
 	}
@@ -1137,6 +1175,19 @@ func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
 		forces.Tension = 0.75
 		forces.Intimacy = 0.30
 		forces.Mystery = 0.85
+	case "RomanticRendezvous":
+		// Highlight warm, lyrical soloist melody with conversational piano and continuous brush sweeps
+		if e.narrative.LeaderTicksLeft <= 0 || e.narrative.ActiveLeader == "none" || e.narrative.ActiveLeader == "bass" {
+			leaders := []string{"sax", "trumpet", "piano"}
+			e.narrative.ActiveLeader = leaders[rand.Intn(len(leaders))]
+		}
+		e.narrative.Register.Center = 0.45
+		e.narrative.Register.Width = 0.65
+		forces.Intimacy = 0.80
+		forces.Warmth = 0.90
+		forces.Confidence = 0.75
+		forces.Tension = 0.15
+		forces.Momentum = 0.50
 	}
 
 	// 6. Obsessions & Fixations

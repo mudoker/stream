@@ -129,11 +129,24 @@ func InitDefaultPersonalities() MusicianPersonalities {
 
 // RandomHarmonicTaste selects a dynamic harmonic preference for the session.
 func RandomHarmonicTaste() HarmonicTaste {
-	styles := []string{"ConsonantClassic", "DarkModal", "AmbiguousChromatic", "BackdoorDominant"}
-	style := styles[rand.Intn(len(styles))]
+	var style string
+	r := rand.Float64()
+	if r < 0.45 {
+		style = "VelvetSophistication"
+	} else if r < 0.75 {
+		style = "ConsonantClassic"
+	} else {
+		styles := []string{"DarkModal", "AmbiguousChromatic", "BackdoorDominant"}
+		style = styles[rand.Intn(len(styles))]
+	}
 	
 	taste := HarmonicTaste{Style: style}
 	switch style {
+	case "VelvetSophistication":
+		taste.NoirChordsBias = 0.15
+		taste.PedalToneBias = 0.20
+		taste.ChromaticBias = 0.15
+		taste.SubstitutionChance = 0.30
 	case "ConsonantClassic":
 		taste.NoirChordsBias = 0.25
 		taste.PedalToneBias = 0.3

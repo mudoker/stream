@@ -38,7 +38,7 @@ var CompingPatterns = [][]int{
 
 // Rich Jazz Progressions (Major Standards, Turnarounds, and Ballads)
 func GenerateDynamicProgression() ([]JazzChord, bool) {
-	style := rand.Intn(4)
+	style := rand.Intn(7)
 	var progression []JazzChord
 	var isMinorProg bool = false // Romance/Warmth favors major tonality
 
@@ -84,6 +84,35 @@ func GenerateDynamicProgression() ([]JazzChord, bool) {
 			{RootOffset: 7, Intervals: []int{0, 4, 7, 10, 14, 21}, Name: "13", Duration: 32}, // V
 			{RootOffset: 0, Intervals: []int{0, 4, 7, 9, 14}, Name: "maj6/9", Duration: 32},  // I
 			{RootOffset: 0, Intervals: []int{0, 4, 7, 9, 14}, Name: "maj6/9", Duration: 32},  // I
+		}
+	case 4: // Lush Romantic Line Cliché / Descending minor (8 chords)
+		progression = []JazzChord{
+			{RootOffset: 9, Intervals: []int{0, 3, 7, 11}, Name: "m(maj7)", Duration: 16},   // Am(maj7)
+			{RootOffset: 9, Intervals: []int{0, 3, 7, 10}, Name: "m7", Duration: 16},        // Am7
+			{RootOffset: 9, Intervals: []int{0, 3, 7, 9}, Name: "m6", Duration: 16},         // Am6
+			{RootOffset: 5, Intervals: []int{0, 4, 7, 11}, Name: "maj9", Duration: 32},      // Fmaj9
+			{RootOffset: 7, Intervals: []int{0, 4, 7, 10, 13}, Name: "7b9", Duration: 16},   // G7b9
+			{RootOffset: 0, Intervals: []int{0, 4, 7, 11}, Name: "maj9", Duration: 32},      // Cmaj9
+			{RootOffset: 11, Intervals: []int{0, 3, 6, 10}, Name: "m7b5", Duration: 16},     // Bm7b5
+			{RootOffset: 4, Intervals: []int{0, 4, 6, 10, 13}, Name: "7alt", Duration: 16},  // E7alt
+		}
+		isMinorProg = true
+	case 5: // Warm Romantic Modal Interchange (4 chords)
+		progression = []JazzChord{
+			{RootOffset: 0, Intervals: []int{0, 4, 7, 11, 14}, Name: "maj9", Duration: 32},  // Cmaj9
+			{RootOffset: 3, Intervals: []int{0, 4, 7, 11, 14}, Name: "maj9", Duration: 32},  // Ebmaj9
+			{RootOffset: 8, Intervals: []int{0, 4, 7, 11}, Name: "maj9", Duration: 32},      // Abmaj9
+			{RootOffset: 7, Intervals: []int{0, 4, 6, 10, 13}, Name: "7alt", Duration: 32},  // G7alt
+		}
+	case 6: // Coltrane-style Mediant Standard Bridge (7 chords)
+		progression = []JazzChord{
+			{RootOffset: 0, Intervals: []int{0, 4, 7, 11}, Name: "maj9", Duration: 16},      // Cmaj9
+			{RootOffset: 8, Intervals: []int{0, 4, 7, 10}, Name: "7", Duration: 16},         // Ab7
+			{RootOffset: 1, Intervals: []int{0, 4, 7, 11}, Name: "maj9", Duration: 16},      // Dbmaj9
+			{RootOffset: 9, Intervals: []int{0, 4, 7, 10}, Name: "7", Duration: 16},         // A7
+			{RootOffset: 2, Intervals: []int{0, 3, 7, 10}, Name: "m9", Duration: 16},        // Dm9
+			{RootOffset: 7, Intervals: []int{0, 4, 7, 10, 13}, Name: "7b9", Duration: 16},   // G7b9
+			{RootOffset: 0, Intervals: []int{0, 4, 7, 11}, Name: "maj9", Duration: 32},      // Cmaj9
 		}
 	}
 	return progression, isMinorProg

@@ -3,6 +3,7 @@ package jazzlounge
 import (
 	"math"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -27,6 +28,9 @@ type JazzLoungeEngine struct {
 	pianoSamples         map[int]*Sample
 	pianoSamplesV1       map[int]*Sample
 	pianoSamplesV3       map[int]*Sample
+	saxSamples           map[int]*Sample
+	trumpetSamples       map[int]*Sample
+	bassSamples          map[int]*Sample
 	drumSamples          map[string]*Sample
 	ambientSounds        []AmbientSound
 	tracks               []Track
@@ -70,6 +74,7 @@ type JazzLoungeEngine struct {
 	chordDurationRemaining int
 	chordTickCount         int
 	macroEnergy            float64
+	dynamicEnergyWave      float64
 	sharedMotifNotes       []int
 	narrative              JazzNarrative
 	personalities          MusicianPersonalities
@@ -87,6 +92,9 @@ func GetJazzLoungeEngine() *JazzLoungeEngine {
 			pianoSamples:     make(map[int]*Sample),
 			pianoSamplesV1:   make(map[int]*Sample),
 			pianoSamplesV3:   make(map[int]*Sample),
+			saxSamples:       make(map[int]*Sample),
+			trumpetSamples:   make(map[int]*Sample),
+			bassSamples:      make(map[int]*Sample),
 			drumSamples:      make(map[string]*Sample),
 			stopChan:         make(chan struct{}),
 			key:              "C",
@@ -162,6 +170,78 @@ func (e *JazzLoungeEngine) init() {
 				}
 			}
 			time.Sleep(15 * time.Millisecond) // Yield CPU to keep TUI responsive
+		}
+
+		// Load Sax Samples
+		saxDir := filepath.Join(e.assetsPath, "SaxSamples")
+		if files, err := os.ReadDir(saxDir); err == nil {
+			for _, file := range files {
+				if file.IsDir() || !strings.HasSuffix(file.Name(), ".mp3") {
+					continue
+				}
+				noteName := strings.TrimSuffix(file.Name(), ".mp3")
+				midi := noteNameToMIDI(noteName)
+				if midi > 0 {
+					path := filepath.Join(saxDir, file.Name())
+					buf, format, err := loadSampleShared(path)
+					if err == nil {
+						e.saxSamples[midi] = &Sample{
+							Name:   noteName,
+							Buffer: buf,
+							Format: format,
+						}
+					}
+				}
+				time.Sleep(5 * time.Millisecond) // Yield CPU to keep TUI responsive
+			}
+		}
+
+		// Load Trumpet Samples
+		trumpetDir := filepath.Join(e.assetsPath, "TrumpetSamples")
+		if files, err := os.ReadDir(trumpetDir); err == nil {
+			for _, file := range files {
+				if file.IsDir() || !strings.HasSuffix(file.Name(), ".mp3") {
+					continue
+				}
+				noteName := strings.TrimSuffix(file.Name(), ".mp3")
+				midi := noteNameToMIDI(noteName)
+				if midi > 0 {
+					path := filepath.Join(trumpetDir, file.Name())
+					buf, format, err := loadSampleShared(path)
+					if err == nil {
+						e.trumpetSamples[midi] = &Sample{
+							Name:   noteName,
+							Buffer: buf,
+							Format: format,
+						}
+					}
+				}
+				time.Sleep(5 * time.Millisecond) // Yield CPU to keep TUI responsive
+			}
+		}
+
+		// Load Bass Samples
+		bassDir := filepath.Join(e.assetsPath, "BassSamples")
+		if files, err := os.ReadDir(bassDir); err == nil {
+			for _, file := range files {
+				if file.IsDir() || !strings.HasSuffix(file.Name(), ".mp3") {
+					continue
+				}
+				noteName := strings.TrimSuffix(file.Name(), ".mp3")
+				midi := noteNameToMIDI(noteName)
+				if midi > 0 {
+					path := filepath.Join(bassDir, file.Name())
+					buf, format, err := loadSampleShared(path)
+					if err == nil {
+						e.bassSamples[midi] = &Sample{
+							Name:   noteName,
+							Buffer: buf,
+							Format: format,
+						}
+					}
+				}
+				time.Sleep(5 * time.Millisecond) // Yield CPU to keep TUI responsive
+			}
 		}
 	}
 
@@ -983,6 +1063,11 @@ func (e *JazzLoungeEngine) walkBassLine(tickCount int) int {
 }
 
 func (e *JazzLoungeEngine) updateNarrative(tickCount int) {
+	// Calculate dynamic energy wave (slow sinusoidal LFO)
+	wave := math.Sin(float64(tickCount) / 60.0)
+	e.dynamicEnergyWave = 0.18 * wave
+	e.bpm = 65.0 + 8.0 * wave
+
 	// Chapter Ticks Management
 	e.narrative.ChapterTicksLeft--
 	if e.narrative.ChapterTicksLeft <= 0 {
@@ -1296,7 +1381,7 @@ func (e *JazzLoungeEngine) playPianoNoteWithVol(midiNote int, volume float64) {
 	volStreamer := &effects.Volume{
 		Streamer: resampled,
 		Base:     2,
-		Volume:   linearToVolumeExponent(volume),
+		Volume:   linearToVolumeExponent(volume * (1.0 + e.dynamicEnergyWave)),
 	}
 
 	// Humanization delay (0 - 10ms)
@@ -1322,21 +1407,6 @@ func (e *JazzLoungeEngine) playPianoNoteWithVol(midiNote int, volume float64) {
 }
 
 func (e *JazzLoungeEngine) playBassNoteWithVol(midiNote int, volume float64) {
-	freq := midiToFreq(midiNote)
-	duration := 1.6 + rand.Float64()*0.8 // long natural decay for double bass
-
-	voice := &BassVoice{
-		SampleRate: e.speakerRate,
-		Frequency:  freq,
-		Amplitude:  e.pianoVolLevel * 0.95, // relative balance
-		Duration:   duration,
-		Velocity:   volume,
-	}
-
-	// Humanization delay (0 - 9ms)
-	delayMs := rand.Float64() * 9.0
-	delaySamples := int((delayMs / 1000.0) * float64(e.speakerRate))
-
 	// Spatial positioning: Bass is center-low, slightly left (PanL = 0.72, PanR = 0.68)
 	panL := 0.72
 	panR := 0.68
@@ -1344,6 +1414,107 @@ func (e *JazzLoungeEngine) playBassNoteWithVol(midiNote int, volume float64) {
 	// Early reflection (reflection delay = 15ms, gain = 0.28)
 	reflectDelaySamples := int(0.015 * float64(e.speakerRate))
 	reflectGain := 0.28 - 0.10*e.narrative.Forces.Intimacy
+
+	// Humanization delay (0 - 9ms)
+	delayMs := rand.Float64() * 9.0
+	delaySamples := int((delayMs / 1000.0) * float64(e.speakerRate))
+
+	if len(e.bassSamples) > 0 {
+		sample, dist := e.FindClosestBassSample(midiNote)
+		if sample != nil {
+			ratio := math.Pow(2.0, float64(dist)/12.0)
+			streamer := sample.Buffer.Streamer(0, sample.Buffer.Len())
+			effSourceRate := beep.SampleRate(float64(sample.Format.SampleRate) * ratio)
+			resampled := beep.Resample(3, effSourceRate, e.speakerRate, streamer)
+
+			volStreamer := &effects.Volume{
+				Streamer: resampled,
+				Base:     2,
+				Volume:   linearToVolumeExponent(volume * e.pianoVolLevel * 0.95 * (1.0 + e.dynamicEnergyWave * 0.7)),
+			}
+
+			spatial := NewSpatialHumanizedStreamer(volStreamer, delaySamples, panL, panR, reflectDelaySamples, reflectGain)
+			e.mixer.Add(spatial)
+			return
+		}
+	}
+
+	// Fallback to Synth Bass
+	freq := midiToFreq(midiNote)
+	duration := 1.6 + rand.Float64()*0.8 // long natural decay for double bass
+
+	voice := &BassVoice{
+		SampleRate: e.speakerRate,
+		Frequency:  freq,
+		Amplitude:  e.pianoVolLevel * 0.95 * (1.0 + e.dynamicEnergyWave * 0.7), // relative balance
+		Duration:   duration,
+		Velocity:   volume,
+	}
+
+	spatial := NewSpatialHumanizedStreamer(voice, delaySamples, panL, panR, reflectDelaySamples, reflectGain)
+	e.mixer.Add(spatial)
+}
+
+func (e *JazzLoungeEngine) playSoloistNoteWithVol(soloistType string, midiNote int, volume float64, duration float64) {
+	// Spatial positioning: Soloists sit center-stage
+	panL := 0.70
+	panR := 0.70
+	if e.narrative.ActiveLeader == soloistType {
+		// Active leader stands forward in the center mix
+		panL = 0.80
+		panR = 0.80
+	}
+
+	// Early reflection (reflection delay = 20ms, gain = 0.30)
+	reflectDelaySamples := int(0.020 * float64(e.speakerRate))
+	reflectGain := 0.30 - 0.10*e.narrative.Forces.Intimacy
+
+	// Humanization delay (0 - 10ms)
+	delayMs := rand.Float64() * 10.0
+	delaySamples := int((delayMs / 1000.0) * float64(e.speakerRate))
+
+	var sample *Sample
+	var dist int
+	if soloistType == "sax" && len(e.saxSamples) > 0 {
+		sample, dist = e.FindClosestSaxSample(midiNote)
+	} else if soloistType == "trumpet" && len(e.trumpetSamples) > 0 {
+		sample, dist = e.FindClosestTrumpetSample(midiNote)
+	}
+
+	if sample != nil {
+		ratio := math.Pow(2.0, float64(dist)/12.0)
+		streamer := sample.Buffer.Streamer(0, sample.Buffer.Len())
+		effSourceRate := beep.SampleRate(float64(sample.Format.SampleRate) * ratio)
+		resampled := beep.Resample(3, effSourceRate, e.speakerRate, streamer)
+
+		// Apply envelope for duration and release fade-out
+		releaseSecs := 0.10
+		if soloistType == "trumpet" {
+			releaseSecs = 0.08
+		}
+		envStreamer := NewEnvelopeStreamer(resampled, e.speakerRate, duration, releaseSecs)
+
+		volStreamer := &effects.Volume{
+			Streamer: envStreamer,
+			Base:     2,
+			Volume:   linearToVolumeExponent(volume * e.synthVolLevel * 0.72 * (1.0 + e.dynamicEnergyWave * 1.2)),
+		}
+
+		spatial := NewSpatialHumanizedStreamer(volStreamer, delaySamples, panL, panR, reflectDelaySamples, reflectGain)
+		e.mixer.Add(spatial)
+		return
+	}
+
+	// Fallback to Synth Voice
+	freq := midiToFreq(midiNote)
+	voice := &SynthVoice{
+		SampleRate: e.speakerRate,
+		Frequency:  freq,
+		Amplitude:  e.synthVolLevel * 0.72 * (1.0 + e.dynamicEnergyWave * 1.2),
+		Velocity:   volume,
+		VoiceType:  soloistType,
+		Duration:   duration,
+	}
 
 	spatial := NewSpatialHumanizedStreamer(voice, delaySamples, panL, panR, reflectDelaySamples, reflectGain)
 	e.mixer.Add(spatial)
@@ -1364,7 +1535,7 @@ func (e *JazzLoungeEngine) playDrumWithVol(name string, volume float64) {
 	volStreamer := &effects.Volume{
 		Streamer: resampled,
 		Base:     2,
-		Volume:   linearToVolumeExponent(volume),
+		Volume:   linearToVolumeExponent(volume * (1.0 + e.dynamicEnergyWave * 0.9)),
 	}
 
 	// Humanization delay (0 - 8ms)
@@ -1410,6 +1581,54 @@ func (e *JazzLoungeEngine) FindClosestSample(midiNote int, volume float64) (*Sam
 	}
 
 	for midi, sample := range samples {
+		diff := int(math.Abs(float64(midiNote - midi)))
+		if diff < minDiff {
+			minDiff = diff
+			bestSample = sample
+			bestMIDI = midi
+		}
+	}
+	return bestSample, midiNote - bestMIDI
+}
+
+func (e *JazzLoungeEngine) FindClosestSaxSample(midiNote int) (*Sample, int) {
+	minDiff := 999
+	var bestSample *Sample
+	bestMIDI := 0
+
+	for midi, sample := range e.saxSamples {
+		diff := int(math.Abs(float64(midiNote - midi)))
+		if diff < minDiff {
+			minDiff = diff
+			bestSample = sample
+			bestMIDI = midi
+		}
+	}
+	return bestSample, midiNote - bestMIDI
+}
+
+func (e *JazzLoungeEngine) FindClosestTrumpetSample(midiNote int) (*Sample, int) {
+	minDiff := 999
+	var bestSample *Sample
+	bestMIDI := 0
+
+	for midi, sample := range e.trumpetSamples {
+		diff := int(math.Abs(float64(midiNote - midi)))
+		if diff < minDiff {
+			minDiff = diff
+			bestSample = sample
+			bestMIDI = midi
+		}
+	}
+	return bestSample, midiNote - bestMIDI
+}
+
+func (e *JazzLoungeEngine) FindClosestBassSample(midiNote int) (*Sample, int) {
+	minDiff := 999
+	var bestSample *Sample
+	bestMIDI := 0
+
+	for midi, sample := range e.bassSamples {
 		diff := int(math.Abs(float64(midiNote - midi)))
 		if diff < minDiff {
 			minDiff = diff

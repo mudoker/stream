@@ -194,3 +194,23 @@ func linearToVolumeExponent(v float64) float64 {
 	}
 	return math.Log2(v)
 }
+
+// noteNameToMIDI maps a pitch string like "Cs4" (C#4), "As3" (A#3), or "A2" to its MIDI value.
+func noteNameToMIDI(note string) int {
+	if len(note) < 2 {
+		return 0
+	}
+	octave := int(note[len(note)-1] - '0')
+	pitch := note[:len(note)-1]
+
+	pitchClassMap := map[string]int{
+		"C": 0, "Cs": 1, "D": 2, "Ds": 3, "E": 4, "F": 5,
+		"Fs": 6, "G": 7, "Gs": 8, "A": 9, "As": 10, "B": 11,
+	}
+
+	pc, ok := pitchClassMap[pitch]
+	if !ok {
+		return 0
+	}
+	return (octave + 1) * 12 + pc
+}

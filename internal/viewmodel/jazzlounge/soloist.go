@@ -254,7 +254,7 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 		// Pre-generate motif if needed (Long-Term Ensemble Motif Memory & Character Preservation)
 		if s.ImprovState == 2 {
 			recalled := false
-			if len(e.motifInventory) > 0 && rand.Float64() < 0.60 {
+			if len(e.motifInventory) > 0 && rand.Float64() < 0.20 {
 				// Recall a motif from the long-term memory inventory
 				bestIdx := 0
 				bestImportance := -999.0
@@ -550,33 +550,5 @@ func (e *JazzLoungeEngine) processSoloist(s *Soloist, tickCount int) {
 		vel = 0.98
 	}
 
-	freq := midiToFreq(nextNote)
-	voice := &SynthVoice{
-		SampleRate: e.speakerRate,
-		Frequency:  freq,
-		Amplitude:  e.synthVolLevel * 0.72, // project confidence and personality
-		Velocity:   vel,
-		VoiceType:  s.Type,
-		Duration:   duration,
-	}
-
-	// Humanization delay (0 - 10ms)
-	delayMs := rand.Float64() * 10.0
-	delaySamples := int((delayMs / 1000.0) * float64(e.speakerRate))
-
-	// Spatial positioning: Soloists sit center-stage
-	panL := 0.70
-	panR := 0.70
-	if e.narrative.ActiveLeader == s.Type {
-		// Active leader stands forward in the center mix
-		panL = 0.80
-		panR = 0.80
-	}
-
-	// Early reflection (reflection delay = 20ms, gain = 0.30)
-	reflectDelaySamples := int(0.020 * float64(e.speakerRate))
-	reflectGain := 0.30 - 0.10*e.narrative.Forces.Intimacy
-
-	spatial := NewSpatialHumanizedStreamer(voice, delaySamples, panL, panR, reflectDelaySamples, reflectGain)
-	e.mixer.Add(spatial)
+	e.playSoloistNoteWithVol(s.Type, nextNote, vel, duration)
 }

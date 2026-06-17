@@ -172,3 +172,57 @@ func (s *SpatialHumanizedStreamer) Stream(samples [][2]float64) (n int, ok bool)
 func (s *SpatialHumanizedStreamer) Err() error {
 	return s.Streamer.Err()
 }
+
+// EnvelopeStreamer wraps a beep.Streamer and fades out after a given duration.
+type EnvelopeStreamer struct {
+	Streamer   beep.Streamer
+	SampleRate beep.SampleRate
+	Duration   float64
+	Release    float64
+	time       float64
+}
+
+func NewEnvelopeStreamer(s beep.Streamer, sr beep.SampleRate, duration, release float64) *EnvelopeStreamer {
+	return &EnvelopeStreamer{
+		Streamer:   s,
+		SampleRate: sr,
+		Duration:   duration,
+		Release:    release,
+	}
+}
+
+func (env *EnvelopeStreamer) Stream(samples [][2]float64) (n int, ok bool) {
+	fs := float64(env.SampleRate)
+	n, ok = env.Streamer.Stream(samples)
+	if n == 0 {
+		return 0, ok
+	}
+
+	for i := 0; i < n; i++ {
+		t := env.time
+		var gain float64
+		if t >= env.Duration+env.Release {
+			// Done, terminate early
+			return i, false
+		} else if t > env.Duration {
+			// Release/Fade-out phase
+			rem := (env.Duration + env.Release) - t
+			gain = rem / env.Release
+			if gain < 0 {
+				gain = 0
+			}
+		} else {
+			// Sustain phase
+			gain = 1.0
+		}
+
+		samples[i][0] *= gain
+		samples[i][1] *= gain
+		env.time += 1.0 / fs
+	}
+	return n, ok
+}
+
+func (env *EnvelopeStreamer) Err() error {
+	return env.Streamer.Err()
+}

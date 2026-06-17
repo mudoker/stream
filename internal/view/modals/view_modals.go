@@ -130,8 +130,10 @@ func RenderDetailPanel(m *viewmodel.Model, t theme.Theme, height int) string {
 	info := ComputeTaskMetricsInfo(m, t, task)
 	sb.WriteString(fmt.Sprintf(" • Planned Time:    %v\n", info.PlannedDur))
 	sb.WriteString(fmt.Sprintf(" • Focus Logged:    %v\n", info.FocusDur))
-	sb.WriteString(fmt.Sprintf(" • Rest Logged:     %v\n", info.BreakDur))
-	sb.WriteString(fmt.Sprintf(" • Focus/Rest:      %s\n", info.RatioStr))
+	if task.SchedulingType != model.Event {
+		sb.WriteString(fmt.Sprintf(" • Rest Logged:     %v\n", info.BreakDur))
+		sb.WriteString(fmt.Sprintf(" • Focus/Rest:      %s\n", info.RatioStr))
+	}
 	sb.WriteString(fmt.Sprintf(" • Efficiency:      %s\n", info.EfficiencyStr))
 	sb.WriteString(fmt.Sprintf(" • Interruptions:   %d\n", task.ExecutionMetrics.InterruptionCount))
 	if task.ExecutionMetrics.ElapsedFocusSeconds > 0 {
@@ -201,8 +203,10 @@ func RenderDetailModal(m *viewmodel.Model, t theme.Theme) string {
 	sb.WriteString("  EXECUTION METRICS\n")
 	sb.WriteString(fmt.Sprintf("  • Planned Time:    %v\n", info.PlannedDur))
 	sb.WriteString(fmt.Sprintf("  • Focus Logged:    %v\n", info.FocusDur))
-	sb.WriteString(fmt.Sprintf("  • Rest Logged:     %v\n", info.BreakDur))
-	sb.WriteString(fmt.Sprintf("  • Focus/Rest:      %s\n", info.RatioStr))
+	if task.SchedulingType != model.Event {
+		sb.WriteString(fmt.Sprintf("  • Rest Logged:     %v\n", info.BreakDur))
+		sb.WriteString(fmt.Sprintf("  • Focus/Rest:      %s\n", info.RatioStr))
+	}
 	sb.WriteString(fmt.Sprintf("  • Efficiency:      %s\n", info.EfficiencyStr))
 	sb.WriteString(fmt.Sprintf("  • Pomodoros:       %d / %d\n", task.ExecutionMetrics.TotalCompletedPomodoros, task.ExecutionMetrics.TargetPomodoros))
 	sb.WriteString(fmt.Sprintf("  • Interruptions:   %d\n", task.ExecutionMetrics.InterruptionCount))

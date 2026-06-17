@@ -54,10 +54,12 @@ func RenderPromptModal(m *viewmodel.Model, t theme.Theme) string {
 	}
 
 	// Calculate and render rest time
-	restTime := viewmodel.CalculateTaskRestTime(m.PromptTask)
-	if restTime > 0 {
-		restInfo := fmt.Sprintf("+%d mins Rest", int(restTime.Minutes()))
-		lines = append(lines, fmt.Sprintf("  Rest:      %s", lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Render(restInfo)))
+	if m.PromptTask.SchedulingType != model.Event {
+		restTime := viewmodel.CalculateTaskRestTime(m.PromptTask)
+		if restTime > 0 {
+			restInfo := fmt.Sprintf("+%d mins Rest", int(restTime.Minutes()))
+			lines = append(lines, fmt.Sprintf("  Rest:      %s", lipgloss.NewStyle().Foreground(lipgloss.Color("#a6e3a1")).Render(restInfo)))
+		}
 	}
 
 	lines = append(lines, "")

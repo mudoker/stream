@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"stream/internal/model"
-	"stream/internal/viewmodel"
 	"stream/internal/view/components"
 	"stream/internal/view/theme"
+	"stream/internal/viewmodel"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -229,13 +229,15 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 		// Map structural height accurately across row milestones
 		h := endRow - startRow
-
 		if h < 1 {
 			h = 1
 		}
 
-		if startRow+h > viewmodel.TotalRows {
-			h = viewmodel.TotalRows - startRow
+		// DEFINITIVE ALIGNMENT FIX: Add 1 extra line so the bottom border hits the target hour milestone line exactly
+		renderH := h + 1
+
+		if startRow+renderH > viewmodel.TotalRows {
+			renderH = viewmodel.TotalRows - startRow
 		}
 
 		colIndex := rc.ColIndex
@@ -249,7 +251,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		// Capture exact coordinates of focused task card
 		if isSelected {
 			selectedStartRow = startRow
-			selectedEndRow = startRow + h
+			selectedEndRow = startRow + renderH
 		}
 
 		cardW := cellWidths[colIndex][startRow]
@@ -280,60 +282,72 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			}
 		}
 
-		// Render main task card
-		cardStr := components.RenderTaskCard(m, t, rc.Task, cardW, h, isActive, isSelected)
-		cardLines := strings.Split(cardStr, "\n")
+		// Render main task card with extended row target
+		cardStr := components.RenderTaskCard(m, t, rc.Task, cardW, renderH, isActive, isSelected)
+		cardLines := strings.Split(strings.TrimSuffix(cardStr, "\n"), "\n")
 
-		for i, line := range cardLines {
+		// Strict grid slot bounding loop matching extended render target
+		for i := 0; i < renderH; i++ {
 			r := startRow + i
 			if r >= viewmodel.TotalRows {
 				break
 			}
-			taskRows[colIndex][r] = line
+			if i < len(cardLines) {
+				taskRows[colIndex][r] = cardLines[i]
+			}
 		}
+
+		currentRowOffset := renderH
 
 		// Render Bottom Commute Buffer
 		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
 			commuteDur := time.Duration(rc.Task.CommuteBuffer) * time.Minute
 			commuteRows := durationToRows(commuteDur)
-			bottomEndRow := startRow + h + commuteRows
+			bottomEndRow := startRow + renderH + commuteRows
 			if bottomEndRow > viewmodel.TotalRows {
 				bottomEndRow = viewmodel.TotalRows
 			}
-			bottomH := bottomEndRow - (startRow + h)
+			bottomH := bottomEndRow - (startRow + renderH)
 			if bottomH > 0 {
 				bottomCommuteTime := rc.Task.TimeWindow.End.Add(commuteDur)
 				bottomCommuteStr := RenderBottomCommuteBlock(t, cardW, bottomH, rc.Task.CommuteBuffer, bottomCommuteTime, isSelected)
-				bottomCommuteLines := strings.Split(bottomCommuteStr, "\n")
-				for i, line := range bottomCommuteLines {
-					r := startRow + h + i
+				bottomCommuteLines := strings.Split(strings.TrimSuffix(bottomCommuteStr, "\n"), "\n")
+				for i := 0; i < bottomH; i++ {
+					r := startRow + currentRowOffset + i
 					if r >= viewmodel.TotalRows {
 						break
 					}
-					taskRows[colIndex][r] = line
+					if i < len(bottomCommuteLines) {
+						taskRows[colIndex][r] = bottomCommuteLines[i]
+					}
 				}
+				currentRowOffset += bottomH
 				if isSelected {
-					selectedEndRow = startRow + h + bottomH
+					selectedEndRow = startRow + currentRowOffset
 				}
 			}
 		}
 
+		// Render Rest Buffer
 		isCompleted := rc.Task.LifecycleState == model.StateCompleted
 		restDur := viewmodel.CalculateTaskRestTime(rc.Task)
 		restRows := durationToRows(restDur)
 		if restRows > 0 {
 			restEndTime := rc.Task.TimeWindow.End.Add(restDur)
 			restStr := RenderRestBlock(t, cardW, restRows, int(restDur.Minutes()), restEndTime, isCompleted, isSelected)
-			restLines := strings.Split(restStr, "\n")
-			for i, line := range restLines {
-				r := startRow + h + i
+			restLines := strings.Split(strings.TrimSuffix(restStr, "\n"), "\n")
+			for i := 0; i < restRows; i++ {
+				r := startRow + currentRowOffset + i
 				if r >= viewmodel.TotalRows {
 					break
 				}
-				taskRows[colIndex][r] = line
+				if i < len(restLines) {
+					taskRows[colIndex][r] = restLines[i]
+				}
 			}
+			currentRowOffset += restRows
 			if isSelected {
-				selectedEndRow = startRow + h + restRows
+				selectedEndRow = startRow + currentRowOffset
 			}
 		}
 	}

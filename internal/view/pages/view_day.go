@@ -228,10 +228,22 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start)
 		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End)
 
+		// Check if there is a consecutive task starting at this task's end time
+		hasConsecutive := false
+		for _, other := range cols {
+			if other.Task.UUID != rc.Task.UUID && other.Task.TimeWindow.Start.Equal(rc.Task.TimeWindow.End) {
+				hasConsecutive = true
+				break
+			}
+		}
+		if hasConsecutive {
+			endRow = endRow - 1
+		}
+
 		// Map structural height accurately across row milestones
 		h := endRow - startRow + 1
-		if h < 2 {
-			h = 2
+		if h < 1 {
+			h = 1
 		}
 
 		if startRow+h > viewmodel.TotalRows {

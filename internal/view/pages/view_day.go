@@ -111,20 +111,35 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 	}
 
+	lastOccupiedRowFirst := make([]int, numCols)
+	for c := 0; c < numCols; c++ {
+		lastOccupiedRowFirst[c] = -1
+	}
+
 	for _, rc := range cols {
 		if rc.TotalCol == 1 {
-			startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute)) / scale
-			endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End.Add(-1 * time.Minute)) / scale
+			startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start) / scale
+			endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End) / scale
 
-			// Adjust startRow for commute buffer
+			// Determine visual start row based on commute buffer
+			commuteRows := 0
 			if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
-				commuteRows := durationToRows(time.Duration(rc.Task.CommuteBuffer) * time.Minute)
-				startRow -= commuteRows
+				commuteRows = durationToRows(time.Duration(rc.Task.CommuteBuffer) * time.Minute)
+			}
+
+			topStartRow := startRow - commuteRows
+			if topStartRow < 0 {
+				topStartRow = 0
+			}
+
+			// Prevent visual overlap in the same column by ensuring the task starts after the predecessor's visual block
+			if lastOccupiedRowFirst[0] != -1 && topStartRow < lastOccupiedRowFirst[0]+1 {
+				topStartRow = lastOccupiedRowFirst[0] + 1
+				startRow = topStartRow + commuteRows
 			}
 
 			// Adjust endRow for commute buffer and rest buffer
 			if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
-				commuteRows := durationToRows(time.Duration(rc.Task.CommuteBuffer) * time.Minute)
 				endRow += commuteRows
 			}
 			restDur := viewmodel.CalculateTaskRestTime(rc.Task)
@@ -147,6 +162,13 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 					cellWidths[c][r] = 0
 				}
 			}
+
+			h := endRow - startRow + 1
+			if h < 1 {
+				h = 1
+			}
+			maxRowOccupied := startRow + h - 1
+			lastOccupiedRowFirst[0] = maxRowOccupied
 		}
 	}
 
@@ -235,8 +257,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	// Overlay tasks onto the columns
 	for _, rc := range cols {
-		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute)) / scale
-		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End.Add(-1 * time.Minute)) / scale
+		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start) / scale
+		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End) / scale
 
 		colIndex := rc.ColIndex
 		if colIndex >= numCols {

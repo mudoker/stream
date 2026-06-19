@@ -1,6 +1,7 @@
 package viewmodel
 
 import (
+	"strings"
 	"time"
 
 	"stream/constant"
@@ -66,9 +67,37 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 		colW = constant.TimelineMinColW
 	}
 
+	lastOccupiedRow := make([]int, numCols)
+	for c := 0; c < numCols; c++ {
+		lastOccupiedRow[c] = -1
+	}
+
 	var rects []TaskRect
 	for _, rc := range resolved {
-		startRow := TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute)) / 5
+		startRow := TimeToRow(rc.Task.TimeWindow.Start) / 5
+
+		colIndex := rc.ColIndex
+		if colIndex >= numCols {
+			colIndex = numCols - 1
+		}
+
+		// Determine visual start row based on commute buffer
+		commuteRows := 0
+		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+			commuteRows = (rc.Task.CommuteBuffer*(RowsPerHour/5) + 59) / 60
+		}
+
+		topStartRow := startRow - commuteRows
+		if topStartRow < 0 {
+			topStartRow = 0
+		}
+
+		// Prevent visual overlap in the same column by ensuring the task starts after the predecessor's visual block
+		if lastOccupiedRow[colIndex] != -1 && topStartRow < lastOccupiedRow[colIndex]+1 {
+			topStartRow = lastOccupiedRow[colIndex] + 1
+			startRow = topStartRow + commuteRows
+		}
+
 		durationMinutes := int(rc.Task.TimeWindow.End.Sub(rc.Task.TimeWindow.Start).Minutes())
 		h := (durationMinutes*(RowsPerHour/5) + 59) / 60
 		if startRow+h > TotalRows/5 {
@@ -77,6 +106,24 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 		if h < 1 {
 			h = 1
 		}
+
+		// Track the actual final row occupied by this visual block
+		maxRowOccupied := startRow + h - 1
+
+		// Add commute buffer bottom
+		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+			maxRowOccupied += commuteRows
+		}
+
+		// Add rest buffer
+		restDur := CalculateTaskRestTime(rc.Task)
+		restMins := int(restDur.Minutes())
+		if restMins > 0 {
+			restRows := (restMins*(RowsPerHour/5) + 59) / 60
+			maxRowOccupied += restRows
+		}
+
+		lastOccupiedRow[colIndex] = maxRowOccupied
 
 		x := rc.ColIndex * colW
 		y := startRow

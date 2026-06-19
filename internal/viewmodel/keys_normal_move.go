@@ -1,6 +1,7 @@
 package viewmodel
 
 import (
+	"strings"
 	"time"
 
 	"stream/internal/model"
@@ -96,7 +97,47 @@ func (m *Model) AutoScrollToSelectedTask() {
 	visualRowsPerHour := RowsPerHour / scale
 	visualTotalRows := TotalRows / scale
 
-	taskStart := TimeToRow(selectedTask.TimeWindow.Start.Add(1 * time.Minute)) / scale
+	// Find the exact task visual start row by calculating if there's any predecessor shift
+	startRow := TimeToRow(selectedTask.TimeWindow.Start) / scale
+	
+	hasConsecutivePredecessor := false
+	for _, other := range m.Tasks {
+		if other.UUID != selectedTask.UUID && model.IsTaskAnchored(other) && SameDay(other.TimeWindow.Start, selectedTask.TimeWindow.Start) {
+			predEnd := other.TimeWindow.End
+			if other.SchedulingType == model.Event && strings.TrimSpace(other.Location) != "" && other.CommuteBuffer > 0 {
+				predEnd = predEnd.Add(time.Duration(other.CommuteBuffer) * time.Minute)
+			}
+			restDur := CalculateTaskRestTime(other)
+			if restDur > 0 {
+				predEnd = predEnd.Add(restDur)
+			}
+
+			currStart := selectedTask.TimeWindow.Start
+			if selectedTask.SchedulingType == model.Event && strings.TrimSpace(selectedTask.Location) != "" && selectedTask.CommuteBuffer > 0 {
+				currStart = currStart.Add(-time.Duration(selectedTask.CommuteBuffer) * time.Minute)
+			}
+
+			if predEnd.Equal(currStart) {
+				hasConsecutivePredecessor = true
+				break
+			}
+		}
+	}
+
+	if hasConsecutivePredecessor {
+		startRow = startRow + 1
+	}
+
+	commuteRows := 0
+	if selectedTask.SchedulingType == model.Event && strings.TrimSpace(selectedTask.Location) != "" && selectedTask.CommuteBuffer > 0 {
+		commuteRows = (selectedTask.CommuteBuffer*visualRowsPerHour + 59) / 60
+	}
+
+	taskStart := startRow - commuteRows
+	if taskStart < 0 {
+		taskStart = 0
+	}
+
 	durationMinutes := int(selectedTask.TimeWindow.End.Sub(selectedTask.TimeWindow.Start).Minutes())
 	h := (durationMinutes*visualRowsPerHour + 59) / 60
 	
@@ -107,7 +148,12 @@ func (m *Model) AutoScrollToSelectedTask() {
 		restRows = (restMins*visualRowsPerHour + 59) / 60
 	}
 
-	taskEnd := taskStart + h + restRows
+	taskEnd := startRow + h
+	if selectedTask.SchedulingType == model.Event && strings.TrimSpace(selectedTask.Location) != "" && selectedTask.CommuteBuffer > 0 {
+		taskEnd += commuteRows
+	}
+	taskEnd += restRows
+
 	if taskEnd > visualTotalRows {
 		taskEnd = visualTotalRows
 	}

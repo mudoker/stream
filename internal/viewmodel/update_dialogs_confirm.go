@@ -6,6 +6,7 @@ import (
 
 	"stream/internal/model"
 
+	"github.com/google/uuid"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -48,6 +49,24 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 	if m.ConfirmOpen {
 		keyStr := msg.String()
+		if m.ConfirmActionType == "exit_focus" {
+			if keyStr == "j" || keyStr == "down" {
+				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex + 1) % 3
+			} else if keyStr == "k" || keyStr == "up" {
+				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex - 1 + 3) % 3
+			} else if keyStr == "enter" {
+				m.HandleExitFocusOption(m.ConfirmSelectedIndex)
+			} else if keyStr == "esc" {
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				if m.ZenTimer != nil {
+					m.ZenTimer.IsPaused = false
+				}
+				m.StatusMsg = "Focus session resumed."
+			}
+			return true, nil
+		}
+
 		if m.ConfirmActionType == "deanchor" {
 			if keyStr == "enter" {
 				if m.ConfirmTask.SchedulingType == model.Habit {
@@ -250,4 +269,94 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 	}
 
 	return false, nil
+}
+
+func (m *Model) HandleExitFocusOption(index int) {
+	if m.ZenTimer == nil {
+		m.ConfirmOpen = false
+		m.ConfirmActionType = ""
+		return
+	}
+
+	m.ZenTimer.RecordElapsedTimes()
+	t := m.ZenTimer.Task
+
+	switch index {
+	case 0: // Mark as complete
+		t.LifecycleState = model.StateCompleted
+		t.UpdatedAt = time.Now()
+		if m.DB != nil {
+			m.DB.UpdateTask(t)
+			m.refreshTasks()
+		}
+		m.ZenTimer = nil
+		m.CurrentMode = ModeNormal
+		m.ConfirmOpen = false
+		m.ConfirmActionType = ""
+		m.StatusMsg = fmt.Sprintf("Task '%s' marked as completed.", t.Title)
+
+	case 1: // Complete and resume
+		originalDur := time.Duration(t.StoryPoints) * 45 * time.Minute
+		if model.IsTaskAnchored(t) {
+			originalDur = t.TimeWindow.End.Sub(t.TimeWindow.Start)
+		}
+		elapsedFocus := time.Duration(t.ExecutionMetrics.ElapsedFocusSeconds) * time.Second
+		remainingDur := originalDur - elapsedFocus
+		if remainingDur < 15*time.Minute {
+			remainingDur = 15 * time.Minute
+		}
+
+		if model.IsTaskAnchored(t) {
+			t.TimeWindow.End = time.Now()
+			if t.TimeWindow.End.Before(t.TimeWindow.Start) {
+				t.TimeWindow.End = t.TimeWindow.Start.Add(1 * time.Minute)
+			}
+		}
+		t.LifecycleState = model.StateCompleted
+		t.UpdatedAt = time.Now()
+		if m.DB != nil {
+			m.DB.UpdateTask(t)
+		}
+
+		sp := int((remainingDur + 44*time.Minute) / (45 * time.Minute))
+		if sp < 1 {
+			sp = 1
+		}
+
+		newTask := model.Task{
+			UUID:           uuid.New().String(),
+			WorkspaceUUID:  t.WorkspaceUUID,
+			Title:          t.Title + " (Resume)",
+			Description:    t.Description,
+			Priority:       t.Priority,
+			StoryPoints:    sp,
+			SchedulingType: model.Floating,
+			LifecycleState: model.StateReady,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
+		}
+		if m.DB != nil {
+			m.DB.AddTask(newTask)
+			m.refreshTasks()
+		}
+
+		m.ZenTimer = nil
+		m.CurrentMode = ModeNormal
+		m.ConfirmOpen = false
+		m.ConfirmActionType = ""
+		m.StatusMsg = fmt.Sprintf("Completed '%s' and created resuming task '%s'.", t.Title, newTask.Title)
+
+	case 2: // Discard session changes
+		t.LifecycleState = model.StateReady
+		t.UpdatedAt = time.Now()
+		if m.DB != nil {
+			m.DB.UpdateTask(t)
+			m.refreshTasks()
+		}
+		m.ZenTimer = nil
+		m.CurrentMode = ModeNormal
+		m.ConfirmOpen = false
+		m.ConfirmActionType = ""
+		m.StatusMsg = "Focus session discarded."
+	}
 }

@@ -264,6 +264,47 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 		cancelBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
 		hintText := lipgloss.NewStyle().Foreground(t.Muted).Render("j/k navigate")
 		lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
+	} else if m.ConfirmActionType == "exit_focus" {
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Focus Session Active"))
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+		lines = append(lines, "  An active focus session is running for:")
+		lines = append(lines, "  "+lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(theme.SentenceCase(m.ConfirmTask.Title)))
+		lines = append(lines, "")
+		lines = append(lines, "  Choose an option:")
+		lines = append(lines, "")
+
+		var opt1, opt2, opt3 string
+		if m.ConfirmSelectedIndex == 0 {
+			opt1 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ 1. Mark as complete ◀")
+		} else {
+			opt1 = lipgloss.NewStyle().Foreground(t.Muted).Render("    1. Mark as complete")
+		}
+
+		if m.ConfirmSelectedIndex == 1 {
+			opt2 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ 2. Complete and resume ◀")
+		} else {
+			opt2 = lipgloss.NewStyle().Foreground(t.Muted).Render("    2. Complete and resume")
+		}
+
+		if m.ConfirmSelectedIndex == 2 {
+			opt3 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ 3. Discard session changes ◀")
+		} else {
+			opt3 = lipgloss.NewStyle().Foreground(t.Muted).Render("    3. Discard session changes")
+		}
+
+		lines = append(lines, opt1)
+		lines = append(lines, opt2)
+		lines = append(lines, opt3)
+
+		lines = append(lines, "")
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+
+		confirmBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Select")
+		cancelBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
+		hintText := lipgloss.NewStyle().Foreground(t.Muted).Render("j/k navigate")
+		lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
 	} else {
 		lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("Confirm Delete"))
 		lines = append(lines, ModalSep(innerW))

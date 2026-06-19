@@ -78,17 +78,11 @@ func (m *Model) HandleZenKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ZenTimer.TotalDuration = sess.Duration
 		m.StatusMsg = "Timer RESTARTED"
 	case "q":
-		// Stop/Abort focus session completely
-		m.ZenTimer.RecordElapsedTimes()
-		t := m.ZenTimer.Task
-		t.LifecycleState = model.StateReady
-		if m.DB != nil {
-			m.DB.UpdateTask(t)
-			m.refreshTasks()
-		}
-		m.ZenTimer = nil
-		m.CurrentMode = ModeNormal
-		m.StatusMsg = "Timer STOPPED"
+		m.ZenTimer.IsPaused = true
+		m.ConfirmTask = m.ZenTimer.Task
+		m.ConfirmActionType = "exit_focus"
+		m.ConfirmSelectedIndex = 0
+		m.ConfirmOpen = true
 	case "b":
 		// Force Break
 		m.ZenTimer.RecordElapsedTimes()

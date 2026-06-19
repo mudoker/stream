@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -202,6 +203,13 @@ func TestZenTimerStopAndResume(t *testing.T) {
 	m.ZenTimer.TotalDuration = 45 * time.Minute
 
 	m.HandleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if !m.ConfirmOpen || m.ConfirmActionType != "exit_focus" {
+		t.Fatal("expected exit_focus confirmation dialog to be open")
+	}
+
+	// Choose option 1 (Mark as complete) to save elapsed time and exit
+	m.HandleExitFocusOption(0)
+
 	if m.CurrentMode != viewmodel.ModeNormal {
 		t.Errorf("expected mode to revert to Normal, got %v", m.CurrentMode)
 	}
@@ -230,5 +238,57 @@ func TestZenTimerStopAndResume(t *testing.T) {
 	}
 	if mRes.ZenTimer.TimeRemaining != 40*time.Minute {
 		t.Errorf("expected TimeRemaining to be preserved at 40m, got %v", mRes.ZenTimer.TimeRemaining)
+	}
+}
+
+func TestExitFocusOptions(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to init db: %v", err)
+	}
+
+	task := model.Task{
+		UUID:           "test-exit-focus",
+		Title:          "Exit Focus Task",
+		StoryPoints:    2,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	database.AddTask(task)
+
+	m := viewmodel.NewModel(database, nil)
+	m.StartZenMode(task)
+
+	m.ZenTimer.TimeRemaining = 60 * time.Minute
+	m.ZenTimer.TotalDuration = 90 * time.Minute
+
+	// Option 2: Complete and Resume (index 1)
+	m.HandleExitFocusOption(1)
+
+	t1, _ := database.GetTask("test-exit-focus")
+	if t1.LifecycleState != model.StateCompleted {
+		t.Errorf("expected original task to be completed, got %v", t1.LifecycleState)
+	}
+
+	var resumeTask model.Task
+	foundResume := false
+	tasks := database.GetTasks()
+	for _, tk := range tasks {
+		if strings.Contains(tk.Title, "Exit Focus Task (Resume)") {
+			resumeTask = tk
+			foundResume = true
+			break
+		}
+	}
+
+	if !foundResume {
+		t.Fatal("expected resuming task to be created")
+	}
+	if resumeTask.SchedulingType != model.Floating {
+		t.Errorf("expected resuming task to be floating, got %v", resumeTask.SchedulingType)
+	}
+	if resumeTask.StoryPoints != 2 {
+		t.Errorf("expected resuming task to have 2 story points, got %d", resumeTask.StoryPoints)
 	}
 }

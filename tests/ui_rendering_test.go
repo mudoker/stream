@@ -239,7 +239,7 @@ func TestConsecutiveTasksTimelineRendering(t *testing.T) {
 	m.Layout.WorkspaceW = 80
 	th := theme.NewTheme()
 
-	timelineOut := pages.RenderDayTimeline(m, th, 40)
+	timelineOut := pages.RenderDayTimeline(m, th, 160)
 	cleanedTimeline := cleanAnsi(timelineOut)
 	t.Logf("Timeline:\n%s", cleanedTimeline)
 
@@ -270,12 +270,12 @@ func TestConsecutiveTasksTimelineRendering(t *testing.T) {
 	// Task One ends at 11:00 (represented by row 88). Task Two starts at 11:00, but is shifted to 89.
 	// Task One title is on row 82 (idx1). Task One bottom border is on row 88 (idx1 + 6).
 	// Task Two top border is on row 89 (idx1 + 7). Task Two title is on row 91 (idx1 + 9 = idx2).
-	if idx2-idx1 != 12 {
-		t.Errorf("Expected Task Two title line to be exactly 12 lines after Task One title line, got %d difference", idx2-idx1)
+	if idx2-idx1 != 60 {
+		t.Errorf("Expected Task Two title line to be exactly 60 lines after Task One title line, got %d difference", idx2-idx1)
 	}
 
-	bottomBorderLine := lines[idx1+9]
-	topBorderLine := lines[idx1+10]
+	bottomBorderLine := lines[idx1+56]
+	topBorderLine := lines[idx1+58]
 
 	// Verify both borders are fully boxed (contain closed corner characters: └/╰/╯/┘ for bottom, ┌/╭/╮/┐ for top).
 	// They must not contain ├ or ┤ since they are not sharing/merging borders.
@@ -333,7 +333,7 @@ func TestConsecutiveTasksWithRestBufferTimelineRendering(t *testing.T) {
 	m.Layout.WorkspaceW = 80
 	th := theme.NewTheme()
 
-	timelineOut := pages.RenderDayTimeline(m, th, 40)
+	timelineOut := pages.RenderDayTimeline(m, th, 160)
 	cleanedTimeline := cleanAnsi(timelineOut)
 	t.Logf("Timeline:\n%s", cleanedTimeline)
 
@@ -371,17 +371,17 @@ func TestConsecutiveTasksWithRestBufferTimelineRendering(t *testing.T) {
 	// Rest buffer bottomLine is row 90 (idx1 + 8).
 	// Task Two top border is row 91 (idx1 + 9).
 	// Task Two title is row 93 (idx1 + 11 = idx2).
-	if idxRest != idx1+10 {
-		t.Errorf("Expected Rest block text line to be 10 lines after Task One title line, got %d difference", idxRest-idx1)
+	if idxRest != idx1+61 {
+		t.Errorf("Expected Rest block text line to be 61 lines after Task One title line, got %d difference", idxRest-idx1)
 	}
-	if idx2 != idx1+14 {
-		t.Errorf("Expected Task Two title line to be 14 lines after Task One title line, got %d difference", idx2-idx1)
+	if idx2 != idx1+70 {
+		t.Errorf("Expected Task Two title line to be 70 lines after Task One title line, got %d difference", idx2-idx1)
 	}
 
-	bottomBorderTask1 := lines[idx1+9]
-	topBorderRest := lines[idx1+10]
-	bottomBorderRest := lines[idx1+11]
-	topBorderTask2 := lines[idx1+12]
+	bottomBorderTask1 := lines[idx1+56]
+	topBorderRest := lines[idx1+57]
+	bottomBorderRest := lines[idx1+66]
+	topBorderTask2 := lines[idx1+68]
 
 	// Verify Task One bottom border contains connector corners (├/┤)
 	if !strings.Contains(bottomBorderTask1, "├") || !strings.Contains(bottomBorderTask1, "┤") {

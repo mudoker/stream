@@ -69,8 +69,8 @@ func TestCalculateAnalyticsStats(t *testing.T) {
 func TestUtilsRowAndOverlaps(t *testing.T) {
 	// 1. TimeToRow
 	row := TimeToRow(time.Date(2026, 6, 11, 9, 30, 0, 0, time.Local))
-	if row != 114 { // (9*12) + (30*12/60) = 108 + 6 = 114
-		t.Errorf("expected row 114, got %d", row)
+	if row != 570 { // (9*60) + (30*60/60) = 540 + 30 = 570
+		t.Errorf("expected row 570, got %d", row)
 	}
 
 	// 2. PartitionHeights

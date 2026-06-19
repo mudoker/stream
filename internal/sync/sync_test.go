@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -653,5 +654,58 @@ func TestSyncEngine_Sync_Replay(t *testing.T) {
 	// Ledger should be empty now
 	if len(localDB.GetLedger()) > 0 {
 		t.Errorf("expected ledger to be replayed and cleared, got %d", len(localDB.GetLedger()))
+	}
+}
+
+func TestFormatSyncError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected string
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: "",
+		},
+		{
+			name:     "googleapi error 401",
+			err:      &googleapi.Error{Code: 401, Message: "Unauthorized"},
+			expected: "API error 401: Unauthorized",
+		},
+		{
+			name: "url error with lookup failure",
+			err: &url.Error{
+				Op:  "Get",
+				URL: "https://www.googleapis.com/calendar/v3/calendars/primary/events?alt=json&prettyPrint=false&showDeleted=true&timeMin=2026-05-20T18%3A12%3A07%2B0",
+				Err: &net.OpError{
+					Op:  "dial",
+					Net: "tcp",
+					Err: &net.DNSError{
+						Err: "no such host",
+					},
+				},
+			},
+			expected: "network unreachable (offline)",
+		},
+		{
+			name: "generic oauth error",
+			err:  errors.New("oauth2: cannot fetch token: 401 Unauthorized"),
+			expected: "OAuth token refresh failed (check connection/credentials)",
+		},
+		{
+			name:     "generic offline error string",
+			err:      errors.New("dial tcp: lookup www.googleapis.com: no such host"),
+			expected: "network unreachable (offline)",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := formatSyncError(tc.err)
+			if !strings.Contains(actual, tc.expected) && !strings.Contains(tc.expected, actual) {
+				t.Errorf("expected string containing %q, got %q", tc.expected, actual)
+			}
+		})
 	}
 }

@@ -20,7 +20,7 @@ func (s *SyncEngine) ManualPull() {
 
 	srv, err := s.ensureService()
 	if err != nil {
-		s.logCallback(fmt.Sprintf("GCal Sync Error: %v", err))
+		s.logCallback(fmt.Sprintf("GCal Sync Error: %s", formatSyncError(err)))
 		return
 	}
 
@@ -30,7 +30,7 @@ func (s *SyncEngine) ManualPull() {
 			s.handleRateLimit(err)
 			return
 		}
-		s.logCallback(fmt.Sprintf("GCal Sync: Pull failed: %v", err))
+		s.logCallback(fmt.Sprintf("GCal Sync: Pull failed: %s", formatSyncError(err)))
 	} else {
 		s.logCallback("GCal Sync: Pull complete.")
 	}

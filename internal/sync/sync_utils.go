@@ -81,7 +81,7 @@ func (s *SyncEngine) sync(includePull bool) {
 						replayed++
 						continue
 					}
-					s.logCallback(fmt.Sprintf("Sync Ledger Error on %s (%s): %v", entry.Op, entry.TaskUUID, err))
+					s.logCallback(fmt.Sprintf("Sync Ledger Error on %s (%s): %s", entry.Op, entry.TaskUUID, formatSyncError(err)))
 					return
 				}
 				_ = s.localDB.RemoveLedgerEntry(entry.ID)
@@ -100,7 +100,7 @@ func (s *SyncEngine) sync(includePull bool) {
 				s.handleRateLimit(err)
 				return
 			}
-			s.logCallback(fmt.Sprintf("Sync Engine Pull Error: %v", err))
+			s.logCallback(fmt.Sprintf("Sync Engine Pull Error: %s", formatSyncError(err)))
 		} else {
 			s.logCallback("Sync Engine: Remote pull complete.")
 		}
@@ -150,7 +150,7 @@ func (s *SyncEngine) handleStaleLedgerEntry(srv *calendar.Service, entry db.Ledg
 		if entry.Task.GCalMetadata.EventID != "" {
 			s.logCallback(fmt.Sprintf("Sync: task %s deleted locally, removing remote event.", entry.TaskUUID))
 			if delErr := s.deleteRemoteEvent(srv, entry.Task); delErr != nil {
-				s.logCallback(fmt.Sprintf("Sync: remote cleanup failed for %s: %v", entry.TaskUUID, delErr))
+				s.logCallback(fmt.Sprintf("Sync: remote cleanup failed for %s: %s", entry.TaskUUID, formatSyncError(delErr)))
 				return false
 			}
 			return true

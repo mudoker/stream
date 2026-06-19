@@ -20,7 +20,7 @@ func (s *SyncEngine) ManualPush() {
 
 	srv, err := s.ensureService()
 	if err != nil {
-		s.logCallback(fmt.Sprintf("GCal Sync Error: %v", err))
+		s.logCallback(fmt.Sprintf("GCal Sync Error: %s", formatSyncError(err)))
 		return
 	}
 
@@ -30,7 +30,7 @@ func (s *SyncEngine) ManualPush() {
 			s.handleRateLimit(err)
 			return
 		}
-		s.logCallback(fmt.Sprintf("GCal Sync: Push failed: %v", err))
+		s.logCallback(fmt.Sprintf("GCal Sync: Push failed: %s", formatSyncError(err)))
 	} else {
 		s.logCallback("GCal Sync: Push complete.")
 	}
@@ -97,12 +97,12 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 			// Exists on GCal: Update it (local is source of truth)
 			t.GCalMetadata.EventID = matchedEvent.Id
 			if err := s.updateRemoteEvent(srv, t); err != nil {
-				s.logCallback(fmt.Sprintf("Sync: Failed to update GCal event '%s': %v", t.Title, err))
+				s.logCallback(fmt.Sprintf("Sync: Failed to update GCal event '%s': %s", t.Title, formatSyncError(err)))
 			}
 		} else {
 			// Does not exist on GCal: Create it
 			if err := s.createRemoteEvent(srv, t); err != nil {
-				s.logCallback(fmt.Sprintf("Sync: Failed to create GCal event '%s': %v", t.Title, err))
+				s.logCallback(fmt.Sprintf("Sync: Failed to create GCal event '%s': %s", t.Title, formatSyncError(err)))
 			}
 		}
 	}

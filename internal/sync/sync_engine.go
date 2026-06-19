@@ -3,6 +3,7 @@ package sync
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -153,4 +154,50 @@ func (s *SyncEngine) handleRateLimit(err error) {
 
 func (s *SyncEngine) isRateLimited() bool {
 	return time.Now().Before(s.rateLimitedUntil)
+}
+
+func formatSyncError(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	if isRateLimitError(err) {
+		return "rate limit exceeded"
+	}
+
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) {
+		return fmt.Sprintf("API error %d: %s", apiErr.Code, apiErr.Message)
+	}
+
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		errStr := urlErr.Err.Error()
+		if strings.Contains(errStr, "lookup") && strings.Contains(errStr, "no such host") {
+			return "network unreachable (offline)"
+		}
+		if strings.Contains(errStr, "connect: connection refused") || strings.Contains(errStr, "connection reset by peer") {
+			return "connection refused/reset"
+		}
+		if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline exceeded") {
+			return "connection timeout"
+		}
+		return errStr
+	}
+
+	errStr := err.Error()
+	if strings.Contains(errStr, "lookup") && strings.Contains(errStr, "no such host") {
+		return "network unreachable (offline)"
+	}
+	if strings.Contains(errStr, "connect: connection refused") || strings.Contains(errStr, "connection reset by peer") {
+		return "connection refused/reset"
+	}
+	if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline exceeded") {
+		return "connection timeout"
+	}
+	if strings.Contains(errStr, "oauth2: cannot fetch token") {
+		return "OAuth token refresh failed (check connection/credentials)"
+	}
+
+	return errStr
 }

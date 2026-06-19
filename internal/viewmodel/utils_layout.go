@@ -93,8 +93,8 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 		}
 
 		// Prevent visual overlap in the same column by ensuring the task starts after the predecessor's visual block
-		if lastOccupiedRow[colIndex] != -1 && topStartRow < lastOccupiedRow[colIndex]+1 {
-			topStartRow = lastOccupiedRow[colIndex] + 1
+		if lastOccupiedRow[colIndex] != -1 && topStartRow < lastOccupiedRow[colIndex] {
+			topStartRow = lastOccupiedRow[colIndex]
 			startRow = topStartRow + commuteRows
 		}
 

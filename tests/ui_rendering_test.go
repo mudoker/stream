@@ -270,30 +270,15 @@ func TestConsecutiveTasksTimelineRendering(t *testing.T) {
 	// Task One ends at 11:00 (represented by row 88). Task Two starts at 11:00, but is shifted to 89.
 	// Task One title is on row 82 (idx1). Task One bottom border is on row 88 (idx1 + 6).
 	// Task Two top border is on row 89 (idx1 + 7). Task Two title is on row 91 (idx1 + 9 = idx2).
-	if idx2-idx1 != 13 {
-		t.Errorf("Expected Task Two title line to be exactly 13 lines after Task One title line, got %d difference", idx2-idx1)
+	if idx2-idx1 != 12 {
+		t.Errorf("Expected Task Two title line to be exactly 12 lines after Task One title line, got %d difference", idx2-idx1)
 	}
 
-	bottomBorderLine := lines[idx1+10]
-	topBorderLine := lines[idx1+11]
+	sharedBorderLine := lines[idx1+10]
 
-	// Verify both borders are fully boxed (contain closed corner characters: └/╰/╯/┘ for bottom, ┌/╭/╮/┐ for top).
-	// They must not contain ├ or ┤ since they are not sharing/merging borders.
-	if strings.Contains(bottomBorderLine, "├") || strings.Contains(bottomBorderLine, "┤") {
-		t.Errorf("Expected Task One bottom border to be closed, but found corner override characters in: %q", bottomBorderLine)
-	}
-	if strings.Contains(topBorderLine, "├") || strings.Contains(topBorderLine, "┤") {
-		t.Errorf("Expected Task Two top border to be closed, but found corner override characters in: %q", topBorderLine)
-	}
-
-	// Verify standard corner characters exist in bottom border line
-	if !strings.ContainsAny(bottomBorderLine, "└╰╯┘") {
-		t.Errorf("Expected bottom border corner characters in bottom border line, got: %q", bottomBorderLine)
-	}
-
-	// Verify standard corner characters exist in top border line
-	if !strings.ContainsAny(topBorderLine, "┌╭╮┐") {
-		t.Errorf("Expected top border corner characters in top border line, got: %q", topBorderLine)
+	// Verify the shared border contains T-junction corner connector characters (├ and ┤)
+	if !strings.Contains(sharedBorderLine, "├") || !strings.Contains(sharedBorderLine, "┤") {
+		t.Errorf("Expected shared border line to contain T-junction corners '├'/'┤', got: %q", sharedBorderLine)
 	}
 }
 
@@ -374,14 +359,13 @@ func TestConsecutiveTasksWithRestBufferTimelineRendering(t *testing.T) {
 	if idxRest != idx1+11 {
 		t.Errorf("Expected Rest block text line to be 11 lines after Task One title line, got %d difference", idxRest-idx1)
 	}
-	if idx2 != idx1+15 {
-		t.Errorf("Expected Task Two title line to be 15 lines after Task One title line, got %d difference", idx2-idx1)
+	if idx2 != idx1+14 {
+		t.Errorf("Expected Task Two title line to be 14 lines after Task One title line, got %d difference", idx2-idx1)
 	}
 
 	bottomBorderTask1 := lines[idx1+10]
 	topBorderRest := lines[idx1+11]
-	bottomBorderRest := lines[idx1+12]
-	topBorderTask2 := lines[idx1+13]
+	sharedBorderRestTask2 := lines[idx1+12]
 
 	// Verify Task One bottom border contains connector corners (├/┤)
 	if !strings.Contains(bottomBorderTask1, "├") || !strings.Contains(bottomBorderTask1, "┤") {
@@ -393,14 +377,9 @@ func TestConsecutiveTasksWithRestBufferTimelineRendering(t *testing.T) {
 		t.Errorf("Expected Rest buffer top line to contain vertical borders '┊', got: %q", topBorderRest)
 	}
 
-	// Verify Rest buffer bottom border is closed (has └ and ┘)
-	if !strings.Contains(bottomBorderRest, "└") || !strings.Contains(bottomBorderRest, "┘") {
-		t.Errorf("Expected bottom corners '└'/'┘' in Rest buffer bottom: %q", bottomBorderRest)
-	}
-
-	// Verify Task Two top border is closed
-	if strings.Contains(topBorderTask2, "├") || strings.Contains(topBorderTask2, "┤") || !strings.ContainsAny(topBorderTask2, "┌╭╮┐") {
-		t.Errorf("Expected closed top corners in Task Two: %q", topBorderTask2)
+	// Verify shared border contains T-junction corner connector characters (├ and ┤)
+	if !strings.Contains(sharedBorderRestTask2, "├") || !strings.Contains(sharedBorderRestTask2, "┤") {
+		t.Errorf("Expected shared border line between Rest and Task Two to contain connector corners '├'/'┤', got: %q", sharedBorderRestTask2)
 	}
 }
 

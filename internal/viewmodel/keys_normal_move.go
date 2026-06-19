@@ -97,35 +97,20 @@ func (m *Model) AutoScrollToSelectedTask() {
 	visualRowsPerHour := RowsPerHour / scale
 	visualTotalRows := TotalRows / scale
 
-	// Find the exact task visual start row by calculating if there's any predecessor shift
-	startRow := TimeToRow(selectedTask.TimeWindow.Start) / scale
-	
-	hasConsecutivePredecessor := false
-	for _, other := range m.Tasks {
-		if other.UUID != selectedTask.UUID && model.IsTaskAnchored(other) && SameDay(other.TimeWindow.Start, selectedTask.TimeWindow.Start) {
-			predEnd := other.TimeWindow.End
-			if other.SchedulingType == model.Event && strings.TrimSpace(other.Location) != "" && other.CommuteBuffer > 0 {
-				predEnd = predEnd.Add(time.Duration(other.CommuteBuffer) * time.Minute)
-			}
-			restDur := CalculateTaskRestTime(other)
-			if restDur > 0 {
-				predEnd = predEnd.Add(restDur)
-			}
-
-			currStart := selectedTask.TimeWindow.Start
-			if selectedTask.SchedulingType == model.Event && strings.TrimSpace(selectedTask.Location) != "" && selectedTask.CommuteBuffer > 0 {
-				currStart = currStart.Add(-time.Duration(selectedTask.CommuteBuffer) * time.Minute)
-			}
-
-			if predEnd.Equal(currStart) {
-				hasConsecutivePredecessor = true
-				break
-			}
+	// Find the task's visual rect from BuildDayTaskRects to get exact start and end coordinates
+	dayTasks := m.GetDayTasks()
+	rects := m.BuildDayTaskRects(dayTasks)
+	var rect TaskRect
+	rectFound := false
+	for _, r := range rects {
+		if r.Task.UUID == m.SelectedTaskUUID {
+			rect = r
+			rectFound = true
+			break
 		}
 	}
-
-	if hasConsecutivePredecessor {
-		startRow = startRow + 1
+	if !rectFound {
+		return
 	}
 
 	commuteRows := 0
@@ -133,26 +118,20 @@ func (m *Model) AutoScrollToSelectedTask() {
 		commuteRows = (selectedTask.CommuteBuffer*visualRowsPerHour + 59) / 60
 	}
 
-	taskStart := startRow - commuteRows
+	taskStart := rect.Top - commuteRows
 	if taskStart < 0 {
 		taskStart = 0
 	}
 
-	durationMinutes := int(selectedTask.TimeWindow.End.Sub(selectedTask.TimeWindow.Start).Minutes())
-	h := (durationMinutes*visualRowsPerHour + 59) / 60
-	
-	restDur := CalculateTaskRestTime(selectedTask)
-	restMins := int(restDur.Minutes())
-	restRows := 0
-	if restMins > 0 {
-		restRows = (restMins*visualRowsPerHour + 59) / 60
-	}
-
-	taskEnd := startRow + h
+	taskEnd := rect.Bottom
 	if selectedTask.SchedulingType == model.Event && strings.TrimSpace(selectedTask.Location) != "" && selectedTask.CommuteBuffer > 0 {
 		taskEnd += commuteRows
 	}
-	taskEnd += restRows
+	restDur := CalculateTaskRestTime(selectedTask)
+	restMins := int(restDur.Minutes())
+	if restMins > 0 {
+		taskEnd += (restMins*visualRowsPerHour + 59) / 60
+	}
 
 	if taskEnd > visualTotalRows {
 		taskEnd = visualTotalRows

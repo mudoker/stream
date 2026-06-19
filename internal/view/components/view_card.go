@@ -199,6 +199,52 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 
 	topLeftChar, topRightChar, bottomLeftChar, bottomRightChar, horizChar, vertChar := cardBorderChars(task, hasRest)
 
+	// Check if this task has a consecutive predecessor in the same column
+	hasConsecutivePredecessor := false
+	var dayTasks []model.Task
+	for _, tVal := range m.Tasks {
+		if model.IsTaskAnchored(tVal) && viewmodel.SameDay(tVal.TimeWindow.Start, task.TimeWindow.Start) {
+			dayTasks = append(dayTasks, tVal)
+		}
+	}
+	cols := viewmodel.ResolveOverlaps(dayTasks)
+	colIndex := -1
+	for _, rc := range cols {
+		if rc.Task.UUID == task.UUID {
+			colIndex = rc.ColIndex
+			break
+		}
+	}
+	if colIndex != -1 {
+		for _, other := range cols {
+			if other.ColIndex == colIndex && other.Task.UUID != task.UUID {
+				predEnd := other.Task.TimeWindow.End
+				if other.Task.SchedulingType == model.Event && strings.TrimSpace(other.Task.Location) != "" && other.Task.CommuteBuffer > 0 {
+					predEnd = predEnd.Add(time.Duration(other.Task.CommuteBuffer) * time.Minute)
+				}
+				restDur := viewmodel.CalculateTaskRestTime(other.Task)
+				if restDur > 0 {
+					predEnd = predEnd.Add(restDur)
+				}
+
+				currStart := task.TimeWindow.Start
+				if task.SchedulingType == model.Event && strings.TrimSpace(task.Location) != "" && task.CommuteBuffer > 0 {
+					currStart = currStart.Add(-time.Duration(task.CommuteBuffer) * time.Minute)
+				}
+
+				if predEnd.Equal(currStart) {
+					hasConsecutivePredecessor = true
+					break
+				}
+			}
+		}
+	}
+
+	if hasConsecutivePredecessor {
+		topLeftChar = "├"
+		topRightChar = "┤"
+	}
+
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
 	topLine := borderStyle.Render(topLeftChar) + borderStyle.Render(strings.Repeat(horizChar, innerWidth)) + borderStyle.Render(topRightChar)
 

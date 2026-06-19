@@ -91,6 +91,26 @@ func ModalSep(w int) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", w))
 }
 
+func RenderExecutionMetrics(task model.Task, info TaskMetricsInfo, headerIndent, itemIndent string, includePomodoros bool) string {
+	var sb strings.Builder
+	sb.WriteString(headerIndent + "EXECUTION METRICS\n")
+	sb.WriteString(fmt.Sprintf("%s• Planned Time:    %v\n", itemIndent, info.PlannedDur))
+	sb.WriteString(fmt.Sprintf("%s• Focus Logged:    %v\n", itemIndent, info.FocusDur))
+	if task.SchedulingType != model.Event {
+		sb.WriteString(fmt.Sprintf("%s• Rest Logged:     %v\n", itemIndent, info.BreakDur))
+		sb.WriteString(fmt.Sprintf("%s• Focus/Rest:      %s\n", itemIndent, info.RatioStr))
+	}
+	sb.WriteString(fmt.Sprintf("%s• Efficiency:      %s\n", itemIndent, info.EfficiencyStr))
+	if includePomodoros {
+		sb.WriteString(fmt.Sprintf("%s• Pomodoros:       %d / %d\n", itemIndent, task.ExecutionMetrics.TotalCompletedPomodoros, task.ExecutionMetrics.TargetPomodoros))
+	}
+	sb.WriteString(fmt.Sprintf("%s• Interruptions:   %d\n", itemIndent, task.ExecutionMetrics.InterruptionCount))
+	if task.ExecutionMetrics.ElapsedFocusSeconds > 0 {
+		sb.WriteString(fmt.Sprintf("%s• Focus Quality:   %s\n", itemIndent, info.QualityStyled))
+	}
+	return sb.String()
+}
+
 func RenderDetailPanel(m *viewmodel.Model, t theme.Theme, height int) string {
 	task := m.DetailTask
 
@@ -126,19 +146,8 @@ func RenderDetailPanel(m *viewmodel.Model, t theme.Theme, height int) string {
 	}
 	sb.WriteString(lipgloss.NewStyle().Foreground(t.Muted).Render(desc) + "\n\n")
 
-	sb.WriteString("EXECUTION METRICS\n")
 	info := ComputeTaskMetricsInfo(m, t, task)
-	sb.WriteString(fmt.Sprintf(" • Planned Time:    %v\n", info.PlannedDur))
-	sb.WriteString(fmt.Sprintf(" • Focus Logged:    %v\n", info.FocusDur))
-	if task.SchedulingType != model.Event {
-		sb.WriteString(fmt.Sprintf(" • Rest Logged:     %v\n", info.BreakDur))
-		sb.WriteString(fmt.Sprintf(" • Focus/Rest:      %s\n", info.RatioStr))
-	}
-	sb.WriteString(fmt.Sprintf(" • Efficiency:      %s\n", info.EfficiencyStr))
-	sb.WriteString(fmt.Sprintf(" • Interruptions:   %d\n", task.ExecutionMetrics.InterruptionCount))
-	if task.ExecutionMetrics.ElapsedFocusSeconds > 0 {
-		sb.WriteString(fmt.Sprintf(" • Focus Quality:   %s\n", info.QualityStyled))
-	}
+	sb.WriteString(RenderExecutionMetrics(task, info, "", " ", false))
 
 	return lipgloss.NewStyle().
 		Foreground(t.Fg).
@@ -176,7 +185,7 @@ func RenderDetailModal(m *viewmodel.Model, t theme.Theme) string {
 	if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
 		sb.WriteString("\n")
 		sb.WriteString(fmt.Sprintf("  %s  →  %s\n",
-			task.TimeWindow.Start.Format("Mon Jan 2  15:04"),
+			task.TimeWindow.Start.Format("Mon Jan _2  15:04"),
 			task.TimeWindow.End.Format("15:04")))
 		if task.SchedulingType == model.Event {
 			if task.Location != "" {
@@ -200,19 +209,7 @@ func RenderDetailModal(m *viewmodel.Model, t theme.Theme) string {
 	sb.WriteString(ModalSep(innerW) + "\n\n")
 
 	info := ComputeTaskMetricsInfo(m, t, task)
-	sb.WriteString("  EXECUTION METRICS\n")
-	sb.WriteString(fmt.Sprintf("  • Planned Time:    %v\n", info.PlannedDur))
-	sb.WriteString(fmt.Sprintf("  • Focus Logged:    %v\n", info.FocusDur))
-	if task.SchedulingType != model.Event {
-		sb.WriteString(fmt.Sprintf("  • Rest Logged:     %v\n", info.BreakDur))
-		sb.WriteString(fmt.Sprintf("  • Focus/Rest:      %s\n", info.RatioStr))
-	}
-	sb.WriteString(fmt.Sprintf("  • Efficiency:      %s\n", info.EfficiencyStr))
-	sb.WriteString(fmt.Sprintf("  • Pomodoros:       %d / %d\n", task.ExecutionMetrics.TotalCompletedPomodoros, task.ExecutionMetrics.TargetPomodoros))
-	sb.WriteString(fmt.Sprintf("  • Interruptions:   %d\n", task.ExecutionMetrics.InterruptionCount))
-	if task.ExecutionMetrics.ElapsedFocusSeconds > 0 {
-		sb.WriteString(fmt.Sprintf("  • Focus Quality:   %s\n", info.QualityStyled))
-	}
+	sb.WriteString(RenderExecutionMetrics(task, info, "  ", "  ", true))
 
 	sb.WriteString("\n")
 	sb.WriteString(ModalSep(innerW) + "\n")

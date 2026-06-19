@@ -312,8 +312,8 @@ func TestTaskMoveModeAutoScroll(t *testing.T) {
 	m.HandleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("8")})
 	m.HandleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
 
-	if m.TimelineHour != 9 {
-		t.Fatalf("expected TimelineHour to scroll to 9, got %d", m.TimelineHour)
+	if m.TimelineHour != 8 {
+		t.Fatalf("expected TimelineHour to scroll to 8, got %d", m.TimelineHour)
 	}
 
 	m.HandleTaskMoveKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("4")})

@@ -92,7 +92,7 @@ func (m *Model) AutoScrollToSelectedTask() {
 	// Always sync selected day to the task's start day to keep it visible on day transition
 	m.SelectedDay = selectedTask.TimeWindow.Start.Local()
 
-	taskStart := TimeToRow(selectedTask.TimeWindow.Start)
+	taskStart := TimeToRow(selectedTask.TimeWindow.Start.Add(1 * time.Minute))
 	durationMinutes := int(selectedTask.TimeWindow.End.Sub(selectedTask.TimeWindow.Start).Minutes())
 	h := (durationMinutes*RowsPerHour + 59) / 60
 	

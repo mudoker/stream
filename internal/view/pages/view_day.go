@@ -109,8 +109,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	for _, rc := range cols {
 		if rc.TotalCol == 1 {
-			startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start)
-			endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End)
+			startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute))
+			endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End.Add(-1 * time.Minute))
 
 			// Adjust startRow for commute buffer
 			if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
@@ -231,8 +231,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	// Overlay tasks onto the columns
 	for _, rc := range cols {
-		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start)
-		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End)
+		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute))
+		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End.Add(-1 * time.Minute))
 
 		colIndex := rc.ColIndex
 		if colIndex >= numCols {

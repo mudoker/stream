@@ -156,7 +156,12 @@ func (m *Model) AutoScrollToSelectedTask() {
 	viewportEnd := startR + visibleH
 
 	if taskEnd-taskStart >= visibleH {
-		m.TimelineHour = (taskStart + visibleH/2) / visualRowsPerHour
+		if m.CurrentMode == ModeTaskDurationAdjust {
+			target := taskEnd - (visibleH - visibleH/2)
+			m.TimelineHour = (target + visualRowsPerHour - 1) / visualRowsPerHour
+		} else {
+			m.TimelineHour = (taskStart + visibleH/2) / visualRowsPerHour
+		}
 	} else {
 		if taskStart < viewportStart {
 			m.TimelineHour = (taskStart + visibleH/2) / visualRowsPerHour

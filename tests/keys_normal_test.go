@@ -737,5 +737,36 @@ func TestDayNavigationTimelineHour(t *testing.T) {
 	}
 }
 
+func TestAutoScrollToSelectedTask_LengthyTaskDurationAdjust(t *testing.T) {
+	start := time.Date(2026, 6, 6, 10, 0, 0, 0, time.Local)
+	end := time.Date(2026, 6, 6, 18, 0, 0, 0, time.Local)
+	task1 := model.Task{
+		UUID:           "task-1_adjusting",
+		Title:          "Lengthy Task",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: start,
+			End:   end,
+		},
+		LifecycleState: model.StateScheduled,
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{task1},
+		SelectedTaskUUID: "task-1_adjusting",
+		Height:           20,
+		CurrentView:      viewmodel.DayView,
+		CurrentMode:      viewmodel.ModeTaskDurationAdjust,
+		TimelineHour:     10,
+		SelectedDay:      time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local),
+	}
+
+	m.AutoScrollToSelectedTask()
+
+	if m.TimelineHour <= 10 {
+		t.Errorf("expected TimelineHour to scroll to tail of lengthy task (> 10), got %d", m.TimelineHour)
+	}
+}
+
 
 

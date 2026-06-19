@@ -36,6 +36,8 @@ func (m *Model) EnterTaskDurationAdjustMode() {
 	// Focus selection on the clone
 	m.SelectedTaskUUID = clone.UUID
 
+	m.AutoScrollToSelectedTask()
+
 	m.StatusMsg = fmt.Sprintf("Adjusting duration for '%s'. Use j/k or count+j/k to increase/decrease by 15m. Enter to confirm, Esc to cancel.", task.Title)
 }
 

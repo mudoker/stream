@@ -12,9 +12,26 @@ import (
 
 func cardBorderChars(task model.Task, hasRest bool) (string, string, string, string, string, string) {
 	if strings.HasSuffix(task.UUID, "_moving") || strings.HasSuffix(task.UUID, "_adjusting") {
-		return "┌", "┐", "└", "┘", "╌", "┊"
+		bottomLeftChar := "└"
+		if hasRest {
+			bottomLeftChar = "├"
+		}
+		bottomRightChar := "┘"
+		if hasRest {
+			bottomRightChar = "┤"
+		}
+		return "┌", "┐", bottomLeftChar, bottomRightChar, "╌", "┊"
 	}
-	return "╭", "╮", "╰", "╯", "─", "│"
+
+	bottomLeftChar := "╰"
+	if hasRest {
+		bottomLeftChar = "├"
+	}
+	bottomRightChar := "╯"
+	if hasRest {
+		bottomRightChar = "┤"
+	}
+	return "╭", "╮", bottomLeftChar, bottomRightChar, "─", "│"
 }
 
 func cardTitleStr(task model.Task, isCompleted bool) string {

@@ -207,3 +207,46 @@ func TestCommandPaletteFiltering(t *testing.T) {
 		t.Errorf("Expected palette to contain filtered command matching 'Quit', got:\n%s", cleanedPalette)
 	}
 }
+
+func TestConsecutiveTasksTimelineRendering(t *testing.T) {
+	today := time.Now()
+	t1 := model.Task{
+		UUID:           "task-1",
+		Title:          "Task One",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 10, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 11, 0, 0, 0, time.Local),
+		},
+	}
+	t2 := model.Task{
+		UUID:           "task-2",
+		Title:          "Task Two",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 11, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 12, 0, 0, 0, time.Local),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{t1, t2},
+		SelectedDay:      today,
+		TimelineHour:     11,
+		SelectedTaskUUID: "task-1",
+	}
+	m.Layout.TimelineW = 40
+	m.Layout.WorkspaceW = 80
+	th := theme.NewTheme()
+
+	timelineOut := pages.RenderDayTimeline(m, th, 40)
+	cleanedTimeline := cleanAnsi(timelineOut)
+
+	// Verify both task titles are rendered in the day view timeline output
+	if !strings.Contains(cleanedTimeline, "Task One") {
+		t.Error("Expected consecutive Task One to be rendered on the timeline")
+	}
+	if !strings.Contains(cleanedTimeline, "Task Two") {
+		t.Error("Expected consecutive Task Two to be rendered on the timeline")
+	}
+}

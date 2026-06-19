@@ -13,7 +13,7 @@ import (
 )
 
 var PriorityOptions = []string{"0 (Critical)", "1 (High)", "2 (Medium)", "3 (Low)"}
-var TaskTypeOptions = []string{"Anchored", "Floating", "Reminder", "Habit", "Event"}
+var TaskTypeOptions = []string{"Task", "Reminder", "Habit", "Event"}
 var SPOptions = []int{0, 1, 2, 3, 5, 8, 13}
 
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -60,6 +60,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 13:
 			m.Form.RecurringDaysSubIdx = (m.Form.RecurringDaysSubIdx - 1 + 7) % 7
 			return m, nil
+		case 16:
+			m.Form.IsAnchoredIdx = (m.Form.IsAnchoredIdx - 1 + 2) % 2
+			return m, nil
 		}
 	case "right":
 		switch m.Form.ActiveField {
@@ -77,6 +80,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case 13:
 			m.Form.RecurringDaysSubIdx = (m.Form.RecurringDaysSubIdx + 1) % 7
+			return m, nil
+		case 16:
+			m.Form.IsAnchoredIdx = (m.Form.IsAnchoredIdx + 1) % 2
 			return m, nil
 		}
 	case " ":
@@ -96,6 +102,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 13:
 			m.Form.RecurringDaysSelected[m.Form.RecurringDaysSubIdx] = !m.Form.RecurringDaysSelected[m.Form.RecurringDaysSubIdx]
 			m.Form.updateDaysInputValue()
+			return m, nil
+		case 16:
+			m.Form.IsAnchoredIdx = (m.Form.IsAnchoredIdx + 1) % 2
 			return m, nil
 		}
 	case "enter":
@@ -117,25 +126,25 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case 1:
 		m.Form.DescInput, cmd = m.Form.DescInput.Update(msg)
 	case 5:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
+		if (m.Form.TaskTypeIdx == 0 && m.Form.IsAnchoredIdx == 1) || m.Form.TaskTypeIdx == 2 || m.Form.TaskTypeIdx == 3 {
 			m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
-		} else if m.Form.TaskTypeIdx == 2 {
+		} else if m.Form.TaskTypeIdx == 1 {
 			m.Form.DueDateInput, cmd = m.Form.DueDateInput.Update(msg)
 		}
 	case 6:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 1 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 2 || m.Form.TaskTypeIdx == 3 {
 			m.Form.DurationInput, cmd = m.Form.DurationInput.Update(msg)
-		} else if m.Form.TaskTypeIdx == 2 {
+		} else if m.Form.TaskTypeIdx == 1 {
 			m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
 		}
 	case 7:
-		if m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 3 {
 			m.Form.LocationInput, cmd = m.Form.LocationInput.Update(msg)
 		} else {
 			m.Form.TagsInput, cmd = m.Form.TagsInput.Update(msg)
 		}
 	case 8:
-		if m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 3 {
 			m.Form.CommuteInput, cmd = m.Form.CommuteInput.Update(msg)
 		}
 	case 9:
@@ -173,25 +182,25 @@ func (m *Model) focusFormFields() {
 	case 1:
 		m.Form.DescInput.Focus()
 	case 5:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
+		if (m.Form.TaskTypeIdx == 0 && m.Form.IsAnchoredIdx == 1) || m.Form.TaskTypeIdx == 2 || m.Form.TaskTypeIdx == 3 {
 			m.Form.StartTimeInput.Focus()
-		} else if m.Form.TaskTypeIdx == 2 {
+		} else if m.Form.TaskTypeIdx == 1 {
 			m.Form.DueDateInput.Focus()
 		}
 	case 6:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 1 || m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 2 || m.Form.TaskTypeIdx == 3 {
 			m.Form.DurationInput.Focus()
-		} else if m.Form.TaskTypeIdx == 2 {
+		} else if m.Form.TaskTypeIdx == 1 {
 			m.Form.StartTimeInput.Focus()
 		}
 	case 7:
-		if m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 3 {
 			m.Form.LocationInput.Focus()
 		} else {
 			m.Form.TagsInput.Focus()
 		}
 	case 8:
-		if m.Form.TaskTypeIdx == 4 {
+		if m.Form.TaskTypeIdx == 3 {
 			m.Form.CommuteInput.Focus()
 		}
 	case 9:
@@ -249,9 +258,9 @@ func (m *Model) SubmitForm() {
 	startTime := time.Date(baseDay.Year(), baseDay.Month(), baseDay.Day(), 9, 0, 0, 0, now.Location())
 	duration := 60
 
-	if taskType == 0 || taskType == 3 || taskType == 4 {
+	if (taskType == 0 && m.Form.IsAnchoredIdx == 1) || taskType == 2 || taskType == 3 {
 		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
-		if taskType == 3 && timeStr == "" {
+		if taskType == 2 && timeStr == "" {
 			durStr := m.Form.DurationInput.Value()
 			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
 				duration = d
@@ -264,7 +273,7 @@ func (m *Model) SubmitForm() {
 				duration = d
 			}
 		}
-	} else if taskType == 2 {
+	} else if taskType == 1 {
 		dateStr := m.Form.DueDateInput.Value()
 		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
 
@@ -316,17 +325,31 @@ func (m *Model) SubmitForm() {
 	}
 
 	if taskType == 0 {
-		newTask.SchedulingType = model.Anchored
-		newTask.TimeWindow = model.TimeWindow{
-			Start: startTime,
-			End:   startTime.Add(time.Duration(duration) * time.Minute),
-		}
-		if isEdit && existingTask.LifecycleState == model.StateCompleted {
-			newTask.LifecycleState = model.StateCompleted
+		if m.Form.IsAnchoredIdx == 1 {
+			newTask.SchedulingType = model.Anchored
+			newTask.TimeWindow = model.TimeWindow{
+				Start: startTime,
+				End:   startTime.Add(time.Duration(duration) * time.Minute),
+			}
+			if isEdit && existingTask.LifecycleState == model.StateCompleted {
+				newTask.LifecycleState = model.StateCompleted
+			} else {
+				newTask.LifecycleState = model.StateScheduled
+			}
 		} else {
-			newTask.LifecycleState = model.StateScheduled
+			newTask.SchedulingType = model.Floating
+			newTask.StoryPoints = spVal
+			durStr := m.Form.DurationInput.Value()
+			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+				newTask.EstimatedDurationMins = d
+			}
+			if isEdit && existingTask.LifecycleState == model.StateCompleted {
+				newTask.LifecycleState = model.StateCompleted
+			} else {
+				newTask.LifecycleState = model.StateReady
+			}
 		}
-	} else if taskType == 4 {
+	} else if taskType == 3 {
 		newTask.SchedulingType = model.Event
 		newTask.StoryPoints = 0
 
@@ -370,7 +393,7 @@ func (m *Model) SubmitForm() {
 		} else {
 			newTask.LifecycleState = model.StateScheduled
 		}
-	} else if taskType == 2 {
+	} else if taskType == 1 {
 		newTask.SchedulingType = model.Reminder
 		newTask.StoryPoints = 0
 		newTask.TimeWindow = model.TimeWindow{
@@ -381,7 +404,7 @@ func (m *Model) SubmitForm() {
 		} else {
 			newTask.LifecycleState = model.StateReady
 		}
-	} else if taskType == 3 {
+	} else if taskType == 2 {
 		newTask.SchedulingType = model.Habit
 		newTask.StoryPoints = 0
 		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
@@ -392,17 +415,6 @@ func (m *Model) SubmitForm() {
 				Start: startTime,
 				End:   startTime.Add(time.Duration(duration) * time.Minute),
 			}
-		}
-		if isEdit && existingTask.LifecycleState == model.StateCompleted {
-			newTask.LifecycleState = model.StateCompleted
-		} else {
-			newTask.LifecycleState = model.StateReady
-		}
-	} else {
-		newTask.SchedulingType = model.Floating
-		durStr := m.Form.DurationInput.Value()
-		if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
-			newTask.EstimatedDurationMins = d
 		}
 		if isEdit && existingTask.LifecycleState == model.StateCompleted {
 			newTask.LifecycleState = model.StateCompleted
@@ -438,7 +450,7 @@ func (m *Model) SubmitForm() {
 		m.triggerGCalPush(newTask)
 		m.StatusMsg = fmt.Sprintf("Task '%s' updated successfully.", title)
 	} else {
-		if m.Form.IsRecurringIdx == 1 || taskType == 3 {
+		if m.Form.IsRecurringIdx == 1 || taskType == 2 {
 			endDateStr := strings.TrimSpace(m.Form.RecurringEndDateInput.Value())
 			endDate, err := time.Parse("2006-01-02", endDateStr)
 			if err != nil {

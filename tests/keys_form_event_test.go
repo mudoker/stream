@@ -27,7 +27,7 @@ func TestEventTaskFormCreation(t *testing.T) {
 	m.Form.TitleInput.SetValue("Launch Event")
 	m.Form.DescInput.SetValue("Google I/O keynote")
 	m.Form.PriorityIdx = 1 // High priority
-	m.Form.TaskTypeIdx = 4 // Event task type
+	m.Form.TaskTypeIdx = 3 // Event task type
 	m.Form.StartTimeInput.SetValue("10:00")
 	m.Form.DurationInput.SetValue("120")
 	m.Form.LocationInput.SetValue("Mountain View")
@@ -82,7 +82,7 @@ func TestEventTaskFormCreationNoLocation(t *testing.T) {
 	m.Form.TitleInput.SetValue("Remote Sync")
 	m.Form.DescInput.SetValue("Zoom meeting")
 	m.Form.PriorityIdx = 1
-	m.Form.TaskTypeIdx = 4 // Event task type
+	m.Form.TaskTypeIdx = 3 // Event task type
 	m.Form.StartTimeInput.SetValue("14:00")
 	m.Form.DurationInput.SetValue("60")
 	m.Form.LocationInput.SetValue("") // empty location
@@ -136,7 +136,7 @@ func TestEventTaskFormCreationStartEndDates(t *testing.T) {
 	m.Form.TitleInput.SetValue("Multi-day Event")
 	m.Form.DescInput.SetValue("Hackathon weekend")
 	m.Form.PriorityIdx = 1
-	m.Form.TaskTypeIdx = 4 // Event
+	m.Form.TaskTypeIdx = 3 // Event
 	m.Form.StartDateInput.SetValue("2026-06-20")
 	m.Form.StartTimeInput.SetValue("09:00")
 	m.Form.EndDateInput.SetValue("2026-06-22")

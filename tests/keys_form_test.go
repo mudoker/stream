@@ -131,7 +131,7 @@ func TestHabitCreationFormSubmit(t *testing.T) {
 	m.Form.DescInput.SetValue("8 glasses a day")
 	m.Form.PriorityIdx = 2 // Medium
 	m.Form.SPIdx = 2       // 2 SP
-	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.TaskTypeIdx = 2 // Habit
 	m.Form.TagsInput.SetValue("health, daily")
 	m.Form.RecurringDaysInput.SetValue("Mon, Tue, Wed, Thu, Fri, Sat, Sun")
 
@@ -221,7 +221,7 @@ func TestReminderCreationFormSubmit(t *testing.T) {
 	m.Form.DescInput.SetValue("Weekly call")
 	m.Form.PriorityIdx = 1 // High
 	m.Form.SPIdx = 3       // 3 SP
-	m.Form.TaskTypeIdx = 2 // Reminder
+	m.Form.TaskTypeIdx = 1 // Reminder
 	m.Form.StartTimeInput.SetValue("") // empty due time
 	m.Form.DueDateInput.SetValue("2026-06-12")
 
@@ -252,7 +252,7 @@ func TestReminderCreationFormSubmit(t *testing.T) {
 	m.Form.DescInput.SetValue("Checkup")
 	m.Form.PriorityIdx = 0 // Critical
 	m.Form.SPIdx = 4       // 5 SP
-	m.Form.TaskTypeIdx = 2 // Reminder
+	m.Form.TaskTypeIdx = 1 // Reminder
 	m.Form.StartTimeInput.SetValue("14:30")
 	m.Form.DueDateInput.SetValue("2026-06-15")
 
@@ -310,7 +310,8 @@ func TestRecurringTaskLifecycle(t *testing.T) {
 	m.Form.DescInput.SetValue("Push day")
 	m.Form.PriorityIdx = 1 // High
 	m.Form.SPIdx = 2       // 2 SP
-	m.Form.TaskTypeIdx = 0 // Anchored
+	m.Form.TaskTypeIdx = 0 // Task
+	m.Form.IsAnchoredIdx = 1 // Yes (Anchored)
 	m.Form.IsRecurringIdx = 1 // Yes
 	m.Form.RecurringEndDateInput.SetValue("2026-06-20")
 	m.Form.RecurringDaysInput.SetValue("Mon, Wed, Fri")
@@ -495,7 +496,8 @@ func TestRecurringCapping(t *testing.T) {
 	m.Form.DescInput.SetValue("Health")
 	m.Form.PriorityIdx = 1
 	m.Form.SPIdx = 2
-	m.Form.TaskTypeIdx = 0 // Anchored
+	m.Form.TaskTypeIdx = 0 // Task
+	m.Form.IsAnchoredIdx = 1 // Yes (Anchored)
 	m.Form.IsRecurringIdx = 1
 	// Set end date to 1 year in the future (2027-06-14)
 	m.Form.RecurringEndDateInput.SetValue("2027-06-14")
@@ -571,6 +573,7 @@ func TestInteractiveDaysSelectAndStoryPointsSkip(t *testing.T) {
 	// 3. Verify Story Points skipping for Habit and Event
 	// Start with type Anchored (0): Story Points (3) should be visible
 	m.Form.TaskTypeIdx = 0
+	m.Form.IsAnchoredIdx = 1
 	visible := m.Form.VisibleFields()
 	hasSP := false
 	for _, val := range visible {
@@ -583,7 +586,7 @@ func TestInteractiveDaysSelectAndStoryPointsSkip(t *testing.T) {
 	}
 
 	// Change type to Habit (3)
-	m.Form.TaskTypeIdx = 3
+	m.Form.TaskTypeIdx = 2
 	visible = m.Form.VisibleFields()
 	hasSP = false
 	for _, val := range visible {
@@ -596,7 +599,7 @@ func TestInteractiveDaysSelectAndStoryPointsSkip(t *testing.T) {
 	}
 
 	// Change type to Event (4)
-	m.Form.TaskTypeIdx = 4
+	m.Form.TaskTypeIdx = 3
 	visible = m.Form.VisibleFields()
 	hasSP = false
 	for _, val := range visible {
@@ -623,7 +626,7 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 	m := viewmodel.NewModel(database, syncEngine)
 	m.Form = viewmodel.NewTaskForm()
 	m.Form.TitleInput.SetValue("Daily Workout")
-	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.TaskTypeIdx = 2 // Habit
 	m.Form.StartTimeInput.SetValue("08:30")
 	m.Form.DurationInput.SetValue("45")
 	m.Form.RecurringDaysInput.SetValue("Mon")
@@ -658,7 +661,7 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 	// Test de-anchored habit creation
 	m.Form = viewmodel.NewTaskForm()
 	m.Form.TitleInput.SetValue("Drink Water Float")
-	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.TaskTypeIdx = 2 // Habit
 	m.Form.StartTimeInput.SetValue("") // Clear start time
 	m.Form.DurationInput.SetValue("30")
 	m.Form.RecurringDaysInput.SetValue("Mon")
@@ -694,7 +697,7 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 	m.Form = viewmodel.NewTaskForm()
 	m.Form.TitleInput.SetValue("Drink Water Anchored")
 	m.Form.DescInput.SetValue("Stay hydrated")
-	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.TaskTypeIdx = 2 // Habit
 	m.Form.StartTimeInput.SetValue("14:15")
 	m.Form.DurationInput.SetValue("15")
 	m.IsEditing = true
@@ -733,7 +736,7 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 	// Test editing a habit (de-anchoring it)
 	m.Form = viewmodel.NewTaskForm()
 	m.Form.TitleInput.SetValue("Drink Water Float Again")
-	m.Form.TaskTypeIdx = 3 // Habit
+	m.Form.TaskTypeIdx = 2 // Habit
 	m.Form.StartTimeInput.SetValue("") // Clear start time
 	m.Form.DurationInput.SetValue("20")
 	m.IsEditing = true
@@ -840,6 +843,44 @@ func TestPartialTaskAnchoring(t *testing.T) {
 	}
 	if remainingTask.EstimatedDurationMins != 90 {
 		t.Errorf("expected remaining task EstimatedDurationMins=90, got %d", remainingTask.EstimatedDurationMins)
+	}
+}
+
+func TestFloatingTaskFormCreation(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	m.Form = viewmodel.NewTaskForm()
+
+	m.Form.TitleInput.SetValue("Clean Room")
+	m.Form.DescInput.SetValue("Tidy up")
+	m.Form.PriorityIdx = 3 // Low
+	m.Form.SPIdx = 1       // 1 SP
+	m.Form.TaskTypeIdx = 0 // Task
+	m.Form.IsAnchoredIdx = 0 // No (Floating)
+	m.Form.DurationInput.SetValue("45")
+
+	m.SubmitForm()
+
+	tasks := database.GetTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task in DB, got %d", len(tasks))
+	}
+
+	task := tasks[0]
+	if task.SchedulingType != model.Floating {
+		t.Errorf("expected scheduling type FLOATING, got %s", task.SchedulingType)
+	}
+	if task.EstimatedDurationMins != 45 {
+		t.Errorf("expected estimated duration 45, got %d", task.EstimatedDurationMins)
 	}
 }
 

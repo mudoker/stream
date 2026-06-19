@@ -281,7 +281,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 
 		// Render main task card
-		cardStr := components.RenderTaskCard(m, t, rc.Task, cardW, h, isActive, isSelected)
+		cardStr := components.RenderCard(m, t, rc.Task, cardW, h, isActive, isSelected)
 		cardLines := strings.Split(strings.TrimSpace(cardStr), "\n")
 
 		// Allow full string write to completely clear layout lines without visual truncation drops

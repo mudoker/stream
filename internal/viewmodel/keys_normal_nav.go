@@ -1,5 +1,9 @@
 package viewmodel
 
+import (
+	"stream/internal/model"
+)
+
 func (m *Model) handleDashboardOrAnalyticsNav(key string) {
 	if m.CurrentView == DashboardView {
 		switch key {
@@ -132,13 +136,68 @@ func (m *Model) handleWeekNav(key string) {
 	case "L":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, 7)
 	case "j", "down":
-		m.ScrollOffset++
+		allTasks := m.getWeekTasks()
+		if len(allTasks) > 0 {
+			curIdx := -1
+			for idx, t := range allTasks {
+				if t.UUID == m.SelectedTaskUUID {
+					curIdx = idx
+					break
+				}
+			}
+			if curIdx == -1 {
+				m.SelectedTaskUUID = allTasks[0].UUID
+				m.SelectedDay = allTasks[0].TimeWindow.Start
+			} else {
+				nextIdx := (curIdx + 1) % len(allTasks)
+				m.SelectedTaskUUID = allTasks[nextIdx].UUID
+				m.SelectedDay = allTasks[nextIdx].TimeWindow.Start
+			}
+		}
 	case "k", "up":
-		m.ScrollOffset--
-		if m.ScrollOffset < 0 {
-			m.ScrollOffset = 0
+		allTasks := m.getWeekTasks()
+		if len(allTasks) > 0 {
+			curIdx := -1
+			for idx, t := range allTasks {
+				if t.UUID == m.SelectedTaskUUID {
+					curIdx = idx
+					break
+				}
+			}
+			if curIdx == -1 {
+				m.SelectedTaskUUID = allTasks[len(allTasks)-1].UUID
+				m.SelectedDay = allTasks[len(allTasks)-1].TimeWindow.Start
+			} else {
+				prevIdx := (curIdx - 1 + len(allTasks)) % len(allTasks)
+				m.SelectedTaskUUID = allTasks[prevIdx].UUID
+				m.SelectedDay = allTasks[prevIdx].TimeWindow.Start
+			}
 		}
 	}
+}
+
+func (m *Model) getWeekTasks() []model.Task {
+	offset := int(m.SelectedDay.Weekday()) - 1
+	if offset < 0 {
+		offset = 6
+	}
+	weekStart := m.SelectedDay.AddDate(0, 0, -offset)
+
+	var allTasks []model.Task
+	for i := 0; i < 7; i++ {
+		day := weekStart.AddDate(0, 0, i)
+		var dayTasks []model.Task
+		for _, task := range m.Tasks {
+			if model.IsTaskAnchored(task) && SameDay(task.TimeWindow.Start, day) {
+				dayTasks = append(dayTasks, task)
+			}
+		}
+		resolved := ResolveOverlaps(dayTasks)
+		for _, rc := range resolved {
+			allTasks = append(allTasks, rc.Task)
+		}
+	}
+	return allTasks
 }
 
 func (m *Model) handleDayNav(key string) {

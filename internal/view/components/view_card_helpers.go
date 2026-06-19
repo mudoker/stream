@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func taskCardBorderChars(task model.Task, hasRest bool) (string, string, string, string, string, string) {
+func cardBorderChars(task model.Task, hasRest bool) (string, string, string, string, string, string) {
 	if strings.HasSuffix(task.UUID, "_moving") || strings.HasSuffix(task.UUID, "_adjusting") {
 		bottomLeftChar := "└"
 		if hasRest {
@@ -34,7 +34,7 @@ func taskCardBorderChars(task model.Task, hasRest bool) (string, string, string,
 	return "╭", "╮", bottomLeftChar, bottomRightChar, "─", "│"
 }
 
-func taskCardTitleStr(task model.Task, isCompleted bool) string {
+func cardTitleStr(task model.Task, isCompleted bool) string {
 	titleStr := theme.SentenceCase(task.Title)
 	if isCompleted {
 		titleStr = "✔ " + titleStr
@@ -47,7 +47,7 @@ func taskCardTitleStr(task model.Task, isCompleted bool) string {
 	return titleStr
 }
 
-func taskCardTitleStyle(t theme.Theme, task model.Task, isZenFocus, isSelected, hasCollision, isCompleted bool) lipgloss.Style {
+func cardTitleStyle(t theme.Theme, task model.Task, isZenFocus, isSelected, hasCollision, isCompleted bool) lipgloss.Style {
 	titleStyle := lipgloss.NewStyle().Foreground(t.Fg).Bold(true)
 	if strings.HasSuffix(task.UUID, "_moving") || strings.HasSuffix(task.UUID, "_adjusting") {
 		titleStyle = lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Faint(true)
@@ -63,7 +63,7 @@ func taskCardTitleStyle(t theme.Theme, task model.Task, isZenFocus, isSelected, 
 	return titleStyle
 }
 
-func taskCardMetaStr(t theme.Theme, task model.Task, contentW int, priorityBadge, timeStr string) string {
+func cardMetaStr(t theme.Theme, task model.Task, contentW int, priorityBadge, timeStr string) string {
 	mutedStyle := lipgloss.NewStyle().Foreground(t.Muted)
 	if strings.HasSuffix(task.UUID, "_moving") || strings.HasSuffix(task.UUID, "_adjusting") {
 		mutedStyle = mutedStyle.Faint(true)

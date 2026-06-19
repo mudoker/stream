@@ -71,7 +71,7 @@ func assertClosedRectangle(t *testing.T, card string, width, height int) {
 	}
 }
 
-func TestRenderTaskCardMaintainsClosedRectangle(t *testing.T) {
+func TestRenderCardMaintainsClosedRectangle(t *testing.T) {
 	th := theme.NewTheme()
 	m := &viewmodel.Model{}
 	task := model.Task{
@@ -85,10 +85,10 @@ func TestRenderTaskCardMaintainsClosedRectangle(t *testing.T) {
 		StoryPoints: 3,
 	}
 
-	card := components.RenderTaskCard(m, th, task, 18, 4, false, false)
+	card := components.RenderCard(m, th, task, 18, 4, false, false)
 	assertClosedRectangle(t, card, 18, 4)
 
-	cardSmall := components.RenderTaskCard(m, th, task, 18, 3, false, false)
+	cardSmall := components.RenderCard(m, th, task, 18, 3, false, false)
 	assertClosedRectangle(t, cardSmall, 18, 3)
 }
 
@@ -154,7 +154,7 @@ func TestRegressionOverlappingScheduleBorderIntegrity(t *testing.T) {
 	}
 
 	for _, rect := range rects {
-		card := components.RenderTaskCard(m, th, rect.Task, rect.Width, rect.Height, false, false)
+		card := components.RenderCard(m, th, rect.Task, rect.Width, rect.Height, false, false)
 		assertClosedRectangle(t, card, rect.Width, rect.Height)
 	}
 }

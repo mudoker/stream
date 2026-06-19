@@ -12,9 +12,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// RenderTaskCard renders a complete multi-line Lipgloss task card block.
+// RenderCard renders a complete multi-line Lipgloss card block.
 // w and h are the card's outer dimensions (including borders).
-func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, isActive bool, isSelected bool) string {
+func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, isActive bool, isSelected bool) string {
 	pColor := t.PriorityColor(task.Priority)
 	if strings.HasSuffix(task.UUID, "_moving") || strings.HasSuffix(task.UUID, "_adjusting") {
 		pColor = t.Muted
@@ -101,7 +101,7 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 	}
 
 	// Truncate title using safe rune slicing
-	titleStr := taskCardTitleStr(task, isCompleted)
+	titleStr := cardTitleStr(task, isCompleted)
 	titleRunes := []rune(titleStr)
 	if len(titleRunes) > contentW-1 {
 		if contentW > 2 {
@@ -112,9 +112,9 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 	}
 
 	// Construct and scale metadata row to fit contentW-1
-	metaStr := taskCardMetaStr(t, task, contentW, priorityBadge, timeStr)
+	metaStr := cardMetaStr(t, task, contentW, priorityBadge, timeStr)
 
-	titleStyle := taskCardTitleStyle(t, task, isZenFocus, isSelected, hasCollision, isCompleted)
+	titleStyle := cardTitleStyle(t, task, isZenFocus, isSelected, hasCollision, isCompleted)
 	titleLine := titleStyle.Render(titleStr)
 	metaLine := metaStr
 
@@ -197,7 +197,7 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 	restDur := viewmodel.CalculateTaskRestTime(task)
 	hasRest := restDur > 0 && task.SchedulingType == model.Anchored
 
-	topLeftChar, topRightChar, bottomLeftChar, bottomRightChar, horizChar, vertChar := taskCardBorderChars(task, hasRest)
+	topLeftChar, topRightChar, bottomLeftChar, bottomRightChar, horizChar, vertChar := cardBorderChars(task, hasRest)
 
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
 	topLine := borderStyle.Render(topLeftChar) + borderStyle.Render(strings.Repeat(horizChar, innerWidth)) + borderStyle.Render(topRightChar)

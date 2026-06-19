@@ -84,7 +84,7 @@ func TestReminderDueDateSubmit(t *testing.T) {
 	m.Form.DescInput.SetValue("Annual checkup")
 	m.Form.PriorityIdx = 1 // High
 	m.Form.SPIdx = 0
-	m.Form.TaskTypeIdx = 2 // Reminder
+	m.Form.TaskTypeIdx = 1 // Reminder
 	m.Form.DueDateInput.SetValue("2026-07-20")
 	m.Form.StartTimeInput.SetValue("14:30") // Due time
 

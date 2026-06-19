@@ -14,11 +14,12 @@ type TaskForm struct {
 	Description           string
 	PriorityIdx           int // 0: P0, 1: P1, 2: P2, 3: P3
 	SPIdx                 int // index in []int{1, 2, 3, 5, 8, 13}
-	TaskTypeIdx           int // 0: Anchored, 1: Floating, 2: Reminder, 3: Habit, 4: Event
+	TaskTypeIdx           int // 0: Task, 1: Reminder, 2: Habit, 3: Event
+	IsAnchoredIdx         int // 0: No, 1: Yes
 	StartHour             int
 	StartMin              int
 	DurationMins          int
-	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days
+	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days, 14: Start Date, 15: End Date, 16: Is Anchored
 	TitleInput            textinput.Model
 	DescInput             textinput.Model
 	StartTimeInput        textinput.Model
@@ -88,6 +89,7 @@ func NewTaskForm() TaskForm {
 		PriorityIdx:           2,
 		SPIdx:                 2,
 		TaskTypeIdx:           0,
+		IsAnchoredIdx:         1,
 		StartHour:             now.Hour(),
 		StartMin:              now.Minute(),
 		DurationMins:          60,

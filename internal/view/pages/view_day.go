@@ -239,32 +239,21 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			colIndex = numCols - 1
 		}
 
-		// Check if there is a consecutive task preceding this task (taking commute and rest buffers into account)
-		hasConsecutivePredecessor := false
-		for _, other := range cols {
-			if other.Task.UUID != rc.Task.UUID && other.ColIndex == rc.ColIndex {
-				otherEnd := taskVisualEndTime(other.Task)
-				thisStart := taskVisualStartTime(rc.Task)
-				if otherEnd.Equal(thisStart) {
-					hasConsecutivePredecessor = true
-					break
-				}
-			}
-		}
-
-		// If consecutive predecessor exists, position startRow immediately after predecessor's visual block
+		// Determine visual start row based on commute buffer
 		commuteRows := 0
 		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
 			commuteRows = durationToRows(time.Duration(rc.Task.CommuteBuffer) * time.Minute)
 		}
 
-		if hasConsecutivePredecessor && lastOccupiedRow[colIndex] != -1 {
-			topStartRow := lastOccupiedRow[colIndex] + 1
+		topStartRow := startRow - commuteRows
+		if topStartRow < 0 {
+			topStartRow = 0
+		}
+
+		// Prevent visual overlap in the same column by ensuring the task starts after the predecessor's visual block
+		if lastOccupiedRow[colIndex] != -1 && topStartRow < lastOccupiedRow[colIndex]+1 {
+			topStartRow = lastOccupiedRow[colIndex] + 1
 			startRow = topStartRow + commuteRows
-		} else {
-			if startRow < 0 {
-				startRow = 0
-			}
 		}
 
 		// Map structural height accurately across row milestones
@@ -506,22 +495,4 @@ func durationToRows(dur time.Duration) int {
 	return (mins*viewmodel.RowsPerHour + 59) / 60
 }
 
-func taskVisualStartTime(task model.Task) time.Time {
-	startTime := task.TimeWindow.Start
-	if task.SchedulingType == model.Event && strings.TrimSpace(task.Location) != "" && task.CommuteBuffer > 0 {
-		startTime = startTime.Add(-time.Duration(task.CommuteBuffer) * time.Minute)
-	}
-	return startTime
-}
 
-func taskVisualEndTime(task model.Task) time.Time {
-	endTime := task.TimeWindow.End
-	if task.SchedulingType == model.Event && strings.TrimSpace(task.Location) != "" && task.CommuteBuffer > 0 {
-		endTime = endTime.Add(time.Duration(task.CommuteBuffer) * time.Minute)
-	}
-	restDur := viewmodel.CalculateTaskRestTime(task)
-	if restDur > 0 {
-		endTime = endTime.Add(restDur)
-	}
-	return endTime
-}

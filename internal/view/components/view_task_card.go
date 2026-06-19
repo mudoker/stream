@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"stream/internal/model"
-	"stream/internal/view/theme"
 	"stream/internal/viewmodel"
+	"stream/internal/view/theme"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -71,6 +71,9 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 
 	if w < 3 {
 		w = 3
+	}
+	if h < 3 {
+		h = 3
 	}
 
 	// Determine padding based on height
@@ -187,12 +190,8 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 		}
 	}
 
-	// Guarantee that the body list lines match exactly heightContent row requirements
 	for len(bodyLines) < heightContent {
 		bodyLines = append(bodyLines, strings.Repeat(" ", innerWidth))
-	}
-	if len(bodyLines) > heightContent {
-		bodyLines = bodyLines[:heightContent]
 	}
 
 	restDur := viewmodel.CalculateTaskRestTime(task)
@@ -215,10 +214,6 @@ func RenderTaskCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int
 		cardLines = append(cardLines, borderStyle.Render(vertChar)+body+borderStyle.Render(vertChar))
 	}
 	cardLines = append(cardLines, bottomLine)
-
-	if len(cardLines) > h {
-		cardLines = cardLines[:h]
-	}
 
 	return strings.Join(cardLines, "\n")
 }

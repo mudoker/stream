@@ -92,20 +92,24 @@ func (m *Model) AutoScrollToSelectedTask() {
 	// Always sync selected day to the task's start day to keep it visible on day transition
 	m.SelectedDay = selectedTask.TimeWindow.Start.Local()
 
-	taskStart := TimeToRow(selectedTask.TimeWindow.Start.Add(1 * time.Minute))
+	const scale = 5
+	visualRowsPerHour := RowsPerHour / scale
+	visualTotalRows := TotalRows / scale
+
+	taskStart := TimeToRow(selectedTask.TimeWindow.Start.Add(1 * time.Minute)) / scale
 	durationMinutes := int(selectedTask.TimeWindow.End.Sub(selectedTask.TimeWindow.Start).Minutes())
-	h := (durationMinutes*RowsPerHour + 59) / 60
+	h := (durationMinutes*visualRowsPerHour + 59) / 60
 	
 	restDur := CalculateTaskRestTime(selectedTask)
 	restMins := int(restDur.Minutes())
 	restRows := 0
 	if restMins > 0 {
-		restRows = (restMins*RowsPerHour + 59) / 60
+		restRows = (restMins*visualRowsPerHour + 59) / 60
 	}
 
 	taskEnd := taskStart + h + restRows
-	if taskEnd > TotalRows {
-		taskEnd = TotalRows
+	if taskEnd > visualTotalRows {
+		taskEnd = visualTotalRows
 	}
 
 	appContentHeight := m.Height
@@ -115,25 +119,25 @@ func (m *Model) AutoScrollToSelectedTask() {
 	}
 
 	// Calculate exact clamped viewport boundaries matching RenderDayTimeline
-	centerRow := m.TimelineHour * RowsPerHour
+	centerRow := m.TimelineHour * visualRowsPerHour
 	startR := centerRow - visibleH/2
 	if startR < 0 {
 		startR = 0
 	}
-	if startR > TotalRows-visibleH {
-		startR = TotalRows - visibleH
+	if startR > visualTotalRows-visibleH {
+		startR = visualTotalRows - visibleH
 	}
 	viewportStart := startR
 	viewportEnd := startR + visibleH
 
 	if taskEnd-taskStart >= visibleH {
-		m.TimelineHour = (taskStart + visibleH/2) / RowsPerHour
+		m.TimelineHour = (taskStart + visibleH/2) / visualRowsPerHour
 	} else {
 		if taskStart < viewportStart {
-			m.TimelineHour = (taskStart + visibleH/2) / RowsPerHour
+			m.TimelineHour = (taskStart + visibleH/2) / visualRowsPerHour
 		} else if taskEnd > viewportEnd {
 			target := taskEnd - (visibleH - visibleH/2)
-			m.TimelineHour = (target + RowsPerHour - 1) / RowsPerHour
+			m.TimelineHour = (target + visualRowsPerHour - 1) / visualRowsPerHour
 		}
 	}
 
@@ -166,7 +170,7 @@ func (m *Model) NavigateVertical(dir int) {
 		}
 	}
 	if !found {
-		targetRow := m.TimelineHour * RowsPerHour
+		targetRow := m.TimelineHour * (RowsPerHour / 5)
 		bestIdx := 0
 		minDist := 1_000_000
 		for i, r := range rects {
@@ -240,7 +244,7 @@ func (m *Model) NavigateHorizontal(dir int) {
 		}
 	}
 	if !found {
-		targetRow := m.TimelineHour * RowsPerHour
+		targetRow := m.TimelineHour * (RowsPerHour / 5)
 		bestIdx := 0
 		minDist := 1_000_000
 		for i, r := range rects {

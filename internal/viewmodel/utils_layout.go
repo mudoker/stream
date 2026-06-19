@@ -68,11 +68,11 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 
 	var rects []TaskRect
 	for _, rc := range resolved {
-		startRow := TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute))
+		startRow := TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute)) / 5
 		durationMinutes := int(rc.Task.TimeWindow.End.Sub(rc.Task.TimeWindow.Start).Minutes())
-		h := (durationMinutes*RowsPerHour + 59) / 60
-		if startRow+h > TotalRows {
-			h = TotalRows - startRow
+		h := (durationMinutes*(RowsPerHour/5) + 59) / 60
+		if startRow+h > TotalRows/5 {
+			h = TotalRows/5 - startRow
 		}
 		if h < 1 {
 			h = 1

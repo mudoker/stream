@@ -19,6 +19,10 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	now := time.Now()
 	isToday := viewmodel.SameDay(m.SelectedDay, now)
 
+	const scale = 5
+	visualRows := viewmodel.TotalRows / scale         // 288
+	visualRowsPerHour := viewmodel.RowsPerHour / scale // 12
+
 	// Gutter / timestamp lane is exactly 7 characters wide: " HH:MM "
 	const timestampLaneW = 7
 	leftSpacerW := 4
@@ -97,8 +101,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	// Pre-calculate cell widths based on task overlaps
 	cellWidths := make([][]int, numCols)
 	for c := 0; c < numCols; c++ {
-		cellWidths[c] = make([]int, viewmodel.TotalRows)
-		for r := 0; r < viewmodel.TotalRows; r++ {
+		cellWidths[c] = make([]int, visualRows)
+		for r := 0; r < visualRows; r++ {
 			if c == numCols-1 {
 				cellWidths[c][r] = colsAreaW - (numCols-1)*colW
 			} else {
@@ -109,8 +113,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	for _, rc := range cols {
 		if rc.TotalCol == 1 {
-			startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute))
-			endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End.Add(-1 * time.Minute))
+			startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute)) / scale
+			endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End.Add(-1 * time.Minute)) / scale
 
 			// Adjust startRow for commute buffer
 			if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
@@ -133,8 +137,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				startRow = 0
 			}
 			limitRow := endRow
-			if limitRow >= viewmodel.TotalRows {
-				limitRow = viewmodel.TotalRows - 1
+			if limitRow >= visualRows {
+				limitRow = visualRows - 1
 			}
 
 			for r := startRow; r <= limitRow; r++ {
@@ -148,21 +152,21 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	nowRow := -1
 	if isToday {
-		nowRow = viewmodel.TimeToRow(now)
+		nowRow = viewmodel.TimeToRow(now) / scale
 	}
 
 	// ── Initialize Columns ───────────────────────────────────────────
-	gutterRows := make([]string, viewmodel.TotalRows)
-	leftSpacerRows := make([]string, viewmodel.TotalRows)
-	rightSpacerRows := make([]string, viewmodel.TotalRows)
+	gutterRows := make([]string, visualRows)
+	leftSpacerRows := make([]string, visualRows)
+	rightSpacerRows := make([]string, visualRows)
 	taskRows := make([][]string, numCols)
 	for c := 0; c < numCols; c++ {
-		taskRows[c] = make([]string, viewmodel.TotalRows)
+		taskRows[c] = make([]string, visualRows)
 	}
 
-	for r := 0; r < viewmodel.TotalRows; r++ {
-		isHourRow := r%viewmodel.RowsPerHour == 0
-		hour := r / viewmodel.RowsPerHour
+	for r := 0; r < visualRows; r++ {
+		isHourRow := r%visualRowsPerHour == 0
+		hour := r / visualRowsPerHour
 
 		// 1. Gutter / Timestamp Lane (7 chars: " HH:MM ")
 		var label string
@@ -231,8 +235,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	// Overlay tasks onto the columns
 	for _, rc := range cols {
-		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute))
-		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End.Add(-1 * time.Minute))
+		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start.Add(1 * time.Minute)) / scale
+		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End.Add(-1 * time.Minute)) / scale
 
 		colIndex := rc.ColIndex
 		if colIndex >= numCols {
@@ -262,11 +266,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			h = 1
 		}
 
-		if startRow+h > viewmodel.TotalRows {
-			h = viewmodel.TotalRows - startRow
+		if startRow+h > visualRows {
+			h = visualRows - startRow
 		}
-
-
 
 		isActive := isToday && now.After(rc.Task.TimeWindow.Start) && now.Before(rc.Task.TimeWindow.End)
 		isSelected := !m.TodoShelfFocus && !m.SidebarFocus && rc.Task.UUID == m.SelectedTaskUUID
@@ -294,7 +296,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				topCommuteLines := strings.Split(topCommuteStr, "\n")
 				for i, line := range topCommuteLines {
 					r := topStartRow + i
-					if r >= viewmodel.TotalRows {
+					if r >= visualRows {
 						break
 					}
 					taskRows[colIndex][r] = line
@@ -313,7 +315,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		actualCardHeightWritten := 0
 		for i, line := range cardLines {
 			r := startRow + i
-			if r >= viewmodel.TotalRows {
+			if r >= visualRows {
 				break
 			}
 			taskRows[colIndex][r] = line
@@ -338,7 +340,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				bottomCommuteLines := strings.Split(strings.TrimSpace(bottomCommuteStr), "\n")
 				for i, line := range bottomCommuteLines {
 					r := startRow + currentRowOffset + i
-					if r >= viewmodel.TotalRows {
+					if r >= visualRows {
 						break
 					}
 					taskRows[colIndex][r] = line
@@ -360,7 +362,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			restLines := strings.Split(strings.TrimSpace(restStr), "\n")
 			for i, line := range restLines {
 				r := startRow + currentRowOffset + i
-				if r >= viewmodel.TotalRows {
+				if r >= visualRows {
 					break
 				}
 				taskRows[colIndex][r] = line
@@ -383,8 +385,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	}
 
 	// ── Assemble all rows ────────────────────────────────────────────
-	allRows := make([]string, viewmodel.TotalRows)
-	for r := 0; r < viewmodel.TotalRows; r++ {
+	allRows := make([]string, visualRows)
+	for r := 0; r < visualRows; r++ {
 		var sb strings.Builder
 		sb.WriteString(gutterRows[r])
 		sb.WriteString(leftSpacerRows[r])
@@ -401,7 +403,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		visibleH = 8
 	}
 
-	centerRow := m.TimelineHour * viewmodel.RowsPerHour
+	centerRow := m.TimelineHour * visualRowsPerHour
 	startR := centerRow - visibleH/2
 
 	// ── Smart Focus Tracking Adjustment Mechanism ───────────────────
@@ -418,7 +420,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 
 		// Sync back to m.TimelineHour so manual scroll starts from this adjusted position
-		m.TimelineHour = (startR + visibleH/2) / viewmodel.RowsPerHour
+		m.TimelineHour = (startR + visibleH/2) / visualRowsPerHour
 		if m.TimelineHour < 0 {
 			m.TimelineHour = 0
 		}
@@ -430,8 +432,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	if startR < 0 {
 		startR = 0
 	}
-	if startR > viewmodel.TotalRows-visibleH {
-		startR = viewmodel.TotalRows - visibleH
+	if startR > visualRows-visibleH {
+		startR = visualRows - visibleH
 	}
 
 	var visible []string
@@ -492,7 +494,7 @@ func durationToRows(dur time.Duration) int {
 	if mins <= 0 {
 		return 0
 	}
-	return (mins*viewmodel.RowsPerHour + 59) / 60
+	return (mins*(viewmodel.RowsPerHour/5) + 59) / 60
 }
 
 

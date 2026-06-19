@@ -118,31 +118,42 @@ func NewTaskForm() TaskForm {
 func (f TaskForm) VisibleFields() []int {
 	var fields []int
 	fields = append(fields, 0, 1, 2)
-	if f.TaskTypeIdx != 2 && f.TaskTypeIdx != 3 && f.TaskTypeIdx != 4 {
+	// Story Points (3) only visible for Task (0)
+	if f.TaskTypeIdx == 0 {
 		fields = append(fields, 3)
 	}
 	fields = append(fields, 4)
 
-	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
-		fields = append(fields, 5, 6)
-	} else if f.TaskTypeIdx == 4 {
-		fields = append(fields, 14, 5, 15, 6)
-	} else if f.TaskTypeIdx == 2 {
-		fields = append(fields, 5, 6)
+	// Is Anchored (16) only visible for Task (0)
+	if f.TaskTypeIdx == 0 {
+		fields = append(fields, 16)
 	}
 
-	if f.TaskTypeIdx == 4 {
-		fields = append(fields, 7)
+	if f.TaskTypeIdx == 0 {
+		if f.IsAnchoredIdx == 1 {
+			fields = append(fields, 5, 6)
+		} else {
+			fields = append(fields, 6)
+		}
+	} else if f.TaskTypeIdx == 1 {
+		// Reminder: Due Date (5), Due Time (6)
+		fields = append(fields, 5, 6)
+	} else if f.TaskTypeIdx == 2 {
+		// Habit: Start Time (5), Duration (6)
+		fields = append(fields, 5, 6)
+	} else if f.TaskTypeIdx == 3 {
+		// Event: Start Date (14), Start Time (5), End Date (15), Duration (6), Location (7)
+		fields = append(fields, 14, 5, 15, 6, 7)
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
 			fields = append(fields, 8)
 		}
 	}
 
 	if !f.IsEditing {
-		if f.TaskTypeIdx == 3 {
+		if f.TaskTypeIdx == 2 {
 			// Habit is always recurring
 			fields = append(fields, 12, 13)
-		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 4 {
+		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
 			fields = append(fields, 11)
 			if f.IsRecurringIdx == 1 {
 				fields = append(fields, 12, 13)

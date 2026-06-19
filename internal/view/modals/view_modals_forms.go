@@ -108,19 +108,32 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	fields = append(fields, renderField(nextFieldNum(), "Title", f.TitleInput.View(), 0))
 	fields = append(fields, renderField(nextFieldNum(), "Description", f.DescInput.View(), 1))
 	fields = append(fields, renderDropdown(nextFieldNum(), "Priority", priorityValStr, 2))
-	if f.TaskTypeIdx != 2 && f.TaskTypeIdx != 3 && f.TaskTypeIdx != 4 {
+	if f.TaskTypeIdx == 0 {
 		fields = append(fields, renderDropdown(nextFieldNum(), "Story Points", spValStr, 3))
 	}
 	fields = append(fields, renderDropdown(nextFieldNum(), "Type", typeValStr, 4))
-	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 3 {
-		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
-		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
+	if f.TaskTypeIdx == 0 {
+		ancOptStr := "No"
+		if f.IsAnchoredIdx == 1 {
+			ancOptStr = "Yes"
+		}
+		fields = append(fields, renderDropdown(nextFieldNum(), "Is Anchored", ancOptStr, 16))
+	}
+
+	if f.TaskTypeIdx == 0 {
+		if f.IsAnchoredIdx == 1 {
+			fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
+			fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
+		} else {
+			fields = append(fields, renderField(nextFieldNum(), "Est. Duration (min)", f.DurationInput.View(), 6))
+		}
 	} else if f.TaskTypeIdx == 1 {
-		fields = append(fields, renderField(nextFieldNum(), "Est. Duration (min)", f.DurationInput.View(), 6))
-	} else if f.TaskTypeIdx == 2 {
 		fields = append(fields, renderField(nextFieldNum(), "Due Date", f.DueDateInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), 6))
-	} else if f.TaskTypeIdx == 4 {
+	} else if f.TaskTypeIdx == 2 {
+		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
+		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
+	} else if f.TaskTypeIdx == 3 {
 		fields = append(fields, renderField(nextFieldNum(), "Start Date", f.StartDateInput.View(), 14))
 		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "End Date", f.EndDateInput.View(), 15))
@@ -132,11 +145,11 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	}
 
 	if !f.IsEditing {
-		if f.TaskTypeIdx == 3 {
+		if f.TaskTypeIdx == 2 {
 			// Habit is always recurring
 			fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
 			fields = append(fields, renderDaysSelect(nextFieldNum(), "Recurring Days", 13))
-		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 4 {
+		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
 			recOptStr := "No"
 			if f.IsRecurringIdx == 1 {
 				recOptStr = "Yes"

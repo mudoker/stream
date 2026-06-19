@@ -55,18 +55,21 @@ func (m *Model) startEditMode(task model.Task) {
 
 	if task.SchedulingType == model.Anchored {
 		m.Form.TaskTypeIdx = 0
+		m.Form.IsAnchoredIdx = 1
 		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
 		durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
 		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
-	} else if task.SchedulingType == model.Event {
-		m.Form.TaskTypeIdx = 4
-		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
-		durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
-		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
-		m.Form.LocationInput.SetValue(task.Location)
-		m.Form.CommuteInput.SetValue(fmt.Sprintf("%d", task.CommuteBuffer))
+	} else if task.SchedulingType == model.Floating {
+		m.Form.TaskTypeIdx = 0
+		m.Form.IsAnchoredIdx = 0
+		m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
+		if task.EstimatedDurationMins > 0 {
+			m.Form.DurationInput.SetValue(fmt.Sprintf("%d", task.EstimatedDurationMins))
+		} else {
+			m.Form.DurationInput.SetValue("60")
+		}
 	} else if task.SchedulingType == model.Reminder {
-		m.Form.TaskTypeIdx = 2
+		m.Form.TaskTypeIdx = 1
 		if task.TimeWindow.Start.Second() == 1 {
 			m.Form.StartTimeInput.SetValue("")
 		} else {
@@ -75,7 +78,7 @@ func (m *Model) startEditMode(task model.Task) {
 		m.Form.DueDateInput.SetValue(task.TimeWindow.Start.Format("2006-01-02"))
 		m.Form.DurationInput.SetValue("60")
 	} else if task.SchedulingType == model.Habit {
-		m.Form.TaskTypeIdx = 3
+		m.Form.TaskTypeIdx = 2
 		if !task.TimeWindow.Start.IsZero() {
 			m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
 			durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
@@ -84,14 +87,13 @@ func (m *Model) startEditMode(task model.Task) {
 			m.Form.StartTimeInput.SetValue("")
 			m.Form.DurationInput.SetValue("60")
 		}
-	} else {
-		m.Form.TaskTypeIdx = 1
-		m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
-		if task.EstimatedDurationMins > 0 {
-			m.Form.DurationInput.SetValue(fmt.Sprintf("%d", task.EstimatedDurationMins))
-		} else {
-			m.Form.DurationInput.SetValue("60")
-		}
+	} else if task.SchedulingType == model.Event {
+		m.Form.TaskTypeIdx = 3
+		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
+		durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
+		m.Form.LocationInput.SetValue(task.Location)
+		m.Form.CommuteInput.SetValue(fmt.Sprintf("%d", task.CommuteBuffer))
 	}
 
 	m.Form.TagsInput.SetValue(strings.Join(task.Tags, ", "))

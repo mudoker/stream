@@ -167,7 +167,7 @@ func getWeekViewLines(m *viewmodel.Model, t theme.Theme, colWidth int) ([][]stri
 		if len(resolved) == 0 {
 			cardsContent = append(cardsContent, "", lipgloss.NewStyle().Foreground(t.Muted).Render("  (No work)"))
 		} else {
-			for _, rc := range resolved {
+			for idx, rc := range resolved {
 				timeText := fmt.Sprintf("%s-%s", rc.Task.TimeWindow.Start.Format("15:04"), rc.Task.TimeWindow.End.Format("15:04"))
 				blockColor := t.PriorityColor(rc.Task.Priority)
 				if rc.Task.UUID == m.SelectedTaskUUID {
@@ -221,7 +221,14 @@ func getWeekViewLines(m *viewmodel.Model, t theme.Theme, colWidth int) ([][]stri
 				}
 
 				cardLines := strings.Split(cardStr, "\n")
-				cardsContent = append(cardsContent, "") // empty line spacing
+				if idx > 0 {
+					prevTask := resolved[idx-1].Task
+					if rc.Task.TimeWindow.Start.Equal(prevTask.TimeWindow.End) {
+						// Contiguous - do not add empty line spacing
+					} else {
+						cardsContent = append(cardsContent, "") // empty line spacing
+					}
+				}
 				cardsContent = append(cardsContent, cardLines...)
 			}
 		}

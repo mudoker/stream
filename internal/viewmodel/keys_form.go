@@ -144,6 +144,10 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Form.RecurringEndDateInput, cmd = m.Form.RecurringEndDateInput.Update(msg)
 	case 13:
 		// Do not pass raw text keystrokes to prevent manual text typing on multi-select
+	case 14:
+		m.Form.StartDateInput, cmd = m.Form.StartDateInput.Update(msg)
+	case 15:
+		m.Form.EndDateInput, cmd = m.Form.EndDateInput.Update(msg)
 	}
 
 	return m, cmd
@@ -158,6 +162,8 @@ func (m *Model) focusFormFields() {
 	m.Form.DueDateInput.Blur()
 	m.Form.LocationInput.Blur()
 	m.Form.CommuteInput.Blur()
+	m.Form.StartDateInput.Blur()
+	m.Form.EndDateInput.Blur()
 	m.Form.RecurringEndDateInput.Blur()
 	m.Form.RecurringDaysInput.Blur()
 
@@ -194,6 +200,10 @@ func (m *Model) focusFormFields() {
 		m.Form.RecurringEndDateInput.Focus()
 	case 13:
 		m.Form.RecurringDaysInput.Focus()
+	case 14:
+		m.Form.StartDateInput.Focus()
+	case 15:
+		m.Form.EndDateInput.Focus()
 	}
 }
 
@@ -319,9 +329,33 @@ func (m *Model) SubmitForm() {
 	} else if taskType == 4 {
 		newTask.SchedulingType = model.Event
 		newTask.StoryPoints = 0
+
+		startDateStr := strings.TrimSpace(m.Form.StartDateInput.Value())
+		endDateStr := strings.TrimSpace(m.Form.EndDateInput.Value())
+		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
+
+		startDay, errS := time.Parse("2006-01-02", startDateStr)
+		if errS != nil {
+			startDay = baseDay
+		}
+		endDay, errE := time.Parse("2006-01-02", endDateStr)
+		if errE != nil {
+			endDay = startDay
+		}
+
+		hour, min := ParseFlexibleTime(timeStr, 9, 0)
+		startTime = time.Date(startDay.Year(), startDay.Month(), startDay.Day(), hour, min, 0, 0, now.Location())
+
+		durStr := m.Form.DurationInput.Value()
+		if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+			duration = d
+		}
+
+		endTime := time.Date(endDay.Year(), endDay.Month(), endDay.Day(), hour, min, 0, 0, now.Location()).Add(time.Duration(duration) * time.Minute)
+
 		newTask.TimeWindow = model.TimeWindow{
 			Start: startTime,
-			End:   startTime.Add(time.Duration(duration) * time.Minute),
+			End:   endTime,
 		}
 		newTask.Location = m.Form.LocationInput.Value()
 		commuteMins := 0
@@ -461,9 +495,10 @@ func (m *Model) SubmitForm() {
 						}
 						instance.LifecycleState = model.StateReady
 					} else {
-						instance.SchedulingType = model.Anchored
+						instance.SchedulingType = newTask.SchedulingType
 						instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), startTime.Hour(), startTime.Minute(), startTime.Second(), 0, startTime.Location())
-						instance.TimeWindow.End = instance.TimeWindow.Start.Add(time.Duration(duration) * time.Minute)
+						occDuration := newTask.TimeWindow.End.Sub(newTask.TimeWindow.Start)
+						instance.TimeWindow.End = instance.TimeWindow.Start.Add(occDuration)
 						instance.LifecycleState = model.StateScheduled
 					}
 

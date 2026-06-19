@@ -25,6 +25,8 @@ type TaskForm struct {
 	DurationInput         textinput.Model
 	TagsInput             textinput.Model
 	DueDateInput          textinput.Model
+	StartDateInput        textinput.Model
+	EndDateInput          textinput.Model
 	LocationInput         textinput.Model
 	CommuteInput          textinput.Model
 	IsRecurringIdx        int // 0: No, 1: Yes
@@ -74,6 +76,14 @@ func NewTaskForm() TaskForm {
 	reDays.Placeholder = "Mon, Wed, Fri"
 	reDays.SetValue("Mon, Tue, Wed, Thu, Fri")
 
+	startDate := textinput.New()
+	startDate.Placeholder = now.Format("2006-01-02")
+	startDate.SetValue(now.Format("2006-01-02"))
+
+	endDate := textinput.New()
+	endDate.Placeholder = now.Format("2006-01-02")
+	endDate.SetValue(now.Format("2006-01-02"))
+
 	form := TaskForm{
 		PriorityIdx:           2,
 		SPIdx:                 2,
@@ -88,6 +98,8 @@ func NewTaskForm() TaskForm {
 		DurationInput:         dur,
 		TagsInput:             tags,
 		DueDateInput:          dd,
+		StartDateInput:        startDate,
+		EndDateInput:          endDate,
 		LocationInput:         loc,
 		CommuteInput:          commute,
 		IsRecurringIdx:        0,
@@ -109,8 +121,10 @@ func (f TaskForm) VisibleFields() []int {
 	}
 	fields = append(fields, 4)
 
-	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 || f.TaskTypeIdx == 4 {
+	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
 		fields = append(fields, 5, 6)
+	} else if f.TaskTypeIdx == 4 {
+		fields = append(fields, 14, 5, 15, 6)
 	} else if f.TaskTypeIdx == 2 {
 		fields = append(fields, 5, 6)
 	}
@@ -126,7 +140,7 @@ func (f TaskForm) VisibleFields() []int {
 		if f.TaskTypeIdx == 3 {
 			// Habit is always recurring
 			fields = append(fields, 12, 13)
-		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 {
+		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 4 {
 			fields = append(fields, 11)
 			if f.IsRecurringIdx == 1 {
 				fields = append(fields, 12, 13)

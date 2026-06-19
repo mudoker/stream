@@ -117,3 +117,54 @@ func TestEventTaskFormCreationNoLocation(t *testing.T) {
 		t.Errorf("expected CommuteBuffer to be 0 since location was empty, got %d", task.CommuteBuffer)
 	}
 }
+
+func TestEventTaskFormCreationStartEndDates(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	m.Form = viewmodel.NewTaskForm()
+
+	// Fill the form fields for an Event with different start/end dates
+	m.Form.TitleInput.SetValue("Multi-day Event")
+	m.Form.DescInput.SetValue("Hackathon weekend")
+	m.Form.PriorityIdx = 1
+	m.Form.TaskTypeIdx = 4 // Event
+	m.Form.StartDateInput.SetValue("2026-06-20")
+	m.Form.StartTimeInput.SetValue("09:00")
+	m.Form.EndDateInput.SetValue("2026-06-22")
+	m.Form.DurationInput.SetValue("180") // 3 hours duration relative to endDay
+
+	// Submit form
+	m.SubmitForm()
+
+	tasks := database.GetTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task in database, got %d", len(tasks))
+	}
+
+	task := tasks[0]
+	if task.SchedulingType != model.Event {
+		t.Errorf("expected EVENT scheduling type, got %s", task.SchedulingType)
+	}
+
+	expectedStartStr := "2026-06-20 09:00:00"
+	expectedEndStr := "2026-06-22 12:00:00" // 09:00 + 180 min
+
+	actualStartStr := task.TimeWindow.Start.Local().Format("2006-01-02 15:04:05")
+	actualEndStr := task.TimeWindow.End.Local().Format("2006-01-02 15:04:05")
+
+	if actualStartStr != expectedStartStr {
+		t.Errorf("expected start %s, got %s", expectedStartStr, actualStartStr)
+	}
+	if actualEndStr != expectedEndStr {
+		t.Errorf("expected end %s, got %s", expectedEndStr, actualEndStr)
+	}
+}

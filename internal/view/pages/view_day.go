@@ -132,11 +132,12 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			if startRow < 0 {
 				startRow = 0
 			}
-			if endRow > viewmodel.TotalRows {
-				endRow = viewmodel.TotalRows
+			limitRow := endRow
+			if limitRow >= viewmodel.TotalRows {
+				limitRow = viewmodel.TotalRows - 1
 			}
 
-			for r := startRow; r < endRow; r++ {
+			for r := startRow; r <= limitRow; r++ {
 				cellWidths[0][r] = colsAreaW
 				for c := 1; c < numCols; c++ {
 					cellWidths[c][r] = 0
@@ -228,9 +229,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End)
 
 		// Map structural height accurately across row milestones
-		h := endRow - startRow
-		if h < 1 {
-			h = 1
+		h := endRow - startRow + 1
+		if h < 2 {
+			h = 2
 		}
 
 		if startRow+h > viewmodel.TotalRows {

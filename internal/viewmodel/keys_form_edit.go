@@ -37,6 +37,22 @@ func (m *Model) startEditMode(task model.Task) {
 	m.Form.LocationInput.SetValue("")
 	m.Form.CommuteInput.SetValue("0")
 
+	startDateVal := task.TimeWindow.Start.Format("2006-01-02")
+	if task.TimeWindow.Start.IsZero() {
+		startDateVal = m.SelectedDay.Format("2006-01-02")
+	}
+	m.Form.StartDateInput.SetValue(startDateVal)
+
+	endDateVal := task.TimeWindow.End.Format("2006-01-02")
+	if task.TimeWindow.End.IsZero() {
+		if !task.TimeWindow.Start.IsZero() {
+			endDateVal = task.TimeWindow.Start.Format("2006-01-02")
+		} else {
+			endDateVal = m.SelectedDay.Format("2006-01-02")
+		}
+	}
+	m.Form.EndDateInput.SetValue(endDateVal)
+
 	if task.SchedulingType == model.Anchored {
 		m.Form.TaskTypeIdx = 0
 		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))

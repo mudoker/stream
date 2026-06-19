@@ -121,7 +121,9 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		fields = append(fields, renderField(nextFieldNum(), "Due Date", f.DueDateInput.View(), 5))
 		fields = append(fields, renderField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), 6))
 	} else if f.TaskTypeIdx == 4 {
+		fields = append(fields, renderField(nextFieldNum(), "Start Date", f.StartDateInput.View(), 14))
 		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
+		fields = append(fields, renderField(nextFieldNum(), "End Date", f.EndDateInput.View(), 15))
 		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
 		fields = append(fields, renderField(nextFieldNum(), "Location", f.LocationInput.View(), 7))
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
@@ -134,7 +136,7 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			// Habit is always recurring
 			fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
 			fields = append(fields, renderDaysSelect(nextFieldNum(), "Recurring Days", 13))
-		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 {
+		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 4 {
 			recOptStr := "No"
 			if f.IsRecurringIdx == 1 {
 				recOptStr = "Yes"

@@ -228,16 +228,18 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start)
 		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End)
 
-		// Check if there is a consecutive task starting at this task's end time
-		hasConsecutive := false
+		// Check if there is a consecutive task preceding this task
+		hasConsecutivePredecessor := false
 		for _, other := range cols {
-			if other.Task.UUID != rc.Task.UUID && other.Task.TimeWindow.Start.Equal(rc.Task.TimeWindow.End) {
-				hasConsecutive = true
+			if other.Task.UUID != rc.Task.UUID && other.Task.TimeWindow.End.Equal(rc.Task.TimeWindow.Start) {
+				hasConsecutivePredecessor = true
 				break
 			}
 		}
-		if hasConsecutive {
-			endRow = endRow - 1
+
+		// If consecutive predecessor exists, shift startRow down by 1 to prevent border overlap and keep both cards fully boxed
+		if hasConsecutivePredecessor {
+			startRow = startRow + 1
 		}
 
 		// Map structural height accurately across row milestones

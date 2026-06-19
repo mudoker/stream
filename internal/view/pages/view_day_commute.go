@@ -11,7 +11,7 @@ import (
 )
 
 // renderTimelineBufferBlock abstracts rendering a timeline block with dashed borders
-// and centered text inside. It supports both top (┌) and bottom (└) corner borders.
+// and centered text inside. It is fully boxed with both top and bottom borders.
 func renderTimelineBufferBlock(w, h int, text string, isTop bool, color lipgloss.Color) string {
 	if w < 3 {
 		w = 3
@@ -23,32 +23,28 @@ func renderTimelineBufferBlock(w, h int, text string, isTop bool, color lipgloss
 	borderStyle := lipgloss.NewStyle().Foreground(color)
 	textStyle := lipgloss.NewStyle().Foreground(color).Italic(true)
 
-	var leftCorner, rightCorner string
-	if isTop {
-		leftCorner = "┌"
-		rightCorner = "┐"
-	} else {
-		leftCorner = "└"
-		rightCorner = "┘"
-	}
-
 	horizChar := "╌"
 	vertChar := "┊"
 
 	var lines []string
 
 	if h == 1 {
-		line := embedTextInLine(leftCorner, rightCorner, horizChar, text, w, borderStyle, textStyle)
+		// Single row: use top corners with embedded text
+		line := embedTextInLine("┌", "┐", horizChar, text, w, borderStyle, textStyle)
 		lines = append(lines, line)
+	} else if h == 2 {
+		// Two rows: first row has top corners and text, second row has bottom corners
+		topLine := embedTextInLine("┌", "┐", horizChar, text, w, borderStyle, textStyle)
+		bottomLine := borderStyle.Render("└" + strings.Repeat(horizChar, w-2) + "┘")
+		lines = append(lines, topLine, bottomLine)
 	} else {
-		borderLine := borderStyle.Render(leftCorner + strings.Repeat(horizChar, w-2) + rightCorner)
-		centerRow := (h - 1) / 2
+		// Three or more rows: top border, middle body rows (with centered text), bottom border
+		topBorderLine := borderStyle.Render("┌" + strings.Repeat(horizChar, w-2) + "┐")
+		bottomBorderLine := borderStyle.Render("└" + strings.Repeat(horizChar, w-2) + "┘")
+		centerRow := 1 + (h-3)/2 // Center among the middle rows (indices 1 to h-2)
 
-		if isTop {
-			lines = append(lines, borderLine)
-		}
-
-		for i := 0; i < h-1; i++ {
+		lines = append(lines, topBorderLine)
+		for i := 1; i < h-1; i++ {
 			var line string
 			if i == centerRow {
 				line = embedTextInLine(vertChar, vertChar, " ", text, w, borderStyle, textStyle)
@@ -57,10 +53,7 @@ func renderTimelineBufferBlock(w, h int, text string, isTop bool, color lipgloss
 			}
 			lines = append(lines, line)
 		}
-
-		if !isTop {
-			lines = append(lines, borderLine)
-		}
+		lines = append(lines, bottomBorderLine)
 	}
 
 	return strings.Join(lines, "\n")

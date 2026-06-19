@@ -796,5 +796,65 @@ func TestTaskDurationAdjustModeHabit(t *testing.T) {
 	}
 }
 
+func TestGetDayTasks_ExcludesOriginalWithClone(t *testing.T) {
+	day := time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local)
+	task1 := model.Task{
+		UUID:           "task-1",
+		Title:          "Original Task",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(10 * time.Hour),
+			End:   day.Add(11 * time.Hour),
+		},
+	}
+	task1Adjusting := model.Task{
+		UUID:           "task-1_adjusting",
+		Title:          "Adjusting Task",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(10 * time.Hour),
+			End:   day.Add(12 * time.Hour),
+		},
+	}
+	task2 := model.Task{
+		UUID:           "task-2",
+		Title:          "Another Task",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(13 * time.Hour),
+			End:   day.Add(14 * time.Hour),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:       []model.Task{task1, task1Adjusting, task2},
+		SelectedDay: day,
+	}
+
+	dayTasks := m.GetDayTasks()
+
+	if len(dayTasks) != 2 {
+		t.Fatalf("expected exactly 2 day tasks, got %d", len(dayTasks))
+	}
+
+	foundOriginal := false
+	foundClone := false
+	for _, dt := range dayTasks {
+		if dt.UUID == "task-1" {
+			foundOriginal = true
+		}
+		if dt.UUID == "task-1_adjusting" {
+			foundClone = true
+		}
+	}
+
+	if foundOriginal {
+		t.Errorf("expected original task-1 to be filtered out, but it was found")
+	}
+	if !foundClone {
+		t.Errorf("expected adjusting clone task-1_adjusting to be found, but it was not")
+	}
+}
+
 
 

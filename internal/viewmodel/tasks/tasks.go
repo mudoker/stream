@@ -3,6 +3,7 @@ package tasks
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"stream/internal/model"
@@ -52,8 +53,20 @@ func ImportSort(tasks []model.Task) {
 }
 
 func GetDayTasks(allTasks []model.Task, day time.Time) []model.Task {
+	clones := make(map[string]bool)
+	for _, t := range allTasks {
+		if strings.HasSuffix(t.UUID, "_moving") {
+			clones[strings.TrimSuffix(t.UUID, "_moving")] = true
+		} else if strings.HasSuffix(t.UUID, "_adjusting") {
+			clones[strings.TrimSuffix(t.UUID, "_adjusting")] = true
+		}
+	}
+
 	var list []model.Task
 	for _, t := range allTasks {
+		if clones[t.UUID] {
+			continue
+		}
 		if model.IsTaskAnchored(t) && sameDay(t.TimeWindow.Start, day) {
 			list = append(list, t)
 		}

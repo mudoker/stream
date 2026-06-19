@@ -72,8 +72,20 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	headerLine := prefix + dayName + "  " + dayDate + strings.Repeat(" ", padW) + navHint
 
 	// ── Resolve overlapping tasks and overlay cards ──────────────────
+	clones := make(map[string]bool)
+	for _, task := range m.Tasks {
+		if strings.HasSuffix(task.UUID, "_moving") {
+			clones[strings.TrimSuffix(task.UUID, "_moving")] = true
+		} else if strings.HasSuffix(task.UUID, "_adjusting") {
+			clones[strings.TrimSuffix(task.UUID, "_adjusting")] = true
+		}
+	}
+
 	var anchoredTasks []model.Task
 	for _, task := range m.Tasks {
+		if clones[task.UUID] {
+			continue
+		}
 		if model.IsTaskAnchored(task) && viewmodel.SameDay(task.TimeWindow.Start, m.SelectedDay) {
 			anchoredTasks = append(anchoredTasks, task)
 		}

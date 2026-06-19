@@ -17,8 +17,8 @@ func (m *Model) EnterTaskDurationAdjustMode() {
 		m.StatusMsg = "No task selected to adjust duration."
 		return
 	}
-	if task.SchedulingType != model.Anchored && task.SchedulingType != model.Event {
-		m.StatusMsg = "Only anchored tasks and events can have their duration adjusted with V."
+	if !model.IsTaskAnchored(task) {
+		m.StatusMsg = "Only anchored tasks, events, and habits can have their duration adjusted with V."
 		return
 	}
 
@@ -71,8 +71,8 @@ func (m *Model) applyTaskDurationAdjust(direction int) {
 		m.StatusMsg = "No task selected to adjust duration."
 		return
 	}
-	if task.SchedulingType != model.Anchored && task.SchedulingType != model.Event {
-		m.StatusMsg = "Only anchored tasks and events can have their duration adjusted with V."
+	if !model.IsTaskAnchored(task) {
+		m.StatusMsg = "Only anchored tasks, events, and habits can have their duration adjusted with V."
 		return
 	}
 

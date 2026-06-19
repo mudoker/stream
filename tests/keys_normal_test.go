@@ -768,5 +768,33 @@ func TestAutoScrollToSelectedTask_LengthyTaskDurationAdjust(t *testing.T) {
 	}
 }
 
+func TestTaskDurationAdjustModeHabit(t *testing.T) {
+	start := time.Date(2026, 6, 6, 10, 0, 0, 0, time.UTC)
+	habit := model.Task{
+		UUID:           "habit-1",
+		SchedulingType: model.Habit,
+		TimeWindow: model.TimeWindow{
+			Start: start,
+			End:   start.Add(time.Hour),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{habit},
+		SelectedTaskUUID: "habit-1",
+	}
+
+	m.EnterTaskDurationAdjustMode()
+	if m.CurrentMode != viewmodel.ModeTaskDurationAdjust {
+		t.Fatal("expected habit to be adjustable with V")
+	}
+
+	m.HandleTaskDurationAdjustKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	dur := m.Tasks[1].TimeWindow.End.Sub(m.Tasks[1].TimeWindow.Start)
+	if dur != 75*time.Minute {
+		t.Fatalf("expected adjusted habit duration to be 75 mins, got %s", dur)
+	}
+}
+
 
 

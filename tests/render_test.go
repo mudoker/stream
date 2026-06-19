@@ -188,8 +188,8 @@ func TestRenderRestBlock(t *testing.T) {
 	if !strings.Contains(h1, "Rest 15m (10:15)") {
 		t.Errorf("Expected height-1 rest block to contain 'Rest 15m (10:15)', got: %q", h1)
 	}
-	if !strings.HasPrefix(h1, "┌") || !strings.HasSuffix(h1, "┐") {
-		t.Errorf("Expected height-1 rest block to have top corners '┌'/'┐', got: %q", h1)
+	if !strings.HasPrefix(h1, "└") || !strings.HasSuffix(h1, "┘") {
+		t.Errorf("Expected height-1 rest block to have bottom corners '└'/'┘', got: %q", h1)
 	}
 
 	// Test height 2 (not completed, not focused)
@@ -201,8 +201,8 @@ func TestRenderRestBlock(t *testing.T) {
 	if !strings.Contains(h2Lines[0], "Rest 15m (10:15)") {
 		t.Errorf("Expected first line of height-2 rest block to contain 'Rest 15m (10:15)', got: %q", h2Lines[0])
 	}
-	if !strings.HasPrefix(h2Lines[0], "┌") || !strings.HasSuffix(h2Lines[0], "┐") {
-		t.Errorf("Expected top line of height-2 rest block to have top corners '┌'/'┐', got: %q", h2Lines[0])
+	if !strings.HasPrefix(h2Lines[0], "┊") || !strings.HasSuffix(h2Lines[0], "┊") {
+		t.Errorf("Expected top line of height-2 rest block to have side borders '┊', got: %q", h2Lines[0])
 	}
 	if !strings.HasPrefix(h2Lines[1], "└") || !strings.HasSuffix(h2Lines[1], "┘") {
 		t.Errorf("Expected bottom line of height-2 rest block to have bottom corners '└'/'┘', got: %q", h2Lines[1])
@@ -214,8 +214,8 @@ func TestRenderRestBlock(t *testing.T) {
 	if len(h3Lines) != 3 {
 		t.Fatalf("Expected height-3 rest block to have 3 lines, got %d", len(h3Lines))
 	}
-	if !strings.HasPrefix(h3Lines[0], "┌") || !strings.HasSuffix(h3Lines[0], "┐") {
-		t.Errorf("Expected top line of height-3 rest block to have top corners '┌'/'┐', got: %q", h3Lines[0])
+	if !strings.HasPrefix(h3Lines[0], "┊") || !strings.HasSuffix(h3Lines[0], "┊") {
+		t.Errorf("Expected top line of height-3 rest block to have side borders '┊', got: %q", h3Lines[0])
 	}
 	if !strings.Contains(h3Lines[1], "Rest 15m (10:15)") {
 		t.Errorf("Expected center line of height-3 rest block to contain 'Rest 15m (10:15)', got: %q", h3Lines[1])
@@ -224,7 +224,7 @@ func TestRenderRestBlock(t *testing.T) {
 		t.Errorf("Expected center line of height-3 rest block to have vertical side borders '┊', got: %q", h3Lines[1])
 	}
 	if !strings.HasPrefix(h3Lines[2], "└") || !strings.HasSuffix(h3Lines[2], "┘") {
-		t.Errorf("Expected bottom line of height-3 rest block to have bottom corners '└'/'┘', got: %q", h3Lines[2])
+		t.Errorf("Expected bottom line of height-3 rest block to have bottom corners, got: %q", h3Lines[2])
 	}
 
 	// Test completed state (not focused)

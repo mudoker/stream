@@ -223,23 +223,48 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	selectedStartRow := -1
 	selectedEndRow := -1
 
+	// Track the last occupied row for each column to handle visual spacing of consecutive blocks
+	lastOccupiedRow := make([]int, numCols)
+	for c := 0; c < numCols; c++ {
+		lastOccupiedRow[c] = -1
+	}
+
 	// Overlay tasks onto the columns
 	for _, rc := range cols {
 		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start)
 		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End)
 
-		// Check if there is a consecutive task preceding this task
+		colIndex := rc.ColIndex
+		if colIndex >= numCols {
+			colIndex = numCols - 1
+		}
+
+		// Check if there is a consecutive task preceding this task (taking commute and rest buffers into account)
 		hasConsecutivePredecessor := false
 		for _, other := range cols {
-			if other.Task.UUID != rc.Task.UUID && other.Task.TimeWindow.End.Equal(rc.Task.TimeWindow.Start) {
-				hasConsecutivePredecessor = true
-				break
+			if other.Task.UUID != rc.Task.UUID && other.ColIndex == rc.ColIndex {
+				otherEnd := taskVisualEndTime(other.Task)
+				thisStart := taskVisualStartTime(rc.Task)
+				if otherEnd.Equal(thisStart) {
+					hasConsecutivePredecessor = true
+					break
+				}
 			}
 		}
 
-		// If consecutive predecessor exists, shift startRow down by 1 to prevent border overlap and keep both cards fully boxed
-		if hasConsecutivePredecessor {
-			startRow = startRow + 1
+		// If consecutive predecessor exists, position startRow immediately after predecessor's visual block
+		commuteRows := 0
+		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+			commuteRows = durationToRows(time.Duration(rc.Task.CommuteBuffer) * time.Minute)
+		}
+
+		if hasConsecutivePredecessor && lastOccupiedRow[colIndex] != -1 {
+			topStartRow := lastOccupiedRow[colIndex] + 1
+			startRow = topStartRow + commuteRows
+		} else {
+			if startRow < 0 {
+				startRow = 0
+			}
 		}
 
 		// Map structural height accurately across row milestones
@@ -252,10 +277,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			h = viewmodel.TotalRows - startRow
 		}
 
-		colIndex := rc.ColIndex
-		if colIndex >= numCols {
-			colIndex = numCols - 1
-		}
+
 
 		isActive := isToday && now.After(rc.Task.TimeWindow.Start) && now.Before(rc.Task.TimeWindow.End)
 		isSelected := !m.TodoShelfFocus && !m.SidebarFocus && rc.Task.UUID == m.SelectedTaskUUID
@@ -359,6 +381,16 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				selectedEndRow = startRow + currentRowOffset
 			}
 		}
+
+		// Track the actual final row occupied by this visual block
+		maxRowOccupied := startRow + h - 1
+		if startRow+actualCardHeightWritten-1 > maxRowOccupied {
+			maxRowOccupied = startRow + actualCardHeightWritten - 1
+		}
+		if startRow+currentRowOffset-1 > maxRowOccupied {
+			maxRowOccupied = startRow + currentRowOffset - 1
+		}
+		lastOccupiedRow[colIndex] = maxRowOccupied
 	}
 
 	// ── Assemble all rows ────────────────────────────────────────────
@@ -472,4 +504,24 @@ func durationToRows(dur time.Duration) int {
 		return 0
 	}
 	return (mins*viewmodel.RowsPerHour + 59) / 60
+}
+
+func taskVisualStartTime(task model.Task) time.Time {
+	startTime := task.TimeWindow.Start
+	if task.SchedulingType == model.Event && strings.TrimSpace(task.Location) != "" && task.CommuteBuffer > 0 {
+		startTime = startTime.Add(-time.Duration(task.CommuteBuffer) * time.Minute)
+	}
+	return startTime
+}
+
+func taskVisualEndTime(task model.Task) time.Time {
+	endTime := task.TimeWindow.End
+	if task.SchedulingType == model.Event && strings.TrimSpace(task.Location) != "" && task.CommuteBuffer > 0 {
+		endTime = endTime.Add(time.Duration(task.CommuteBuffer) * time.Minute)
+	}
+	restDur := viewmodel.CalculateTaskRestTime(task)
+	if restDur > 0 {
+		endTime = endTime.Add(restDur)
+	}
+	return endTime
 }

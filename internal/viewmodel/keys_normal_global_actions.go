@@ -91,6 +91,9 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		}
 		return true, nil
 	case "enter":
+		if m.CurrentView == MonthView {
+			return false, nil
+		}
 		if m.CurrentView == DashboardView || m.CurrentView == AnalyticsView {
 			return true, nil
 		}

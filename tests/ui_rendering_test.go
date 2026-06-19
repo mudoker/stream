@@ -241,6 +241,7 @@ func TestConsecutiveTasksTimelineRendering(t *testing.T) {
 
 	timelineOut := pages.RenderDayTimeline(m, th, 40)
 	cleanedTimeline := cleanAnsi(timelineOut)
+	t.Logf("Timeline:\n%s", cleanedTimeline)
 
 	// Verify both task titles are rendered in the day view timeline output
 	if !strings.Contains(cleanedTimeline, "Task One") {
@@ -295,3 +296,111 @@ func TestConsecutiveTasksTimelineRendering(t *testing.T) {
 		t.Errorf("Expected top border corner characters in top border line, got: %q", topBorderLine)
 	}
 }
+
+func TestConsecutiveTasksWithRestBufferTimelineRendering(t *testing.T) {
+	today := time.Now()
+	t1 := model.Task{
+		UUID:           "task-1",
+		Title:          "Task One",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 10, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 11, 0, 0, 0, time.Local),
+		},
+	}
+	restDur := viewmodel.CalculateTaskRestTime(t1)
+	if restDur <= 0 {
+		t.Fatalf("Expected Task One to have a rest buffer, got %v", restDur)
+	}
+
+	t2 := model.Task{
+		UUID:           "task-2",
+		Title:          "Task Two",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: t1.TimeWindow.End.Add(restDur),
+			End:   t1.TimeWindow.End.Add(restDur).Add(1 * time.Hour),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{t1, t2},
+		SelectedDay:      today,
+		TimelineHour:     11,
+		SelectedTaskUUID: "task-1",
+	}
+	m.Layout.TimelineW = 40
+	m.Layout.WorkspaceW = 80
+	th := theme.NewTheme()
+
+	timelineOut := pages.RenderDayTimeline(m, th, 40)
+	cleanedTimeline := cleanAnsi(timelineOut)
+	t.Logf("Timeline:\n%s", cleanedTimeline)
+
+	if !strings.Contains(cleanedTimeline, "Task One") {
+		t.Error("Expected consecutive Task One to be rendered on the timeline")
+	}
+	if !strings.Contains(cleanedTimeline, "Task Two") {
+		t.Error("Expected consecutive Task Two to be rendered on the timeline")
+	}
+	if !strings.Contains(cleanedTimeline, "Rest") {
+		t.Error("Expected rest buffer to be rendered on the timeline")
+	}
+
+	lines := strings.Split(cleanedTimeline, "\n")
+	idx1, idxRest, idx2 := -1, -1, -1
+	for idx, line := range lines {
+		if strings.Contains(line, "Task One") && idx1 == -1 {
+			idx1 = idx
+		}
+		if strings.Contains(line, "Rest") && idxRest == -1 {
+			idxRest = idx
+		}
+		if strings.Contains(line, "Task Two") && idx2 == -1 {
+			idx2 = idx
+		}
+	}
+
+	if idx1 == -1 || idxRest == -1 || idx2 == -1 {
+		t.Fatalf("Could not find all blocks. Task One index: %d, Rest index: %d, Task Two index: %d", idx1, idxRest, idx2)
+	}
+
+	// Verify they are rendered on adjacent rows with zero blank lines/shared lines.
+	// Task One starts at row 80. Task One bottom border is row 88 (idx1 + 6).
+	// Rest buffer topLine is row 89 (idx1 + 7, has text "Rest", so idxRest = idx1 + 7).
+	// Rest buffer bottomLine is row 90 (idx1 + 8).
+	// Task Two top border is row 91 (idx1 + 9).
+	// Task Two title is row 93 (idx1 + 11 = idx2).
+	if idxRest != idx1+7 {
+		t.Errorf("Expected Rest block text line to be 7 lines after Task One title line, got %d difference", idxRest-idx1)
+	}
+	if idx2 != idx1+11 {
+		t.Errorf("Expected Task Two title line to be 11 lines after Task One title line, got %d difference", idx2-idx1)
+	}
+
+	bottomBorderTask1 := lines[idx1+6]
+	topBorderRest := lines[idx1+7]
+	bottomBorderRest := lines[idx1+8]
+	topBorderTask2 := lines[idx1+9]
+
+	// Verify Task One bottom border is closed
+	if strings.Contains(bottomBorderTask1, "├") || strings.Contains(bottomBorderTask1, "┤") || !strings.ContainsAny(bottomBorderTask1, "└╰╯┘") {
+		t.Errorf("Expected closed bottom corners in Task One: %q", bottomBorderTask1)
+	}
+
+	// Verify Rest buffer top border is closed (has ┌ and ┐)
+	if !strings.Contains(topBorderRest, "┌") || !strings.Contains(topBorderRest, "┐") {
+		t.Errorf("Expected top corners '┌'/'┐' in Rest buffer top: %q", topBorderRest)
+	}
+
+	// Verify Rest buffer bottom border is closed (has └ and ┘)
+	if !strings.Contains(bottomBorderRest, "└") || !strings.Contains(bottomBorderRest, "┘") {
+		t.Errorf("Expected bottom corners '└'/'┘' in Rest buffer bottom: %q", bottomBorderRest)
+	}
+
+	// Verify Task Two top border is closed
+	if strings.Contains(topBorderTask2, "├") || strings.Contains(topBorderTask2, "┤") || !strings.ContainsAny(topBorderTask2, "┌╭╮┐") {
+		t.Errorf("Expected closed top corners in Task Two: %q", topBorderTask2)
+	}
+}
+

@@ -383,14 +383,14 @@ func TestConsecutiveTasksWithRestBufferTimelineRendering(t *testing.T) {
 	bottomBorderRest := lines[idx1+8]
 	topBorderTask2 := lines[idx1+9]
 
-	// Verify Task One bottom border is closed
-	if strings.Contains(bottomBorderTask1, "├") || strings.Contains(bottomBorderTask1, "┤") || !strings.ContainsAny(bottomBorderTask1, "└╰╯┘") {
-		t.Errorf("Expected closed bottom corners in Task One: %q", bottomBorderTask1)
+	// Verify Task One bottom border contains connector corners (├/┤)
+	if !strings.Contains(bottomBorderTask1, "├") || !strings.Contains(bottomBorderTask1, "┤") {
+		t.Errorf("Expected Task One bottom border to contain connector corners '├'/'┤', got: %q", bottomBorderTask1)
 	}
 
-	// Verify Rest buffer top border is closed (has ┌ and ┐)
-	if !strings.Contains(topBorderRest, "┌") || !strings.Contains(topBorderRest, "┐") {
-		t.Errorf("Expected top corners '┌'/'┐' in Rest buffer top: %q", topBorderRest)
+	// Verify Rest buffer top line has vertical borders (┊) and no top border horizontal line
+	if !strings.HasPrefix(strings.TrimSpace(topBorderRest), "┊") || !strings.HasSuffix(strings.TrimSpace(topBorderRest), "┊") {
+		t.Errorf("Expected Rest buffer top line to have vertical borders '┊', got: %q", topBorderRest)
 	}
 
 	// Verify Rest buffer bottom border is closed (has └ and ┘)

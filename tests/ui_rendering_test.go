@@ -249,4 +249,49 @@ func TestConsecutiveTasksTimelineRendering(t *testing.T) {
 	if !strings.Contains(cleanedTimeline, "Task Two") {
 		t.Error("Expected consecutive Task Two to be rendered on the timeline")
 	}
+
+	lines := strings.Split(cleanedTimeline, "\n")
+	idx1, idx2 := -1, -1
+	for idx, line := range lines {
+		if strings.Contains(line, "Task One") {
+			idx1 = idx
+		}
+		if strings.Contains(line, "Task Two") {
+			idx2 = idx
+		}
+	}
+
+	if idx1 == -1 || idx2 == -1 {
+		t.Fatalf("Could not find both task titles. Task One index: %d, Task Two index: %d", idx1, idx2)
+	}
+
+	// Verify they are rendered on adjacent rows with zero blank lines/shared lines.
+	// Task One ends at 11:00 (represented by row 88). Task Two starts at 11:00, but is shifted to 89.
+	// Task One title is on row 82 (idx1). Task One bottom border is on row 88 (idx1 + 6).
+	// Task Two top border is on row 89 (idx1 + 7). Task Two title is on row 91 (idx1 + 9 = idx2).
+	if idx2-idx1 != 9 {
+		t.Errorf("Expected Task Two title line to be exactly 9 lines after Task One title line, got %d difference", idx2-idx1)
+	}
+
+	bottomBorderLine := lines[idx1+6]
+	topBorderLine := lines[idx1+7]
+
+	// Verify both borders are fully boxed (contain closed corner characters: └/╰/╯/┘ for bottom, ┌/╭/╮/┐ for top).
+	// They must not contain ├ or ┤ since they are not sharing/merging borders.
+	if strings.Contains(bottomBorderLine, "├") || strings.Contains(bottomBorderLine, "┤") {
+		t.Errorf("Expected Task One bottom border to be closed, but found corner override characters in: %q", bottomBorderLine)
+	}
+	if strings.Contains(topBorderLine, "├") || strings.Contains(topBorderLine, "┤") {
+		t.Errorf("Expected Task Two top border to be closed, but found corner override characters in: %q", topBorderLine)
+	}
+
+	// Verify standard corner characters exist in bottom border line
+	if !strings.ContainsAny(bottomBorderLine, "└╰╯┘") {
+		t.Errorf("Expected bottom border corner characters in bottom border line, got: %q", bottomBorderLine)
+	}
+
+	// Verify standard corner characters exist in top border line
+	if !strings.ContainsAny(topBorderLine, "┌╭╮┐") {
+		t.Errorf("Expected top border corner characters in top border line, got: %q", topBorderLine)
+	}
 }

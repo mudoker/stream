@@ -129,6 +129,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	}
 
 	for _, rc := range cols {
+		if strings.HasSuffix(rc.Task.UUID, "_moving") || strings.HasSuffix(rc.Task.UUID, "_adjusting") {
+			continue
+		}
 		if rc.TotalCol == 1 {
 			startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start) / scale
 			endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End) / scale
@@ -269,6 +272,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	// Overlay tasks onto the columns
 	for _, rc := range cols {
+		isSpecial := strings.HasSuffix(rc.Task.UUID, "_moving") || strings.HasSuffix(rc.Task.UUID, "_adjusting")
+
 		startRow := viewmodel.TimeToRow(rc.Task.TimeWindow.Start) / scale
 		endRow := viewmodel.TimeToRow(rc.Task.TimeWindow.End) / scale
 
@@ -289,7 +294,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 
 		// Prevent visual overlap in the same column by ensuring the task starts after the predecessor's visual block
-		if lastOccupiedRow[colIndex] != -1 && topStartRow < lastOccupiedRow[colIndex] {
+		if !isSpecial && lastOccupiedRow[colIndex] != -1 && topStartRow < lastOccupiedRow[colIndex] {
 			topStartRow = lastOccupiedRow[colIndex]
 			startRow = topStartRow + commuteRows
 		}
@@ -314,6 +319,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 
 		cardW := cellWidths[colIndex][startRow]
+		if isSpecial {
+			cardW = colsAreaW
+		}
 
 		// Render Top Commute Buffer
 		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
@@ -334,6 +342,11 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 						break
 					}
 					taskRows[colIndex][r] = line
+					if isSpecial {
+						for c := 1; c < numCols; c++ {
+							taskRows[c][r] = ""
+						}
+					}
 				}
 				if isSelected {
 					selectedStartRow = topStartRow
@@ -353,6 +366,11 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				break
 			}
 			taskRows[colIndex][r] = line
+			if isSpecial {
+				for c := 1; c < numCols; c++ {
+					taskRows[c][r] = ""
+				}
+			}
 			actualCardHeightWritten++
 		}
 
@@ -378,6 +396,11 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 						break
 					}
 					taskRows[colIndex][r] = line
+					if isSpecial {
+						for c := 1; c < numCols; c++ {
+							taskRows[c][r] = ""
+						}
+					}
 				}
 				currentRowOffset += len(bottomCommuteLines)
 				if isSelected {
@@ -400,6 +423,11 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 					break
 				}
 				taskRows[colIndex][r] = line
+				if isSpecial {
+					for c := 1; c < numCols; c++ {
+						taskRows[c][r] = ""
+					}
+				}
 			}
 			currentRowOffset += len(restLines)
 			if isSelected {
@@ -415,7 +443,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		if startRow+currentRowOffset-1 > maxRowOccupied {
 			maxRowOccupied = startRow + currentRowOffset - 1
 		}
-		lastOccupiedRow[colIndex] = maxRowOccupied
+		if !isSpecial {
+			lastOccupiedRow[colIndex] = maxRowOccupied
+		}
 	}
 
 	// ── Assemble all rows ────────────────────────────────────────────

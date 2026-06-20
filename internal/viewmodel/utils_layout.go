@@ -74,6 +74,8 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 
 	var rects []TaskRect
 	for _, rc := range resolved {
+		isSpecial := strings.HasSuffix(rc.Task.UUID, "_moving") || strings.HasSuffix(rc.Task.UUID, "_adjusting")
+
 		startRow := TimeToRow(rc.Task.TimeWindow.Start) / 5
 
 		colIndex := rc.ColIndex
@@ -93,7 +95,7 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 		}
 
 		// Prevent visual overlap in the same column by ensuring the task starts after the predecessor's visual block
-		if lastOccupiedRow[colIndex] != -1 && topStartRow < lastOccupiedRow[colIndex] {
+		if !isSpecial && lastOccupiedRow[colIndex] != -1 && topStartRow < lastOccupiedRow[colIndex] {
 			topStartRow = lastOccupiedRow[colIndex]
 			startRow = topStartRow + commuteRows
 		}
@@ -123,19 +125,26 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 			maxRowOccupied += restRows
 		}
 
-		lastOccupiedRow[colIndex] = maxRowOccupied
+		if !isSpecial {
+			lastOccupiedRow[colIndex] = maxRowOccupied
+		}
 
 		x := rc.ColIndex * colW
+		w := colW
+		if isSpecial {
+			x = 0
+			w = colsAreaW
+		}
 		y := startRow
 		rects = append(rects, TaskRect{
 			ScheduledColumn: rc,
 			Left:            x,
-			Right:           x + colW,
+			Right:           x + w,
 			Top:             y,
 			Bottom:          y + h,
-			CenterX:         x + colW/2,
+			CenterX:         x + w/2,
 			CenterY:         y + h/2,
-			Width:           colW,
+			Width:           w,
 			Height:          h,
 		})
 	}

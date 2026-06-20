@@ -1,12 +1,15 @@
 package tests
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"stream/internal/db"
 	"stream/internal/model"
 	"stream/internal/sync"
+	"stream/internal/view/pages"
+	"stream/internal/view/theme"
 	"stream/internal/viewmodel"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -853,6 +856,82 @@ func TestGetDayTasks_ExcludesOriginalWithClone(t *testing.T) {
 	}
 	if !foundClone {
 		t.Errorf("expected adjusting clone task-1_adjusting to be found, but it was not")
+	}
+}
+
+func TestConsecutiveTasksMoveRendering(t *testing.T) {
+	day := time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local)
+	taskA := model.Task{
+		UUID:           "task-A",
+		Title:          "Task A",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(10 * time.Hour),
+			End:   day.Add(11 * time.Hour),
+		},
+	}
+	taskB := model.Task{
+		UUID:           "task-B",
+		Title:          "Task B",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(11 * time.Hour),
+			End:   day.Add(12 * time.Hour),
+		},
+	}
+	taskC := model.Task{
+		UUID:           "task-C",
+		Title:          "Task C",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(12 * time.Hour),
+			End:   day.Add(13 * time.Hour),
+		},
+	}
+	taskD := model.Task{
+		UUID:           "task-D",
+		Title:          "Task D",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(14 * time.Hour),
+			End:   day.Add(15 * time.Hour),
+		},
+	}
+	taskDMoving := model.Task{
+		UUID:           "task-D_moving",
+		Title:          "Task D [Moving]",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(10 * time.Hour),
+			End:   day.Add(11 * time.Hour), // Consecutive with Task B
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:        []model.Task{taskA, taskB, taskC, taskD, taskDMoving},
+		SelectedDay:  day,
+		TimelineHour: 11,
+		Layout: viewmodel.Layout{
+			TimelineW: 60,
+		},
+	}
+
+	// Render day timeline view to verify it compiles, formats, and runs layout algorithms without issues/panics.
+	output := pages.RenderDayTimeline(m, theme.NewTheme(), 45)
+	if output == "" {
+		t.Fatal("expected non-empty output from RenderDayTimeline")
+	}
+
+	// Verify that the task B's text is present in the rendered timeline (i.e. it was not broken/squished to 0 or 3 chars width and completely truncated)
+	if !strings.Contains(strings.ToLower(output), "task b") {
+		t.Fatalf("expected RenderDayTimeline output to contain 'Task B', rendering might be broken: \n%s", output)
+	}
+	if !strings.Contains(strings.ToLower(output), "task d [moving]") {
+		t.Fatalf("expected RenderDayTimeline output to contain 'Task D [Moving]': \n%s", output)
+	}
+	if !strings.Contains(strings.ToLower(output), "task c") {
+		t.Logf("Timeline output: \n%s", output)
+		t.Errorf("expected RenderDayTimeline output to contain 'Task C'")
 	}
 }
 

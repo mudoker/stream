@@ -117,6 +117,12 @@ type Model struct {
 	AnchorDurationInput textinput.Model
 	AnchorActiveField   int
 
+	LogSessionPromptOpen  bool
+	LogSessionPromptTask  model.Task
+	LogSessionFocusInput  textinput.Model
+	LogSessionBreakInput  textinput.Model
+	LogSessionActiveField int
+
 	HelpOpen             bool
 	HelpScrollOffset     int
 	ScrollOffset         int

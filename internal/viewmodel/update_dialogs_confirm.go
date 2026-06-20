@@ -2,12 +2,14 @@ package viewmodel
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"stream/internal/model"
 
-	"github.com/google/uuid"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/google/uuid"
 )
 
 func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
@@ -219,7 +221,32 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 		switch keyStr {
 		case "y", "Y", "enter":
-			if m.ConfirmActionType == "complete_reminder" {
+			if m.ConfirmActionType == "log_session_confirm" {
+				m.LogSessionPromptTask = m.ConfirmTask
+				m.LogSessionFocusInput = textinput.New()
+				
+				var plannedMins int
+				if m.ConfirmTask.SchedulingType == model.Anchored || m.ConfirmTask.SchedulingType == model.Event {
+					plannedMins = int(m.ConfirmTask.TimeWindow.End.Sub(m.ConfirmTask.TimeWindow.Start).Minutes())
+				} else {
+					plannedMins = m.ConfirmTask.StoryPoints * 45
+				}
+				if plannedMins <= 0 {
+					plannedMins = 60
+				}
+				m.LogSessionFocusInput.SetValue(strconv.Itoa(plannedMins))
+				m.LogSessionFocusInput.Focus()
+
+				m.LogSessionBreakInput = textinput.New()
+				m.LogSessionBreakInput.SetValue("0")
+
+				m.LogSessionActiveField = 0
+				m.LogSessionPromptOpen = true
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.StatusMsg = "Enter focus and break minutes to log session."
+				return true, nil
+			} else if m.ConfirmActionType == "complete_reminder" {
 				if keyStr == "enter" {
 					m.ConfirmOpen = false
 					m.ConfirmActionType = ""
@@ -254,7 +281,18 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				return true, nil
 			}
 		case "n", "N", "esc":
-			if m.ConfirmActionType == "complete_reminder" {
+			if m.ConfirmActionType == "log_session_confirm" {
+				m.ConfirmTask.LifecycleState = model.StateCompleted
+				m.ConfirmTask.UpdatedAt = time.Now()
+				m.DB.UpdateTask(m.ConfirmTask)
+				m.refreshTasks()
+				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
+					m.DetailOpen = false
+				}
+				m.StatusMsg = fmt.Sprintf("Task '%s' completed without logging focus time.", m.ConfirmTask.Title)
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+			} else if m.ConfirmActionType == "complete_reminder" {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""
 				m.StatusMsg = "Completion canceled."

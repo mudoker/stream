@@ -252,13 +252,44 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 	case "complete":
 		task, exists := m.GetActiveTask()
 		if exists {
-			task.LifecycleState = model.StateCompleted
-			m.DB.UpdateTask(task)
-			m.refreshTasks()
-			if m.ZenTimer != nil && m.ZenTimer.Task.UUID == task.UUID {
-				m.ZenTimer = nil
+			if task.SchedulingType == model.Habit {
+				dateStr := m.SelectedDay.Format("2006-01-02")
+				foundIdx := -1
+				for idx, d := range task.CompletedDates {
+					if d == dateStr {
+						foundIdx = idx
+						break
+					}
+				}
+				if foundIdx == -1 {
+					task.CompletedDates = append(task.CompletedDates, dateStr)
+					task.LifecycleState = model.StateCompleted
+					task.UpdatedAt = time.Now()
+					m.DB.UpdateTask(task)
+					m.refreshTasks()
+					m.StatusMsg = fmt.Sprintf("Habit '%s' completed for %s!", task.Title, dateStr)
+				}
+			} else if task.SchedulingType == model.Reminder {
+				m.ConfirmTask = task
+				m.ConfirmOpen = true
+				m.ConfirmActionType = "complete_reminder"
+			} else {
+				if task.LifecycleState != model.StateCompleted {
+					if m.ZenTimer == nil || m.ZenTimer.Task.UUID != task.UUID {
+						m.ConfirmTask = task
+						m.ConfirmOpen = true
+						m.ConfirmActionType = "log_session_confirm"
+						m.ConfirmSelectedIndex = 0
+					} else {
+						task.LifecycleState = model.StateCompleted
+						task.UpdatedAt = time.Now()
+						m.DB.UpdateTask(task)
+						m.refreshTasks()
+						m.ZenTimer = nil
+						m.StatusMsg = fmt.Sprintf("Task '%s' completed.", task.Title)
+					}
+				}
 			}
-			m.StatusMsg = fmt.Sprintf("Task '%s' completed.", task.Title)
 		}
 
 	case "delete":

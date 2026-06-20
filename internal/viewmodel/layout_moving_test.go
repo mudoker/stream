@@ -5,7 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"stream/internal/db"
 	"stream/internal/model"
+	"stream/internal/sync"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestResolveOverlaps_MovingOverlay(t *testing.T) {
@@ -89,5 +93,113 @@ func TestResolveOverlaps_MovingOverlay(t *testing.T) {
 		if r.Height != expectedHeight {
 			t.Errorf("task %s rect height was altered: expected %d, got %d", r.Task.UUID, expectedHeight, r.Height)
 		}
+	}
+}
+
+func TestManualSessionLogging(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := NewModel(database, syncEngine)
+
+	day := time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local)
+	task := model.Task{
+		UUID:           "task-log-test",
+		Title:          "Log Time Task",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(10 * time.Hour),
+			End:   day.Add(11 * time.Hour), // 60 mins planned
+		},
+	}
+	database.AddTask(task)
+	m.refreshTasks()
+
+	m.SelectedTaskUUID = "task-log-test"
+	m.SelectedDay = day
+
+	// 1. Completing a task when NOT in zen mode prompts log_session_confirm
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	if !m.ConfirmOpen || m.ConfirmActionType != "log_session_confirm" {
+		t.Fatalf("expected log_session_confirm dialog, got ConfirmOpen=%t ConfirmActionType=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+
+	// 2. Pressing "y" on log_session_confirm opens LogSessionPromptOpen
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if m.ConfirmOpen || !m.LogSessionPromptOpen {
+		t.Fatalf("expected LogSessionPromptOpen to be active, got LogSessionPromptOpen=%t", m.LogSessionPromptOpen)
+	}
+
+	// Default value of focus minutes should be planned duration (60)
+	if m.LogSessionFocusInput.Value() != "60" {
+		t.Errorf("expected default focus input value '60', got %q", m.LogSessionFocusInput.Value())
+	}
+	if m.LogSessionBreakInput.Value() != "0" {
+		t.Errorf("expected default break input value '0', got %q", m.LogSessionBreakInput.Value())
+	}
+
+	// Fill in new focus/break minutes: 45 focus, 5 break
+	m.LogSessionFocusInput.SetValue("45")
+	m.LogSessionBreakInput.SetValue("5")
+
+	// 3. Pressing Enter saves focus/break elapsed time and completes the task
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.LogSessionPromptOpen {
+		t.Fatal("expected LogSessionPromptOpen to be closed after Enter")
+	}
+
+	updated, _ := m.DB.GetTask("task-log-test")
+	if updated.LifecycleState != model.StateCompleted {
+		t.Errorf("expected task to be completed, got %s", updated.LifecycleState)
+	}
+	if updated.ExecutionMetrics.ElapsedFocusSeconds != 45*60 {
+		t.Errorf("expected 45m (2700s) focus time, got %d", updated.ExecutionMetrics.ElapsedFocusSeconds)
+	}
+	if updated.ExecutionMetrics.ElapsedBreakSeconds != 5*60 {
+		t.Errorf("expected 5m (300s) break time, got %d", updated.ExecutionMetrics.ElapsedBreakSeconds)
+	}
+
+	// 4. Test "No" selection completing task without logging time (0 minutes)
+	task2 := model.Task{
+		UUID:           "task-log-test-2",
+		Title:          "No Log Task",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(12 * time.Hour),
+			End:   day.Add(13 * time.Hour),
+		},
+	}
+	database.AddTask(task2)
+	m.refreshTasks()
+	m.SelectedTaskUUID = "task-log-test-2"
+
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	if !m.ConfirmOpen || m.ConfirmActionType != "log_session_confirm" {
+		t.Fatalf("expected log_session_confirm dialog, got ConfirmOpen=%t ConfirmActionType=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+
+	// Press "n" to decline logging
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	if m.ConfirmOpen || m.LogSessionPromptOpen {
+		t.Fatal("expected confirmation and prompt modals to be closed")
+	}
+
+	updated2, _ := m.DB.GetTask("task-log-test-2")
+	if updated2.LifecycleState != model.StateCompleted {
+		t.Errorf("expected task to be completed, got %s", updated2.LifecycleState)
+	}
+	if updated2.ExecutionMetrics.ElapsedFocusSeconds != 0 {
+		t.Errorf("expected 0 focus time logged, got %d", updated2.ExecutionMetrics.ElapsedFocusSeconds)
 	}
 }

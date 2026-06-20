@@ -305,6 +305,19 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 		cancelBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
 		hintText := lipgloss.NewStyle().Foreground(t.Muted).Render("j/k navigate")
 		lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
+	} else if m.ConfirmActionType == "log_session_confirm" {
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Log Focus Session?"))
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+		lines = append(lines, "  Would you like to log the focus time spent")
+		lines = append(lines, "  on this completed task?")
+		lines = append(lines, "")
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+
+		yesBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Y] Yes, Log Time")
+		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Just Complete")
+		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
 	} else {
 		lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("Confirm Delete"))
 		lines = append(lines, ModalSep(innerW))
@@ -492,4 +505,32 @@ func RenderUpdatePromptModal(m *viewmodel.Model, t theme.Theme) string {
 	fields = append(fields, "")
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
+}
+
+func RenderLogSessionPromptModal(m *viewmodel.Model, t theme.Theme) string {
+	const innerW = 46
+	var lines []string
+	lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Log Focus Session"))
+	lines = append(lines, ModalSep(innerW))
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("  Task:  %s", lipgloss.NewStyle().Bold(true).Render(theme.SentenceCase(m.LogSessionPromptTask.Title))))
+	lines = append(lines, "")
+
+	renderField := func(label string, view string, isActive bool) string {
+		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
+		if isActive {
+			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
+		}
+		return fmt.Sprintf("  %-20s %s", lblStyle.Render(label), view)
+	}
+
+	lines = append(lines, renderField("Focus duration (min)", m.LogSessionFocusInput.View(), m.LogSessionActiveField == 0))
+	lines = append(lines, renderField("Break duration (min)", m.LogSessionBreakInput.View(), m.LogSessionActiveField == 1))
+
+	lines = append(lines, "")
+	lines = append(lines, ModalSep(innerW))
+	hint := lipgloss.NewStyle().Foreground(t.Muted).Render("Tab switch  Enter save  Esc cancel")
+	lines = append(lines, "  "+hint)
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
 }

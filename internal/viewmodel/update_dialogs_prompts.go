@@ -12,6 +12,61 @@ import (
 )
 
 func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
+	if m.LogSessionPromptOpen {
+		switch msg.String() {
+		case "tab", "down":
+			m.LogSessionActiveField = (m.LogSessionActiveField + 1) % 2
+			m.focusLogSessionPromptFields()
+			return true, nil
+		case "shift+tab", "up":
+			m.LogSessionActiveField = (m.LogSessionActiveField - 1 + 2) % 2
+			m.focusLogSessionPromptFields()
+			return true, nil
+		case "enter":
+			focusStr := m.LogSessionFocusInput.Value()
+			focusMins := 0
+			if val, err := strconv.Atoi(focusStr); err == nil && val > 0 {
+				focusMins = val
+			}
+
+			breakStr := m.LogSessionBreakInput.Value()
+			breakMins := 0
+			if val, err := strconv.Atoi(breakStr); err == nil && val > 0 {
+				breakMins = val
+			}
+
+			t := m.LogSessionPromptTask
+			t.ExecutionMetrics.ElapsedFocusSeconds = focusMins * 60
+			t.ExecutionMetrics.ElapsedBreakSeconds = breakMins * 60
+			t.LifecycleState = model.StateCompleted
+			t.UpdatedAt = time.Now()
+
+			if m.DB != nil {
+				m.DB.UpdateTask(t)
+				m.refreshTasks()
+			} else {
+				m.updateTaskInMemory(t)
+			}
+
+			m.StatusMsg = fmt.Sprintf("Logged focus session of %d mins and completed '%s'!", focusMins, t.Title)
+			m.LogSessionPromptOpen = false
+			return true, nil
+
+		case "esc":
+			m.LogSessionPromptOpen = false
+			m.StatusMsg = "Completion canceled."
+			return true, nil
+		}
+
+		var cmd tea.Cmd
+		if m.LogSessionActiveField == 0 {
+			m.LogSessionFocusInput, cmd = m.LogSessionFocusInput.Update(msg)
+		} else {
+			m.LogSessionBreakInput, cmd = m.LogSessionBreakInput.Update(msg)
+		}
+		return true, cmd
+	}
+
 	if m.AnchorPromptOpen {
 		switch msg.String() {
 		case "tab", "down":
@@ -195,4 +250,14 @@ func (m *Model) cancelPromptTask() {
 		}
 	}
 	m.PromptOpen = false
+}
+
+func (m *Model) focusLogSessionPromptFields() {
+	if m.LogSessionActiveField == 0 {
+		m.LogSessionFocusInput.Focus()
+		m.LogSessionBreakInput.Blur()
+	} else {
+		m.LogSessionFocusInput.Blur()
+		m.LogSessionBreakInput.Focus()
+	}
 }

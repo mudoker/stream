@@ -142,10 +142,16 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 					task.LifecycleState = model.StateCompleted
 					m.StatusMsg = fmt.Sprintf("Habit '%s' completed for %s!", task.Title, dateStr)
 				}
+				task.UpdatedAt = time.Now()
+				m.DB.UpdateTask(task)
+				m.refreshTasks()
 			} else {
 				if task.LifecycleState == model.StateCompleted {
 					task.LifecycleState = model.StateBacklog
 					m.StatusMsg = fmt.Sprintf("Task '%s' marked incomplete.", task.Title)
+					task.UpdatedAt = time.Now()
+					m.DB.UpdateTask(task)
+					m.refreshTasks()
 				} else {
 					if task.SchedulingType == model.Reminder {
 						m.ConfirmTask = task
@@ -153,16 +159,20 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 						m.ConfirmActionType = "complete_reminder"
 						return true, nil
 					}
-					task.LifecycleState = model.StateCompleted
-					m.StatusMsg = fmt.Sprintf("Task '%s' completed!", task.Title)
-				}
-			}
-			task.UpdatedAt = time.Now()
-			m.DB.UpdateTask(task)
-			m.refreshTasks()
-			if task.LifecycleState == model.StateCompleted {
-				if m.ZenTimer != nil && m.ZenTimer.Task.UUID == task.UUID {
-					m.ZenTimer = nil
+					if m.ZenTimer == nil || m.ZenTimer.Task.UUID != task.UUID {
+						m.ConfirmTask = task
+						m.ConfirmOpen = true
+						m.ConfirmActionType = "log_session_confirm"
+						m.ConfirmSelectedIndex = 0
+						return true, nil
+					} else {
+						task.LifecycleState = model.StateCompleted
+						m.StatusMsg = fmt.Sprintf("Task '%s' completed!", task.Title)
+						task.UpdatedAt = time.Now()
+						m.DB.UpdateTask(task)
+						m.refreshTasks()
+						m.ZenTimer = nil
+					}
 				}
 			}
 		}

@@ -32,6 +32,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.HelpScrollOffset = 0
 
 		m.AnchorPromptOpen = false
+		m.LogSessionPromptOpen = false
 		m.UpdatePromptOpen = false
 
 		if m.PromptOpen {
@@ -75,7 +76,7 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.HelpOpen || m.AnchorPromptOpen || m.PromptOpen || m.ReviewOpen || m.DetailOpen {
+	if m.HelpOpen || m.AnchorPromptOpen || m.LogSessionPromptOpen || m.PromptOpen || m.ReviewOpen || m.DetailOpen {
 		if handled, cmd := m.handleConfirmDialogKeys(msg); handled {
 			return m, cmd
 		}

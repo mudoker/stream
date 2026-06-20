@@ -1,6 +1,8 @@
 package viewmodel
 
 import (
+	"time"
+
 	"stream/internal/model"
 )
 
@@ -129,75 +131,158 @@ func (m *Model) handleWeekNav(key string) {
 	switch key {
 	case "h", "left":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -1)
+		m.selectDefaultTaskForSelectedWeekDay()
+		m.AutoScrollToSelectedWeekTask()
 	case "l", "right":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, 1)
+		m.selectDefaultTaskForSelectedWeekDay()
+		m.AutoScrollToSelectedWeekTask()
 	case "H":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -7)
-	case "L":
+		m.selectDefaultTaskForSelectedWeekDay()
+		m.AutoScrollToSelectedWeekTask()
+	case "L", "K":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, 7)
+		m.selectDefaultTaskForSelectedWeekDay()
+		m.AutoScrollToSelectedWeekTask()
 	case "j", "down":
-		allTasks := m.getWeekTasks()
-		if len(allTasks) > 0 {
+		m.ScrollOffset++
+		dayTasks := m.getWeekDayTasks(m.SelectedDay)
+		if len(dayTasks) > 0 {
 			curIdx := -1
-			for idx, t := range allTasks {
+			for idx, t := range dayTasks {
 				if t.UUID == m.SelectedTaskUUID {
 					curIdx = idx
 					break
 				}
 			}
 			if curIdx == -1 {
-				m.SelectedTaskUUID = allTasks[0].UUID
-				m.SelectedDay = allTasks[0].TimeWindow.Start
+				m.SelectedTaskUUID = dayTasks[0].UUID
 			} else {
-				nextIdx := (curIdx + 1) % len(allTasks)
-				m.SelectedTaskUUID = allTasks[nextIdx].UUID
-				m.SelectedDay = allTasks[nextIdx].TimeWindow.Start
+				nextIdx := (curIdx + 1) % len(dayTasks)
+				m.SelectedTaskUUID = dayTasks[nextIdx].UUID
 			}
+			m.AutoScrollToSelectedWeekTask()
 		}
 	case "k", "up":
-		allTasks := m.getWeekTasks()
-		if len(allTasks) > 0 {
+		m.ScrollOffset--
+		if m.ScrollOffset < 0 {
+			m.ScrollOffset = 0
+		}
+		dayTasks := m.getWeekDayTasks(m.SelectedDay)
+		if len(dayTasks) > 0 {
 			curIdx := -1
-			for idx, t := range allTasks {
+			for idx, t := range dayTasks {
 				if t.UUID == m.SelectedTaskUUID {
 					curIdx = idx
 					break
 				}
 			}
 			if curIdx == -1 {
-				m.SelectedTaskUUID = allTasks[len(allTasks)-1].UUID
-				m.SelectedDay = allTasks[len(allTasks)-1].TimeWindow.Start
+				m.SelectedTaskUUID = dayTasks[len(dayTasks)-1].UUID
 			} else {
-				prevIdx := (curIdx - 1 + len(allTasks)) % len(allTasks)
-				m.SelectedTaskUUID = allTasks[prevIdx].UUID
-				m.SelectedDay = allTasks[prevIdx].TimeWindow.Start
+				prevIdx := (curIdx - 1 + len(dayTasks)) % len(dayTasks)
+				m.SelectedTaskUUID = dayTasks[prevIdx].UUID
 			}
+			m.AutoScrollToSelectedWeekTask()
 		}
 	}
 }
 
-func (m *Model) getWeekTasks() []model.Task {
-	offset := int(m.SelectedDay.Weekday()) - 1
-	if offset < 0 {
-		offset = 6
+func (m *Model) getWeekDayTasks(day time.Time) []model.Task {
+	var dayTasks []model.Task
+	for _, task := range m.Tasks {
+		if model.IsTaskAnchored(task) && SameDay(task.TimeWindow.Start, day) {
+			dayTasks = append(dayTasks, task)
+		}
 	}
-	weekStart := m.SelectedDay.AddDate(0, 0, -offset)
+	var sorted []model.Task
+	resolved := ResolveOverlaps(dayTasks)
+	for _, rc := range resolved {
+		sorted = append(sorted, rc.Task)
+	}
+	return sorted
+}
 
-	var allTasks []model.Task
-	for i := 0; i < 7; i++ {
-		day := weekStart.AddDate(0, 0, i)
-		var dayTasks []model.Task
-		for _, task := range m.Tasks {
-			if model.IsTaskAnchored(task) && SameDay(task.TimeWindow.Start, day) {
-				dayTasks = append(dayTasks, task)
+func (m *Model) selectDefaultTaskForSelectedWeekDay() {
+	dayTasks := m.getWeekDayTasks(m.SelectedDay)
+	if len(dayTasks) > 0 {
+		m.SelectedTaskUUID = dayTasks[0].UUID
+	} else {
+		m.SelectedTaskUUID = ""
+	}
+}
+
+func (m *Model) getWeekAvailLaneH() int {
+	appContentHeight := m.Height - 1
+	if appContentHeight < 10 {
+		appContentHeight = 10
+	}
+
+	height := appContentHeight - 2
+	laneHeight := height - 4
+	if laneHeight < 10 {
+		laneHeight = 10
+	}
+
+	availLaneH := laneHeight - 2
+	if availLaneH < 1 {
+		availLaneH = 1
+	}
+	return availLaneH
+}
+
+func (m *Model) AutoScrollToSelectedWeekTask() {
+	if m.SelectedTaskUUID == "" {
+		return
+	}
+
+	dayTasks := m.getWeekDayTasks(m.SelectedDay)
+	if len(dayTasks) == 0 {
+		return
+	}
+
+	taskStart := -1
+	taskEnd := -1
+	lineIdx := 0
+
+	for idx, task := range dayTasks {
+		dur := task.TimeWindow.End.Sub(task.TimeWindow.Start)
+		durMins := int(dur.Minutes())
+		outerH := (durMins * 6) / 60
+		if outerH < 4 {
+			outerH = 4
+		}
+
+		if idx > 0 {
+			prevTask := dayTasks[idx-1]
+			if task.TimeWindow.Start.Equal(prevTask.TimeWindow.End) {
+				// Contiguous - do not add empty line spacing
+			} else {
+				lineIdx += 1 // empty line spacing
 			}
 		}
-		resolved := ResolveOverlaps(dayTasks)
-		for _, rc := range resolved {
-			allTasks = append(allTasks, rc.Task)
+
+		if task.UUID == m.SelectedTaskUUID {
+			taskStart = lineIdx
+			taskEnd = lineIdx + outerH
+			break
 		}
+
+		lineIdx += outerH
 	}
-	return allTasks
+
+	if taskStart == -1 {
+		return
+	}
+
+	availLaneH := m.getWeekAvailLaneH()
+
+	if taskStart < m.ScrollOffset {
+		m.ScrollOffset = taskStart
+	} else if taskEnd > m.ScrollOffset+availLaneH {
+		m.ScrollOffset = taskEnd - availLaneH
+	}
 }
 
 func (m *Model) handleDayNav(key string) {

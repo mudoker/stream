@@ -40,28 +40,43 @@ func TestWeekNavigation(t *testing.T) {
 		SelectedTaskUUID: "task-monday",
 	}
 
-	// 1. Move right (l) -> changes selected day to Tuesday
+	// 1. Move right (l) -> changes selected day to Tuesday and selects task-tuesday
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
 	if !m.SelectedDay.Equal(monday.AddDate(0, 0, 1)) {
 		t.Errorf("Expected SelectedDay to be Tuesday, got %s", m.SelectedDay)
 	}
-
-	// 2. Move down (j) -> Focuses on tasks chronologically in the week
-	m.SelectedTaskUUID = ""
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
-	if m.SelectedTaskUUID != "task-monday" {
-		t.Errorf("Expected SelectedTaskUUID to shift to task-monday, got %s", m.SelectedTaskUUID)
-	}
-
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	if m.SelectedTaskUUID != "task-tuesday" {
-		t.Errorf("Expected SelectedTaskUUID to shift to task-tuesday, got %s", m.SelectedTaskUUID)
+		t.Errorf("Expected SelectedTaskUUID to be task-tuesday, got %s", m.SelectedTaskUUID)
 	}
 
-	// 3. Move up (k) -> moves back to task-monday
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	// 2. Move down (j) on Tuesday -> stays on Tuesday and still selects task-tuesday (since it cycles within Tuesday)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if !m.SelectedDay.Equal(monday.AddDate(0, 0, 1)) {
+		t.Errorf("Expected SelectedDay to remain Tuesday, got %s", m.SelectedDay)
+	}
+	if m.SelectedTaskUUID != "task-tuesday" {
+		t.Errorf("Expected SelectedTaskUUID to remain task-tuesday, got %s", m.SelectedTaskUUID)
+	}
+
+	// 3. Move left (h) -> shifts back to Monday and selects task-monday
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	if !m.SelectedDay.Equal(monday) {
+		t.Errorf("Expected SelectedDay to be Monday, got %s", m.SelectedDay)
+	}
 	if m.SelectedTaskUUID != "task-monday" {
-		t.Errorf("Expected SelectedTaskUUID to shift back to task-monday, got %s", m.SelectedTaskUUID)
+		t.Errorf("Expected SelectedTaskUUID to be task-monday, got %s", m.SelectedTaskUUID)
+	}
+
+	// 4. Shift week time frame backward (H)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("H")})
+	if !m.SelectedDay.Equal(monday.AddDate(0, 0, -7)) {
+		t.Errorf("Expected SelectedDay to shift back 7 days, got %s", m.SelectedDay)
+	}
+
+	// 5. Shift week time frame forward using K (or L)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
+	if !m.SelectedDay.Equal(monday) {
+		t.Errorf("Expected SelectedDay to return to Monday, got %s", m.SelectedDay)
 	}
 }
 
@@ -161,5 +176,77 @@ func TestDashboardNavigation(t *testing.T) {
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
 	if m.DashboardFocusRow != 0 {
 		t.Errorf("Expected row 0 to be focused, got %d", m.DashboardFocusRow)
+	}
+}
+
+func TestWeekScrollingAndTaskAutoScroll(t *testing.T) {
+	monday := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
+	t1 := model.Task{
+		UUID:           "task-monday-1",
+		Title:          "Monday Task 1",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: monday,
+			End:   monday.Add(1 * time.Hour), // height = 6 lines
+		},
+	}
+	t2 := model.Task{
+		UUID:           "task-monday-2",
+		Title:          "Monday Task 2",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: monday.Add(2 * time.Hour),
+			End:   monday.Add(4 * time.Hour), // height = 12 lines
+		},
+	}
+
+	m := &viewmodel.Model{
+		CurrentView:      viewmodel.WeekView,
+		CurrentMode:      viewmodel.ModeNormal,
+		Tasks:            []model.Task{t1, t2},
+		SelectedDay:      monday,
+		SelectedTaskUUID: "task-monday-1",
+		ScrollOffset:     0,
+		Height:           20, // results in availLaneH = 11
+	}
+
+	// 1. With tasks: pressing j cycles to the next task and triggers auto-scroll.
+	// task 1: start=0, height=6.
+	// task 2: start=7, height=12.
+	// Moving to task 2 sets taskStart = 7, taskEnd = 19.
+	// availLaneH = 11.
+	// Since taskEnd (19) > ScrollOffset(0) + availLaneH(11), it scrolls to taskEnd - availLaneH = 8.
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if m.SelectedTaskUUID != "task-monday-2" {
+		t.Errorf("Expected task-monday-2 to be selected, got %s", m.SelectedTaskUUID)
+	}
+	if m.ScrollOffset != 8 {
+		t.Errorf("Expected ScrollOffset to be 8, got %d", m.ScrollOffset)
+	}
+
+	// 2. Pressing k goes back to task 1.
+	// task 1: start=0, height=6.
+	// Since taskStart (0) < ScrollOffset(8), it scrolls to taskStart = 0.
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	if m.SelectedTaskUUID != "task-monday-1" {
+		t.Errorf("Expected task-monday-1 to be selected, got %s", m.SelectedTaskUUID)
+	}
+	if m.ScrollOffset != 0 {
+		t.Errorf("Expected ScrollOffset to be 0, got %d", m.ScrollOffset)
+	}
+
+	// 3. Clear all tasks on Monday to test manual scrolling.
+	m.Tasks = nil
+	m.SelectedTaskUUID = ""
+	
+	// Scroll offset should increment/decrement directly when there are no tasks
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if m.ScrollOffset != 1 {
+		t.Errorf("Expected manual scroll down ScrollOffset to be 1, got %d", m.ScrollOffset)
+	}
+
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	if m.ScrollOffset != 0 {
+		t.Errorf("Expected manual scroll up ScrollOffset to be 0, got %d", m.ScrollOffset)
 	}
 }

@@ -140,9 +140,11 @@ func RenderWarningModal(m *viewmodel.Model, t theme.Theme) string {
 
 	okBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter/Esc/Space] Close")
 
+	titleStyle := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true)
+
 	return components.RenderBaseModal(components.BaseModalConfig{
 		Title:      "⚠️  VALIDATION ERROR",
-		TitleColor: t.P0Color,
+		TitleStyle: &titleStyle,
 		BodyLines:  bodyLines,
 		FooterText: okBtn,
 		InnerWidth: innerW,
@@ -377,9 +379,11 @@ func RenderSessionExpiryModal(m *viewmodel.Model, t theme.Theme) string {
 	yesBtn := lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render("[Y] Yes, Reset Timer")
 	noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Allow Lock")
 
+	titleStyle := lipgloss.NewStyle().Foreground(t.FocusPurple).Bold(true)
+
 	return components.RenderBaseModal(components.BaseModalConfig{
 		Title:      "⚠️  SESSION EXPIRES IN 1 MINUTE",
-		TitleColor: t.FocusPurple,
+		TitleStyle: &titleStyle,
 		BodyLines:  bodyLines,
 		Buttons:    []string{yesBtn, noBtn},
 		InnerWidth: innerW,
@@ -436,9 +440,11 @@ func RenderUpdatePromptModal(m *viewmodel.Model, t theme.Theme) string {
 			Render("  [ Snooze 1 Hour ]  ")
 	}
 
+	titleStyle := lipgloss.NewStyle().Foreground(t.P1Color).Bold(true)
+
 	return components.RenderBaseModal(components.BaseModalConfig{
 		Title:      "🚀  UPDATE AVAILABLE!",
-		TitleColor: t.P1Color,
+		TitleStyle: &titleStyle,
 		BodyLines:  bodyLines,
 		Buttons:    []string{updateBtn, snoozeBtn},
 		InnerWidth: innerW,

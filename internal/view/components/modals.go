@@ -33,12 +33,17 @@ func ModalSep(w int) string {
 // BaseModalConfig defines the configuration structure for reusable modals.
 type BaseModalConfig struct {
 	Title      string
-	TitleColor lipgloss.Color // optional title foreground override
 	BodyLines  []string
 	Buttons    []string // optional list of buttons to be centered
 	FooterText string   // optional centered footer text
 	InnerWidth int
 	Theme      theme.Theme
+
+	// Optional style overrides
+	TitleStyle     *lipgloss.Style // optional custom style for the title
+	SeparatorStyle *lipgloss.Style // optional custom style for separator dividers
+	FooterStyle    *lipgloss.Style // optional custom style for the footer text
+	ModalStyle     *lipgloss.Style // optional custom style for the outer modal box
 }
 
 // RenderBaseModal renders a standardized modal with centered header, body, action buttons, and footer.
@@ -50,12 +55,17 @@ func RenderBaseModal(cfg BaseModalConfig) string {
 	var lines []string
 
 	if cfg.Title != "" {
-		titleColor := cfg.Theme.Accent
-		if string(cfg.TitleColor) != "" {
-			titleColor = cfg.TitleColor
+		titleStyle := lipgloss.NewStyle().Foreground(cfg.Theme.Accent).Bold(true)
+		if cfg.TitleStyle != nil {
+			titleStyle = *cfg.TitleStyle
 		}
-		lines = append(lines, lipgloss.NewStyle().Foreground(titleColor).Bold(true).Render(cfg.Title))
-		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, titleStyle.Render(cfg.Title))
+
+		sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(constants.ColorSeparator))
+		if cfg.SeparatorStyle != nil {
+			sepStyle = *cfg.SeparatorStyle
+		}
+		lines = append(lines, sepStyle.Render(strings.Repeat("─", innerW)))
 		lines = append(lines, "")
 	}
 
@@ -65,7 +75,12 @@ func RenderBaseModal(cfg BaseModalConfig) string {
 
 	if len(cfg.Buttons) > 0 {
 		lines = append(lines, "")
-		lines = append(lines, ModalSep(innerW))
+		
+		sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(constants.ColorSeparator))
+		if cfg.SeparatorStyle != nil {
+			sepStyle = *cfg.SeparatorStyle
+		}
+		lines = append(lines, sepStyle.Render(strings.Repeat("─", innerW)))
 		lines = append(lines, "")
 
 		buttonsLine := strings.Join(cfg.Buttons, "      ")
@@ -79,19 +94,31 @@ func RenderBaseModal(cfg BaseModalConfig) string {
 
 	if cfg.FooterText != "" {
 		lines = append(lines, "")
-		lines = append(lines, ModalSep(innerW))
+		
+		sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(constants.ColorSeparator))
+		if cfg.SeparatorStyle != nil {
+			sepStyle = *cfg.SeparatorStyle
+		}
+		lines = append(lines, sepStyle.Render(strings.Repeat("─", innerW)))
 		lines = append(lines, "")
 
 		visibleW := lipgloss.Width(cfg.FooterText)
 		leftPadding := (innerW - visibleW) / 2
 		footerLine := cfg.FooterText
+		if cfg.FooterStyle != nil {
+			footerLine = cfg.FooterStyle.Render(cfg.FooterText)
+		}
 		if leftPadding > 0 {
 			footerLine = strings.Repeat(" ", leftPadding) + footerLine
 		}
 		lines = append(lines, footerLine)
 	}
 
-	return cfg.Theme.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+	modalStyle := cfg.Theme.ModalStyle
+	if cfg.ModalStyle != nil {
+		modalStyle = *cfg.ModalStyle
+	}
+	return modalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
 }
 
 // RenderBaseConfirmModal draws a standardized confirmation dialog with key navigation.

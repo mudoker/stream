@@ -462,13 +462,24 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		var sb strings.Builder
 		sb.WriteString(gutterRows[r])
 		sb.WriteString(leftSpacerRows[r])
+
+		var colsSb strings.Builder
 		for c := 0; c < numCols; c++ {
 			if cellWidths[c][r] == 0 {
-				sb.WriteString("")
+				colsSb.WriteString("")
 			} else {
-				sb.WriteString(taskRows[c][r])
+				colsSb.WriteString(taskRows[c][r])
 			}
 		}
+		colsStr := colsSb.String()
+		colsWidth := lipgloss.Width(colsStr)
+		if colsWidth > colsAreaW {
+			colsStr = theme.SliceAnsi(colsStr, 0, colsAreaW)
+		} else if colsWidth < colsAreaW {
+			colsStr = colsStr + strings.Repeat(" ", colsAreaW-colsWidth)
+		}
+
+		sb.WriteString(colsStr)
 		sb.WriteString(rightSpacerRows[r])
 		allRows[r] = sb.String()
 	}

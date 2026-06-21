@@ -105,53 +105,49 @@ func RenderPromptModal(m *viewmodel.Model, t theme.Theme) string {
 
 func RenderAuthNoticeModal(m *viewmodel.Model, t theme.Theme) string {
 	const innerW = 54
-	var lines []string
+	var bodyLines []string
 
-	title := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("🔗 GOOGLE CALENDAR AUTH")
-	lines = append(lines, title)
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
-	lines = append(lines, lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render("  Auth link copied to clipboard!"))
-	lines = append(lines, "")
+	bodyLines = append(bodyLines, lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render("  Auth link copied to clipboard!"))
+	bodyLines = append(bodyLines, "")
 
 	wrappedMsg := theme.WrapText(m.AuthNoticeMsg, innerW-4)
 	for _, line := range strings.Split(wrappedMsg, "\n") {
-		lines = append(lines, "  "+line)
+		bodyLines = append(bodyLines, "  "+line)
 	}
-	lines = append(lines, "")
-	lines = append(lines, lipgloss.NewStyle().Foreground(t.Fg).Render("  Complete sign-in in your browser."))
-	lines = append(lines, lipgloss.NewStyle().Foreground(t.Fg).Render("  The dialog closes automatically on success."))
-	lines = append(lines, "")
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
+	bodyLines = append(bodyLines, "")
+	bodyLines = append(bodyLines, lipgloss.NewStyle().Foreground(t.Fg).Render("  Complete sign-in in your browser."))
+	bodyLines = append(bodyLines, lipgloss.NewStyle().Foreground(t.Fg).Render("  The dialog closes automatically on success."))
 
 	closeBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc/Enter/Q] Close and return to normal mode")
-	lines = append(lines, "  "+closeBtn)
 
-	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+	return components.RenderBaseModal(components.BaseModalConfig{
+		Title:      "🔗 GOOGLE CALENDAR AUTH",
+		BodyLines:  bodyLines,
+		FooterText: closeBtn,
+		InnerWidth: innerW,
+		Theme:      t,
+	})
 }
 
 func RenderWarningModal(m *viewmodel.Model, t theme.Theme) string {
 	const innerW = 46
-	var lines []string
-
-	title := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("⚠️  VALIDATION ERROR")
-	lines = append(lines, title)
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
+	var bodyLines []string
 
 	wrappedMsg := theme.WrapText(m.WarningMsg, innerW-4)
 	for _, line := range strings.Split(wrappedMsg, "\n") {
-		lines = append(lines, "  "+line)
+		bodyLines = append(bodyLines, "  "+line)
 	}
-	lines = append(lines, "")
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
 
 	okBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter/Esc/Space] Close")
-	lines = append(lines, "  "+okBtn)
 
-	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+	return components.RenderBaseModal(components.BaseModalConfig{
+		Title:      "⚠️  VALIDATION ERROR",
+		TitleColor: t.P0Color,
+		BodyLines:  bodyLines,
+		FooterText: okBtn,
+		InnerWidth: innerW,
+		Theme:      t,
+	})
 }
 
 func RenderReviewModal(m *viewmodel.Model, t theme.Theme) string {
@@ -285,13 +281,11 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 
 func RenderAnchorPromptModal(m *viewmodel.Model, t theme.Theme) string {
 	const innerW = 46
-	var lines []string
-	lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Anchor Task to Timeline"))
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("  Task:  %s", lipgloss.NewStyle().Bold(true).Render(theme.SentenceCase(m.AnchorPromptTask.Title))))
-	lines = append(lines, fmt.Sprintf("  Est:   %d SP (%d mins)", m.AnchorPromptTask.StoryPoints, m.AnchorPromptTask.StoryPoints*45))
-	lines = append(lines, "")
+	var bodyLines []string
+
+	bodyLines = append(bodyLines, fmt.Sprintf("  Task:  %s", lipgloss.NewStyle().Bold(true).Render(theme.SentenceCase(m.AnchorPromptTask.Title))))
+	bodyLines = append(bodyLines, fmt.Sprintf("  Est:   %d SP (%d mins)", m.AnchorPromptTask.StoryPoints, m.AnchorPromptTask.StoryPoints*45))
+	bodyLines = append(bodyLines, "")
 
 	renderField := func(label string, view string, isActive bool) string {
 		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
@@ -301,15 +295,18 @@ func RenderAnchorPromptModal(m *viewmodel.Model, t theme.Theme) string {
 		return fmt.Sprintf("  %-16s %s", lblStyle.Render(label), view)
 	}
 
-	lines = append(lines, renderField("Start Time", m.AnchorTimeInput.View(), m.AnchorActiveField == 0))
-	lines = append(lines, renderField("Duration (min)", m.AnchorDurationInput.View(), m.AnchorActiveField == 1))
+	bodyLines = append(bodyLines, renderField("Start Time", m.AnchorTimeInput.View(), m.AnchorActiveField == 0))
+	bodyLines = append(bodyLines, renderField("Duration (min)", m.AnchorDurationInput.View(), m.AnchorActiveField == 1))
 
-	lines = append(lines, "")
-	lines = append(lines, ModalSep(innerW))
 	hint := lipgloss.NewStyle().Foreground(t.Muted).Render("Tab switch  Enter confirm  Esc cancel")
-	lines = append(lines, "  "+hint)
 
-	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+	return components.RenderBaseModal(components.BaseModalConfig{
+		Title:      "Anchor Task to Timeline",
+		BodyLines:  bodyLines,
+		FooterText: hint,
+		InnerWidth: innerW,
+		Theme:      t,
+	})
 }
 
 func RenderLockScreen(m *viewmodel.Model, t theme.Theme) string {
@@ -372,56 +369,47 @@ func RenderLockScreen(m *viewmodel.Model, t theme.Theme) string {
 
 func RenderSessionExpiryModal(m *viewmodel.Model, t theme.Theme) string {
 	const innerW = 46
-	var fields []string
+	var bodyLines []string
 
-	title := lipgloss.NewStyle().Foreground(t.FocusPurple).Bold(true).Render("⚠️  SESSION EXPIRES IN 1 MINUTE")
-	fields = append(fields, title)
-	fields = append(fields, ModalSep(innerW))
-	fields = append(fields, "")
-	fields = append(fields, lipgloss.NewStyle().Foreground(t.Fg).Render("Your session is about to expire."))
-	fields = append(fields, lipgloss.NewStyle().Foreground(t.Fg).Render("Would you like to extend your session?"))
-	fields = append(fields, "")
-	fields = append(fields, ModalSep(innerW))
-	fields = append(fields, "")
+	bodyLines = append(bodyLines, lipgloss.NewStyle().Foreground(t.Fg).Render("Your session is about to expire."))
+	bodyLines = append(bodyLines, lipgloss.NewStyle().Foreground(t.Fg).Render("Would you like to extend your session?"))
 
 	yesBtn := lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render("[Y] Yes, Reset Timer")
 	noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Allow Lock")
-	fields = append(fields, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
 
-	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
+	return components.RenderBaseModal(components.BaseModalConfig{
+		Title:      "⚠️  SESSION EXPIRES IN 1 MINUTE",
+		TitleColor: t.FocusPurple,
+		BodyLines:  bodyLines,
+		Buttons:    []string{yesBtn, noBtn},
+		InnerWidth: innerW,
+		Theme:      t,
+	})
 }
 
 func RenderUpdatePromptModal(m *viewmodel.Model, t theme.Theme) string {
 	const innerW = 52
-	var fields []string
-
-	title := lipgloss.NewStyle().Foreground(t.P1Color).Bold(true).Render("🚀  UPDATE AVAILABLE!")
-	fields = append(fields, title)
-	fields = append(fields, ModalSep(innerW))
-	fields = append(fields, "")
+	var bodyLines []string
 
 	msg := "A new version of the application is available. Pulling the latest changes is highly recommended to avoid missing features or database out-of-sync bugs."
 	wrappedMsg := lipgloss.NewStyle().Width(innerW - 4).Foreground(t.Fg).Render(msg)
-	fields = append(fields, wrappedMsg)
-	fields = append(fields, "")
+	bodyLines = append(bodyLines, wrappedMsg)
+	bodyLines = append(bodyLines, "")
 
 	if len(m.UpdateCommits) > 0 {
-		fields = append(fields, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("CHANGELOG:"))
+		bodyLines = append(bodyLines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("CHANGELOG:"))
 		maxCommits := 6
 		for i, commit := range m.UpdateCommits {
 			if i >= maxCommits {
 				remaining := len(m.UpdateCommits) - maxCommits
-				fields = append(fields, lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  • ... and %d more commits", remaining)))
+				bodyLines = append(bodyLines, lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  • ... and %d more commits", remaining)))
 				break
 			}
 			commitStyle := lipgloss.NewStyle().Foreground(t.Fg)
-			fields = append(fields, fmt.Sprintf("  • %s", commitStyle.Render(commit)))
+			bodyLines = append(bodyLines, fmt.Sprintf("  • %s", commitStyle.Render(commit)))
 		}
-		fields = append(fields, "")
+		bodyLines = append(bodyLines, "")
 	}
-
-	fields = append(fields, ModalSep(innerW))
-	fields = append(fields, "")
 
 	var updateBtn, snoozeBtn string
 	if m.UpdatePromptSelectedIdx == 0 {
@@ -448,20 +436,22 @@ func RenderUpdatePromptModal(m *viewmodel.Model, t theme.Theme) string {
 			Render("  [ Snooze 1 Hour ]  ")
 	}
 
-	fields = append(fields, fmt.Sprintf("    %s         %s", updateBtn, snoozeBtn))
-	fields = append(fields, "")
-
-	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
+	return components.RenderBaseModal(components.BaseModalConfig{
+		Title:      "🚀  UPDATE AVAILABLE!",
+		TitleColor: t.P1Color,
+		BodyLines:  bodyLines,
+		Buttons:    []string{updateBtn, snoozeBtn},
+		InnerWidth: innerW,
+		Theme:      t,
+	})
 }
 
 func RenderLogSessionPromptModal(m *viewmodel.Model, t theme.Theme) string {
 	const innerW = 46
-	var lines []string
-	lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Log Focus Session"))
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("  Task:  %s", lipgloss.NewStyle().Bold(true).Render(theme.SentenceCase(m.LogSessionPromptTask.Title))))
-	lines = append(lines, "")
+	var bodyLines []string
+
+	bodyLines = append(bodyLines, fmt.Sprintf("  Task:  %s", lipgloss.NewStyle().Bold(true).Render(theme.SentenceCase(m.LogSessionPromptTask.Title))))
+	bodyLines = append(bodyLines, "")
 
 	renderField := func(label string, view string, isActive bool) string {
 		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
@@ -471,15 +461,18 @@ func RenderLogSessionPromptModal(m *viewmodel.Model, t theme.Theme) string {
 		return fmt.Sprintf("  %-20s %s", lblStyle.Render(label), view)
 	}
 
-	lines = append(lines, renderField("Focus duration (min)", m.LogSessionFocusInput.View(), m.LogSessionActiveField == 0))
-	lines = append(lines, renderField("Break duration (min)", m.LogSessionBreakInput.View(), m.LogSessionActiveField == 1))
+	bodyLines = append(bodyLines, renderField("Focus duration (min)", m.LogSessionFocusInput.View(), m.LogSessionActiveField == 0))
+	bodyLines = append(bodyLines, renderField("Break duration (min)", m.LogSessionBreakInput.View(), m.LogSessionActiveField == 1))
 
-	lines = append(lines, "")
-	lines = append(lines, ModalSep(innerW))
 	hint := lipgloss.NewStyle().Foreground(t.Muted).Render("Tab switch  Enter save  Esc cancel")
-	lines = append(lines, "  "+hint)
 
-	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+	return components.RenderBaseModal(components.BaseModalConfig{
+		Title:      "Log Focus Session",
+		BodyLines:  bodyLines,
+		FooterText: hint,
+		InnerWidth: innerW,
+		Theme:      t,
+	})
 }
 
 func formatDuration(d time.Duration) string {

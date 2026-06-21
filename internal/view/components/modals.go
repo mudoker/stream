@@ -1,7 +1,6 @@
 package components
 
 import (
-	"fmt"
 	"strings"
 
 	"stream/internal/view/theme"
@@ -31,21 +30,81 @@ func ModalSep(w int) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(constants.ColorSeparator)).Render(strings.Repeat("─", w))
 }
 
+// BaseModalConfig defines the configuration structure for reusable modals.
+type BaseModalConfig struct {
+	Title      string
+	TitleColor lipgloss.Color // optional title foreground override
+	BodyLines  []string
+	Buttons    []string // optional list of buttons to be centered
+	FooterText string   // optional centered footer text
+	InnerWidth int
+	Theme      theme.Theme
+}
+
+// RenderBaseModal renders a standardized modal with centered header, body, action buttons, and footer.
+func RenderBaseModal(cfg BaseModalConfig) string {
+	innerW := cfg.InnerWidth
+	if innerW <= 0 {
+		innerW = 50
+	}
+	var lines []string
+
+	if cfg.Title != "" {
+		titleColor := cfg.Theme.Accent
+		if string(cfg.TitleColor) != "" {
+			titleColor = cfg.TitleColor
+		}
+		lines = append(lines, lipgloss.NewStyle().Foreground(titleColor).Bold(true).Render(cfg.Title))
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+	}
+
+	for _, line := range cfg.BodyLines {
+		lines = append(lines, line)
+	}
+
+	if len(cfg.Buttons) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+
+		buttonsLine := strings.Join(cfg.Buttons, "      ")
+		visibleW := lipgloss.Width(buttonsLine)
+		leftPadding := (innerW - visibleW) / 2
+		if leftPadding > 0 {
+			buttonsLine = strings.Repeat(" ", leftPadding) + buttonsLine
+		}
+		lines = append(lines, buttonsLine)
+	}
+
+	if cfg.FooterText != "" {
+		lines = append(lines, "")
+		lines = append(lines, ModalSep(innerW))
+		lines = append(lines, "")
+
+		visibleW := lipgloss.Width(cfg.FooterText)
+		leftPadding := (innerW - visibleW) / 2
+		footerLine := cfg.FooterText
+		if leftPadding > 0 {
+			footerLine = strings.Repeat(" ", leftPadding) + footerLine
+		}
+		lines = append(lines, footerLine)
+	}
+
+	return cfg.Theme.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+}
+
 // RenderBaseConfirmModal draws a standardized confirmation dialog with key navigation.
 func RenderBaseConfirmModal(title string, descLines []string, options []string, selectedIdx int, destructiveIdx int, focusArea int, t theme.Theme) string {
 	const innerW = 50
-	var lines []string
-
-	lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(title))
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
+	var bodyLines []string
 
 	for _, d := range descLines {
-		lines = append(lines, "  "+d)
+		bodyLines = append(bodyLines, "  "+d)
 	}
-	lines = append(lines, "")
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
+	bodyLines = append(bodyLines, "")
+	bodyLines = append(bodyLines, ModalSep(innerW))
+	bodyLines = append(bodyLines, "")
 
 	// Render selectable options
 	for idx, opt := range options {
@@ -63,31 +122,32 @@ func RenderBaseConfirmModal(title string, descLines []string, options []string, 
 		} else {
 			optStr = lipgloss.NewStyle().Foreground(t.Muted).Render("    " + opt)
 		}
-		lines = append(lines, optStr)
+		bodyLines = append(bodyLines, optStr)
 	}
 
-	lines = append(lines, "")
-	lines = append(lines, ModalSep(innerW))
-	lines = append(lines, "")
-
-	var confirmBtn, cancelBtn string
+	var buttons []string
 	if focusArea == 0 {
-		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  ")
-		cancelBtn = lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  ")
+		buttons = []string{
+			lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  "),
+			lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  "),
+		}
 	} else if focusArea == 1 {
-		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▶ Confirm ◀")
-		cancelBtn = lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  ")
+		buttons = []string{
+			lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▶ Confirm ◀"),
+			lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  "),
+		}
 	} else {
-		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  ")
-		cancelBtn = lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("▶ Cancel ◀")
+		buttons = []string{
+			lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  "),
+			lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("▶ Cancel ◀"),
+		}
 	}
-	buttonsLine := fmt.Sprintf("%s      %s", confirmBtn, cancelBtn)
-	visibleW := lipgloss.Width(buttonsLine)
-	leftPadding := (innerW - visibleW) / 2
-	if leftPadding > 0 {
-		buttonsLine = strings.Repeat(" ", leftPadding) + buttonsLine
-	}
-	lines = append(lines, buttonsLine)
 
-	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+	return RenderBaseModal(BaseModalConfig{
+		Title:      title,
+		BodyLines:  bodyLines,
+		Buttons:    buttons,
+		InnerWidth: innerW,
+		Theme:      t,
+	})
 }

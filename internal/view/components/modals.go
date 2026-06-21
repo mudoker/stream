@@ -81,7 +81,13 @@ func RenderBaseConfirmModal(title string, descLines []string, options []string, 
 		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  ")
 		cancelBtn = lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("▶ Cancel ◀")
 	}
-	lines = append(lines, fmt.Sprintf("  %s      %s", confirmBtn, cancelBtn))
+	buttonsLine := fmt.Sprintf("%s      %s", confirmBtn, cancelBtn)
+	visibleW := lipgloss.Width(buttonsLine)
+	leftPadding := (innerW - visibleW) / 2
+	if leftPadding > 0 {
+		buttonsLine = strings.Repeat(" ", leftPadding) + buttonsLine
+	}
+	lines = append(lines, buttonsLine)
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
 }

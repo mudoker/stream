@@ -90,19 +90,17 @@ func (zt *ZenTimer) ShrinkGreedy(delay time.Duration) {
 
 	remainingDelay := delay
 
-	// Iterate through sessions and subtract remainingDelay from Focus sessions
+	// Iterate through sessions and subtract remainingDelay sequentially
 	for i := range zt.Sessions {
 		if remainingDelay <= 0 {
 			break
 		}
-		if zt.Sessions[i].Type == FocusSession {
-			if zt.Sessions[i].Duration > remainingDelay {
-				zt.Sessions[i].Duration -= remainingDelay
-				remainingDelay = 0
-			} else {
-				remainingDelay -= zt.Sessions[i].Duration
-				zt.Sessions[i].Duration = 0
-			}
+		if zt.Sessions[i].Duration > remainingDelay {
+			zt.Sessions[i].Duration -= remainingDelay
+			remainingDelay = 0
+		} else {
+			remainingDelay -= zt.Sessions[i].Duration
+			zt.Sessions[i].Duration = 0
 		}
 	}
 

@@ -384,4 +384,33 @@ func TestStartLateTrimFeature(t *testing.T) {
 	if m.ZenTimer.Sessions[2].Type != timer.FocusSession || m.ZenTimer.Sessions[2].Duration != 10*time.Minute {
 		t.Errorf("expected third session to be untouched Focus 10m, got type=%s dur=%v", m.ZenTimer.Sessions[2].Type, m.ZenTimer.Sessions[2].Duration)
 	}
+
+	// 4. Test starting 55 minutes late (Focus 50m and part of Break 10m are missed)
+	m.CurrentMode = viewmodel.ModeNormal
+	m.ZenTimer = nil
+	task.LifecycleState = model.StateReady
+	now55 := time.Now()
+	task.TimeWindow.Start = now55.Add(-55 * time.Minute)
+	task.TimeWindow.End = now55.Add(5 * time.Minute)
+	database.UpdateTask(task)
+
+	m.CheckAndStartZenMode(task)
+	// Move to Option 1 (Trim) and confirm
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	// Remaining session: Break 5m, Focus 10m
+	if len(m.ZenTimer.Sessions) != 2 {
+		t.Fatalf("expected 2 sessions after 55m trim, got %d", len(m.ZenTimer.Sessions))
+	}
+	if m.ZenTimer.Sessions[0].Type != timer.BreakSession {
+		t.Errorf("expected first session to be BreakSession, got %s", m.ZenTimer.Sessions[0].Type)
+	}
+	breakDur := m.ZenTimer.Sessions[0].Duration
+	if breakDur > 5*time.Minute || breakDur < 4*time.Minute {
+		t.Errorf("expected break session to be trimmed to ~5m (between 4m and 5m), got %v", breakDur)
+	}
+	if m.ZenTimer.Sessions[1].Type != timer.FocusSession || m.ZenTimer.Sessions[1].Duration != 10*time.Minute {
+		t.Errorf("expected second session to be untouched Focus 10m, got type=%s dur=%v", m.ZenTimer.Sessions[1].Type, m.ZenTimer.Sessions[1].Duration)
+	}
 }

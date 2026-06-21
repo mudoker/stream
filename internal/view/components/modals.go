@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"stream/internal/view/theme"
+	"stream/internal/viewmodel/common/constants"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -27,7 +28,7 @@ func PrepareModalContent(content string, innerW int) string {
 
 // ModalSep draws a horizontal divider line.
 func ModalSep(w int) string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", w))
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(constants.ColorSeparator)).Render(strings.Repeat("─", w))
 }
 
 // RenderBaseConfirmModal draws a standardized confirmation dialog with key navigation.

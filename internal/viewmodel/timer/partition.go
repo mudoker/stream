@@ -3,7 +3,7 @@ package timer
 import (
 	"time"
 
-	"stream/constant"
+	"stream/internal/viewmodel/common/constants"
 )
 
 type SessionType string
@@ -26,20 +26,20 @@ func PartitionTask(total time.Duration) []Session {
 	// Default fallback for invalid or zero duration
 	if rem <= 0 {
 		return []Session{
-			{Type: FocusSession, Duration: constant.TimerDefaultFocusDuration},
+			{Type: FocusSession, Duration: constants.TimerDefaultFocusDuration},
 		}
 	}
 
 	// 1. Process focus time using 50-min and 25-min blocks
 	for rem > 0 {
-		if rem >= constant.TimerLongFocusDuration {
-			sessions = append(sessions, Session{Type: FocusSession, Duration: constant.TimerLongFocusDuration})
-			sessions = append(sessions, Session{Type: BreakSession, Duration: constant.TimerLongBreakDuration})
-			rem -= constant.TimerLongFocusDuration
-		} else if rem >= constant.TimerDefaultFocusDuration {
-			sessions = append(sessions, Session{Type: FocusSession, Duration: constant.TimerDefaultFocusDuration})
-			sessions = append(sessions, Session{Type: BreakSession, Duration: constant.TimerDefaultBreakDuration})
-			rem -= constant.TimerDefaultFocusDuration
+		if rem >= constants.TimerLongFocusDuration {
+			sessions = append(sessions, Session{Type: FocusSession, Duration: constants.TimerLongFocusDuration})
+			sessions = append(sessions, Session{Type: BreakSession, Duration: constants.TimerLongBreakDuration})
+			rem -= constants.TimerLongFocusDuration
+		} else if rem >= constants.TimerDefaultFocusDuration {
+			sessions = append(sessions, Session{Type: FocusSession, Duration: constants.TimerDefaultFocusDuration})
+			sessions = append(sessions, Session{Type: BreakSession, Duration: constants.TimerDefaultBreakDuration})
+			rem -= constants.TimerDefaultFocusDuration
 		} else {
 			// 2. Handle trailing leftover focus time (less than 25 minutes)
 			if len(sessions) > 0 {
@@ -48,11 +48,11 @@ func PartitionTask(total time.Duration) []Session {
 				appended := false
 				for i := len(sessions) - 1; i >= 0; i-- {
 					if sessions[i].Type == FocusSession {
-						if sessions[i].Duration == constant.TimerLongFocusDuration {
+						if sessions[i].Duration == constants.TimerLongFocusDuration {
 							continue
 						}
 						// If adding it keeps it under or equal to a 50m cap, add it
-						if sessions[i].Duration+rem <= constant.TimerLongFocusDuration {
+						if sessions[i].Duration+rem <= constants.TimerLongFocusDuration {
 							sessions[i].Duration += rem
 							appended = true
 							break

@@ -3,7 +3,7 @@ package viewmodel
 import (
 	"time"
 
-	"stream/constant"
+	"stream/internal/viewmodel/common/constants"
 	"stream/internal/db"
 	"stream/internal/model"
 	"stream/internal/sync"
@@ -166,9 +166,9 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 	m := Model{
 		DB:                          database,
 		Sync:                        syncEngine,
-		Layout:                      ComputeLayout(constant.DefaultLayoutWidth, constant.DefaultLayoutHeight),
-		Width:                       constant.DefaultLayoutWidth,
-		Height:                      constant.DefaultLayoutHeight,
+		Layout:                      ComputeLayout(constants.DefaultLayoutWidth, constants.DefaultLayoutHeight),
+		Width:                       constants.DefaultLayoutWidth,
+		Height:                      constants.DefaultLayoutHeight,
 		CurrentView:                 DayView,
 		CurrentMode:                 ModeNormal,
 		SelectedDay:                 time.Now(),

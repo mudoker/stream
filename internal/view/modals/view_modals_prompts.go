@@ -3,6 +3,7 @@ package modals
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"stream/internal/model"
 	"stream/internal/view/components"
@@ -244,6 +245,21 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			-1,
 			t,
 		)
+	case "start_late_confirm":
+		lateDur := time.Now().Sub(m.ConfirmTask.TimeWindow.Start)
+		return components.RenderBaseConfirmModal(
+			"Start Late - Adjust Timer?",
+			[]string{
+				fmt.Sprintf("You are starting late by %s.", formatDuration(lateDur)),
+				"Would you like to trim the timer to match the",
+				"remaining scheduled time, or start with the",
+				"full planned duration?",
+			},
+			[]string{"Start with Full Duration", "Trim to Current Time"},
+			m.ConfirmSelectedIndex,
+			-1,
+			t,
+		)
 	default: // delete
 		return components.RenderBaseConfirmModal(
 			"Confirm Delete",
@@ -456,4 +472,16 @@ func RenderLogSessionPromptModal(m *viewmodel.Model, t theme.Theme) string {
 	lines = append(lines, "  "+hint)
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%d seconds", int(d.Seconds()))
+	}
+	mins := int(d.Minutes())
+	secs := int(d.Seconds()) % 60
+	if secs == 0 {
+		return fmt.Sprintf("%d minutes", mins)
+	}
+	return fmt.Sprintf("%dm %ds", mins, secs)
 }

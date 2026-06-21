@@ -83,6 +83,53 @@ func NewZenTimer(t model.Task) *ZenTimer {
 	}
 }
 
+func (zt *ZenTimer) ShrinkGreedy(delay time.Duration) {
+	if delay <= 0 {
+		return
+	}
+
+	remainingDelay := delay
+
+	// Iterate through sessions and subtract remainingDelay from Focus sessions
+	for i := range zt.Sessions {
+		if remainingDelay <= 0 {
+			break
+		}
+		if zt.Sessions[i].Type == FocusSession {
+			if zt.Sessions[i].Duration > remainingDelay {
+				zt.Sessions[i].Duration -= remainingDelay
+				remainingDelay = 0
+			} else {
+				remainingDelay -= zt.Sessions[i].Duration
+				zt.Sessions[i].Duration = 0
+			}
+		}
+	}
+
+	// Filter out any sessions that have been shrunk to 0 duration
+	var activeSessions []Session
+	for _, sess := range zt.Sessions {
+		if sess.Duration > 0 {
+			activeSessions = append(activeSessions, sess)
+		}
+	}
+	zt.Sessions = activeSessions
+
+	// If no sessions remain, adjust appropriately
+	if len(zt.Sessions) == 0 {
+		zt.Running = false
+		zt.TimeRemaining = 0
+		zt.CurrentSessionIdx = 0
+		zt.TotalDuration = 0
+		return
+	}
+
+	zt.CurrentSessionIdx = 0
+	zt.TimeRemaining = zt.Sessions[0].Duration
+	zt.TotalDuration = zt.Sessions[0].Duration
+	zt.Running = true
+}
+
 func (zt *ZenTimer) RecordElapsedTimes() int {
 	if zt.CurrentSessionIdx >= 0 && zt.CurrentSessionIdx < len(zt.Sessions) {
 		sess := zt.Sessions[zt.CurrentSessionIdx]

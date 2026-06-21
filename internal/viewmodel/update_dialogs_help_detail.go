@@ -48,7 +48,7 @@ func (m *Model) handleHelpAndDetailKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			m.DetailOpen = false
 			return true, nil
 		case "z":
-			m.StartZenMode(m.DetailTask)
+			m.CheckAndStartZenMode(m.DetailTask)
 			m.DetailOpen = false
 			return true, nil
 		case "x":

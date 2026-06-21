@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"stream/constant"
+	"stream/internal/viewmodel/common/constants"
 )
 
 const (
-	RowsPerHour = constant.RowsPerHour
-	TotalRows   = constant.TotalRows
-	GutterWidth = constant.GutterWidth
+	RowsPerHour = constants.RowsPerHour
+	TotalRows   = constants.TotalRows
+	GutterWidth = constants.GutterWidth
 )
 
 // TimeToRow converts a time.Time to its local day row index (0 to TotalRows-1).

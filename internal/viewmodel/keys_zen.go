@@ -13,10 +13,48 @@ import (
 
 func (m *Model) StartZenMode(task model.Task) {
 	task.LifecycleState = model.StateActive
-	m.DB.UpdateTask(task)
-	m.refreshTasks()
+	if m.DB != nil {
+		m.DB.UpdateTask(task)
+		m.refreshTasks()
+	} else {
+		m.updateTaskInMemory(task)
+	}
 
 	m.ZenTimer = timer.NewZenTimer(task)
+	m.CurrentMode = ModeZen
+}
+
+func (m *Model) CheckAndStartZenMode(task model.Task) {
+	if !task.TimeWindow.Start.IsZero() {
+		now := time.Now()
+		if now.After(task.TimeWindow.Start) && now.Before(task.TimeWindow.End) {
+			lateDur := now.Sub(task.TimeWindow.Start)
+			if lateDur >= 1*time.Minute {
+				m.ConfirmTask = task
+				m.ConfirmActionType = "start_late_confirm"
+				m.ConfirmSelectedIndex = 0
+				m.ConfirmOpen = true
+				m.StatusMsg = fmt.Sprintf("Started late by %s. Choose timer adjustment option.", formatDuration(lateDur))
+				return
+			}
+		}
+	}
+
+	m.StartZenMode(task)
+}
+
+func (m *Model) StartZenModeWithTrim(task model.Task) {
+	task.LifecycleState = model.StateActive
+	if m.DB != nil {
+		m.DB.UpdateTask(task)
+		m.refreshTasks()
+	} else {
+		m.updateTaskInMemory(task)
+	}
+
+	m.ZenTimer = timer.NewZenTimer(task)
+	delay := time.Now().Sub(task.TimeWindow.Start)
+	m.ZenTimer.ShrinkGreedy(delay)
 	m.CurrentMode = ModeZen
 }
 

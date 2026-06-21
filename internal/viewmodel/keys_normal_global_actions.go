@@ -166,7 +166,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 					m.DB.UpdateTask(t)
 				}
 			}
-			m.StartZenMode(task)
+			m.CheckAndStartZenMode(task)
 		} else {
 			m.StatusMsg = "No active task selected to start Zen Mode."
 		}

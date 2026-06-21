@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"stream/constant"
+	"stream/internal/viewmodel/common/constants"
 	"stream/internal/model"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -36,7 +36,7 @@ func (m *Model) EnterTaskMoveMode() {
 	// Focus selection on the clone
 	m.SelectedTaskUUID = clone.UUID
 
-	m.StatusMsg = fmt.Sprintf("Locked '%s'. Use j/k or count+j/k to move in %dm steps. Enter to confirm, Esc to cancel.", task.Title, constant.TaskMoveStepMinutes)
+	m.StatusMsg = fmt.Sprintf("Locked '%s'. Use j/k or count+j/k to move in %dm steps. Enter to confirm, Esc to cancel.", task.Title, constants.TaskMoveStepMinutes)
 }
 
 func (m *Model) HandleTaskMoveKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -84,7 +84,7 @@ func (m *Model) applyTaskMove(direction int) {
 		return
 	}
 
-	delta := time.Duration(steps*constant.TaskMoveStepMinutes) * time.Minute
+	delta := time.Duration(steps*constants.TaskMoveStepMinutes) * time.Minute
 	task.TimeWindow.Start = task.TimeWindow.Start.Add(delta)
 	task.TimeWindow.End = task.TimeWindow.End.Add(delta)
 	m.updateTaskInMemory(task)
@@ -94,5 +94,5 @@ func (m *Model) applyTaskMove(direction int) {
 	if direction < 0 {
 		moveDir = "up"
 	}
-	m.StatusMsg = fmt.Sprintf("Moved '%s' %d minutes %s. Enter to confirm, Esc to cancel.", task.Title, absInt(steps*constant.TaskMoveStepMinutes), moveDir)
+	m.StatusMsg = fmt.Sprintf("Moved '%s' %d minutes %s. Enter to confirm, Esc to cancel.", task.Title, absInt(steps*constants.TaskMoveStepMinutes), moveDir)
 }

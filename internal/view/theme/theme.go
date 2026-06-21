@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	"stream/internal/model"
+	"stream/internal/viewmodel/common/constants"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
@@ -45,21 +46,21 @@ type Theme struct {
 }
 
 func NewTheme() Theme {
-	canvasBg := lipgloss.Color("#1e1e2e")
-	panelBg := lipgloss.Color("#181825")
-	selectedBg := lipgloss.Color("#313244")
-	modalBg := lipgloss.Color("#1e1e2e")
-	fg := lipgloss.Color("#cdd6f4")
-	muted := lipgloss.Color("#6c7086")
-	accent := lipgloss.Color("#89b4fa")
-	focusPurple := lipgloss.Color("#bd93f9")
+	canvasBg := lipgloss.Color(constants.ColorCanvasBg)
+	panelBg := lipgloss.Color(constants.ColorPanelBg)
+	selectedBg := lipgloss.Color(constants.ColorSelectedBg)
+	modalBg := lipgloss.Color(constants.ColorModalBg)
+	fg := lipgloss.Color(constants.ColorFg)
+	muted := lipgloss.Color(constants.ColorMuted)
+	accent := lipgloss.Color(constants.ColorAccent)
+	focusPurple := lipgloss.Color(constants.ColorFocusPurple)
 
-	p0 := lipgloss.Color("#f38ba8")
-	p1 := lipgloss.Color("#fab387")
-	p2 := lipgloss.Color("#f9e2af")
-	p3 := lipgloss.Color("#89dceb")
+	p0 := lipgloss.Color(constants.ColorP0)
+	p1 := lipgloss.Color(constants.ColorP1)
+	p2 := lipgloss.Color(constants.ColorP2)
+	p3 := lipgloss.Color(constants.ColorP3)
 
-	success := lipgloss.Color("#a6e3a1")
+	success := lipgloss.Color(constants.ColorSuccess)
 
 	return Theme{
 		CanvasBg:     canvasBg,

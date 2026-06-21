@@ -147,6 +147,16 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				} else {
 					common.CancelLogSession(m, m.ConfirmTask)
 				}
+			case "start_late_confirm":
+				if m.ConfirmSelectedIndex == 0 {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.StartZenMode(m.ConfirmTask)
+				} else {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.StartZenModeWithTrim(m.ConfirmTask)
+				}
 			default: // delete
 				if m.ConfirmSelectedIndex == 0 {
 					common.DeleteTaskOccurrence(m, m.ConfirmTask)

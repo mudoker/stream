@@ -184,7 +184,7 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					m.StatusMsg = fmt.Sprintf("Reminder '%s' dismissed.", m.PromptTask.Title)
 					return true, nil
 				}
-				m.StartZenMode(m.PromptTask)
+				m.CheckAndStartZenMode(m.PromptTask)
 				m.PromptOpen = false
 				return true, nil
 			case 1: // Snooze 5m

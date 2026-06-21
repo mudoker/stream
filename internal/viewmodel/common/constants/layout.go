@@ -1,9 +1,9 @@
-package constant
+package constants
 
 const (
-	RowsPerHour                  = 60  // 1-minute slots per hour (60 rows/hour)
+	RowsPerHour                  = 60   // 1-minute slots per hour (60 rows/hour)
 	TotalRows                    = 1440 // 24h * 60 rows
-	GutterWidth                  = 11  // " HH:MM ───┼" timestamp gutter
+	GutterWidth                  = 11   // " HH:MM ───┼" timestamp gutter
 	TimelineTimestampLaneW       = 7
 	TimelineLeftSpacerW          = 4
 	TimelineRightSpacerW         = 2

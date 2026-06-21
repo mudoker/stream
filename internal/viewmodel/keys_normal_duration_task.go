@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"stream/constant"
+	"stream/internal/viewmodel/common/constants"
 	"stream/internal/model"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -76,12 +76,12 @@ func (m *Model) applyTaskDurationAdjust(direction int) {
 		return
 	}
 
-	delta := time.Duration(steps*constant.TaskDurationStepMinutes) * time.Minute
+	delta := time.Duration(steps*constants.TaskDurationStepMinutes) * time.Minute
 	newEnd := task.TimeWindow.End.Add(delta)
 
 	// Ensure duration is at least 15 minutes
-	if newEnd.Sub(task.TimeWindow.Start) < constant.MinTaskDurationMinutes*time.Minute {
-		newEnd = task.TimeWindow.Start.Add(constant.MinTaskDurationMinutes * time.Minute)
+	if newEnd.Sub(task.TimeWindow.Start) < constants.MinTaskDurationMinutes*time.Minute {
+		newEnd = task.TimeWindow.Start.Add(constants.MinTaskDurationMinutes * time.Minute)
 	}
 
 	task.TimeWindow.End = newEnd

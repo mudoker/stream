@@ -292,3 +292,96 @@ func TestExitFocusOptions(t *testing.T) {
 		t.Errorf("expected resuming task to have 2 story points, got %d", resumeTask.StoryPoints)
 	}
 }
+
+func TestStartLateTrimFeature(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to init db: %v", err)
+	}
+
+	// 1 hour task, scheduled starting 15 minutes ago
+	now := time.Now()
+	task := model.Task{
+		UUID:           "test-start-late",
+		Title:          "Start Late Task",
+		StoryPoints:    0, // use anchored time window
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: now.Add(-15 * time.Minute),
+			End:   now.Add(45 * time.Minute),
+		},
+	}
+	database.AddTask(task)
+
+	m := viewmodel.NewModel(database, nil)
+
+	// 1. Trigger Zen mode, check if confirm modal opens
+	m.CheckAndStartZenMode(task)
+	if !m.ConfirmOpen || m.ConfirmActionType != "start_late_confirm" {
+		t.Fatalf("expected start_late_confirm dialog to be open, got ConfirmOpen=%t Action=%q", m.ConfirmOpen, m.ConfirmActionType)
+	}
+	if m.ConfirmSelectedIndex != 0 {
+		t.Errorf("expected default option to be 0 (Full Duration), got %d", m.ConfirmSelectedIndex)
+	}
+
+	// 2. Select Option 0 (Full duration)
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.ConfirmOpen {
+		t.Error("expected confirm dialog to close")
+	}
+	if m.CurrentMode != viewmodel.ModeZen || m.ZenTimer == nil {
+		t.Fatal("expected Zen mode to start")
+	}
+	// Total duration of partitioned sessions for 1h task (Focus 50m, Break 10m, Focus 10m)
+	// Should be unchanged
+	if len(m.ZenTimer.Sessions) != 3 {
+		t.Fatalf("expected 3 sessions, got %d", len(m.ZenTimer.Sessions))
+	}
+	if m.ZenTimer.Sessions[0].Duration != 50*time.Minute {
+		t.Errorf("expected first session to be 50m, got %v", m.ZenTimer.Sessions[0].Duration)
+	}
+
+	// 3. Reset and test Option 1 (Trim to current time)
+	m.CurrentMode = viewmodel.ModeNormal
+	m.ZenTimer = nil
+	task.LifecycleState = model.StateReady
+	database.UpdateTask(task)
+
+	m.CheckAndStartZenMode(task)
+	if !m.ConfirmOpen || m.ConfirmActionType != "start_late_confirm" {
+		t.Fatal("expected start_late_confirm dialog to open again")
+	}
+
+	// Move to Option 1
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if m.ConfirmSelectedIndex != 1 {
+		t.Errorf("expected index to be 1, got %d", m.ConfirmSelectedIndex)
+	}
+
+	// Press Enter to confirm Trimmed Duration
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.CurrentMode != viewmodel.ModeZen || m.ZenTimer == nil {
+		t.Fatal("expected Zen mode to start")
+	}
+
+	// Shrunk sessions should be: Focus 35m (50 - 15), Break 10m, Focus 10m
+	if len(m.ZenTimer.Sessions) != 3 {
+		t.Fatalf("expected 3 sessions after trim, got %d", len(m.ZenTimer.Sessions))
+	}
+	// Since time has ticked slightly, delay will be slightly more than 15 minutes.
+	// We can assert the first session is approximately 35 minutes, or between 34 and 35 minutes.
+	firstSessDur := m.ZenTimer.Sessions[0].Duration
+	if firstSessDur > 35*time.Minute || firstSessDur < 34*time.Minute {
+		t.Errorf("expected first session to be trimmed to ~35m (between 34m and 35m), got %v", firstSessDur)
+	}
+
+	// Break session and second focus session must remain untouched
+	if m.ZenTimer.Sessions[1].Type != timer.BreakSession || m.ZenTimer.Sessions[1].Duration != 10*time.Minute {
+		t.Errorf("expected second session to be untouched Break 10m, got type=%s dur=%v", m.ZenTimer.Sessions[1].Type, m.ZenTimer.Sessions[1].Duration)
+	}
+	if m.ZenTimer.Sessions[2].Type != timer.FocusSession || m.ZenTimer.Sessions[2].Duration != 10*time.Minute {
+		t.Errorf("expected third session to be untouched Focus 10m, got type=%s dur=%v", m.ZenTimer.Sessions[2].Type, m.ZenTimer.Sessions[2].Duration)
+	}
+}

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"stream/constant"
+	"stream/internal/viewmodel/common/constants"
 	"stream/internal/model"
 )
 
@@ -45,12 +45,12 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 		return nil
 	}
 
-	gridW := m.Layout.TimelineW - constant.TimelineTimestampLaneW
+	gridW := m.Layout.TimelineW - constants.TimelineTimestampLaneW
 	if gridW < 10 {
 		gridW = 10
 	}
 
-	colsAreaW := gridW - constant.TimelineLeftSpacerW - constant.TimelineRightSpacerW
+	colsAreaW := gridW - constants.TimelineLeftSpacerW - constants.TimelineRightSpacerW
 	if colsAreaW < 1 {
 		colsAreaW = 1
 	}
@@ -63,8 +63,8 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 	}
 
 	colW := colsAreaW / numCols
-	if colW < constant.TimelineMinColW {
-		colW = constant.TimelineMinColW
+	if colW < constants.TimelineMinColW {
+		colW = constants.TimelineMinColW
 	}
 
 	lastOccupiedRow := make([]int, numCols)
@@ -154,8 +154,8 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 
 func getEffectiveEnd(t model.Task) time.Time {
 	dur := t.TimeWindow.End.Sub(t.TimeWindow.Start)
-	if dur < constant.MinTaskEffectiveDuration {
-		return t.TimeWindow.Start.Add(constant.MinTaskEffectiveDuration)
+	if dur < constants.MinTaskEffectiveDuration {
+		return t.TimeWindow.Start.Add(constants.MinTaskEffectiveDuration)
 	}
 	return t.TimeWindow.End
 }

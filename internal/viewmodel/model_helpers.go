@@ -179,6 +179,14 @@ func (m *Model) GetConfirmSelectedIndex() int {
 	return m.ConfirmSelectedIndex
 }
 
+func (m *Model) GetConfirmFocusArea() int {
+	return m.ConfirmFocusArea
+}
+
+func (m *Model) SetConfirmFocusArea(area int) {
+	m.ConfirmFocusArea = area
+}
+
 func (m *Model) GetZenTimer() *timer.ZenTimer {
 	return m.ZenTimer
 }

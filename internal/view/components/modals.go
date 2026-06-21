@@ -32,7 +32,7 @@ func ModalSep(w int) string {
 }
 
 // RenderBaseConfirmModal draws a standardized confirmation dialog with key navigation.
-func RenderBaseConfirmModal(title string, descLines []string, options []string, selectedIdx int, destructiveIdx int, t theme.Theme) string {
+func RenderBaseConfirmModal(title string, descLines []string, options []string, selectedIdx int, destructiveIdx int, focusArea int, t theme.Theme) string {
 	const innerW = 50
 	var lines []string
 
@@ -55,7 +55,11 @@ func RenderBaseConfirmModal(title string, descLines []string, options []string, 
 			if idx == destructiveIdx {
 				color = t.P0Color
 			}
-			optStr = lipgloss.NewStyle().Foreground(color).Bold(true).Render("  ▶ " + opt + " ◀")
+			if focusArea == 0 {
+				optStr = lipgloss.NewStyle().Foreground(color).Bold(true).Render("  ▶ " + opt + " ◀")
+			} else {
+				optStr = lipgloss.NewStyle().Foreground(color).Render("  ◦ " + opt)
+			}
 		} else {
 			optStr = lipgloss.NewStyle().Foreground(t.Muted).Render("    " + opt)
 		}
@@ -66,9 +70,21 @@ func RenderBaseConfirmModal(title string, descLines []string, options []string, 
 	lines = append(lines, ModalSep(innerW))
 	lines = append(lines, "")
 
-	confirmBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Confirm")
-	cancelBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
-	hintText := lipgloss.NewStyle().Foreground(t.Muted).Render("j/k or h/l navigate")
+	var confirmBtn, cancelBtn string
+	var hintText string
+	if focusArea == 0 {
+		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  ")
+		cancelBtn = lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  ")
+		hintText = lipgloss.NewStyle().Foreground(t.Muted).Render("j/k select, Tab navigate")
+	} else if focusArea == 1 {
+		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▶ Confirm ◀")
+		cancelBtn = lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  ")
+		hintText = lipgloss.NewStyle().Foreground(t.Muted).Render("Enter choose, Tab navigate")
+	} else {
+		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  ")
+		cancelBtn = lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("▶ Cancel ◀")
+		hintText = lipgloss.NewStyle().Foreground(t.Muted).Render("Enter choose, Tab navigate")
+	}
 	lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))

@@ -405,3 +405,90 @@ func TestCompleteReminderAndLogSessionModals(t *testing.T) {
 	}
 }
 
+func TestConfirmModalFocusNavigation(t *testing.T) {
+	task := model.Task{
+		UUID:           "task-1",
+		Title:          "Task to Delete",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+
+	m := &viewmodel.Model{
+		CurrentMode:      viewmodel.ModeNormal,
+		Tasks:            []model.Task{task},
+		SelectedTaskUUID: "task-1",
+	}
+
+	// 1. Open delete modal using 'd'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	if !m.ConfirmOpen || m.ConfirmActionType != "delete" {
+		t.Fatalf("Expected delete confirm modal to open, got ConfirmOpen=%t ConfirmActionType=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+
+	// 2. Default focus area should be 0 (options list)
+	if m.ConfirmFocusArea != 0 {
+		t.Errorf("Expected default focus area to be 0, got %d", m.ConfirmFocusArea)
+	}
+
+	// 3. Pressing 'tab' should move to focus area 1 (Confirm button)
+	m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if m.ConfirmFocusArea != 1 {
+		t.Errorf("Expected focus area to be 1 after tab, got %d", m.ConfirmFocusArea)
+	}
+
+	// 4. Pressing 'tab' again should move to focus area 2 (Cancel button)
+	m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if m.ConfirmFocusArea != 2 {
+		t.Errorf("Expected focus area to be 2 after second tab, got %d", m.ConfirmFocusArea)
+	}
+
+	// 5. Pressing 'tab' again should wrap to focus area 0
+	m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if m.ConfirmFocusArea != 0 {
+		t.Errorf("Expected focus area to wrap back to 0, got %d", m.ConfirmFocusArea)
+	}
+
+	// 6. Pressing 'shift+tab' should move to focus area 2 (Cancel button)
+	m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	if m.ConfirmFocusArea != 2 {
+		t.Errorf("Expected focus area to be 2 after shift+tab, got %d", m.ConfirmFocusArea)
+	}
+
+	// 7. Arrow keys/h/l on action buttons
+	// From 2, pressing 'left' / 'h' should switch focus to 1 (Confirm)
+	m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	if m.ConfirmFocusArea != 1 {
+		t.Errorf("Expected focus area to switch to 1 on 'left' arrow, got %d", m.ConfirmFocusArea)
+	}
+
+	// From 1, pressing 'right' / 'l' should switch focus to 2 (Cancel)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	if m.ConfirmFocusArea != 2 {
+		t.Errorf("Expected focus area to switch to 2 on 'l' key, got %d", m.ConfirmFocusArea)
+	}
+
+	// From 2, pressing 'up' / 'k' should return focus to 0 (options list)
+	m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.ConfirmFocusArea != 0 {
+		t.Errorf("Expected focus area to return to 0 on 'up' arrow, got %d", m.ConfirmFocusArea)
+	}
+
+	// 8. Press enter on Cancel button
+	// First move to focus area 2
+	m.Update(tea.KeyMsg{Type: tea.KeyShiftTab}) // 0 -> 2
+	if m.ConfirmFocusArea != 2 {
+		t.Fatalf("Expected focus area 2 before testing cancel enter, got %d", m.ConfirmFocusArea)
+	}
+
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.ConfirmOpen {
+		t.Error("Expected confirm modal to close after pressing enter on Cancel button")
+	}
+	if m.ConfirmFocusArea != 0 {
+		t.Errorf("Expected ConfirmFocusArea to reset to 0 after closing, got %d", m.ConfirmFocusArea)
+	}
+	if len(m.Tasks) == 0 {
+		t.Error("Expected task not to be deleted when Cancel was pressed")
+	}
+}
+

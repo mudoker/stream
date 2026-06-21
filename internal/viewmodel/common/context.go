@@ -19,6 +19,8 @@ type ModelContext interface {
 	SetConfirmSelectedIndex(idx int)
 	GetConfirmTask() model.Task
 	GetConfirmSelectedIndex() int
+	GetConfirmFocusArea() int
+	SetConfirmFocusArea(area int)
 	GetZenTimer() *timer.ZenTimer
 	SetZenTimer(zt *timer.ZenTimer)
 	GetTasks() []model.Task

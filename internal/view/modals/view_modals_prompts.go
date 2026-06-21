@@ -179,6 +179,7 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			[]string{"Yes, Complete", "No, Cancel"},
 			m.ConfirmSelectedIndex,
 			-1,
+			m.ConfirmFocusArea,
 			t,
 		)
 	case "deanchor":
@@ -192,6 +193,7 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			[]string{"Yes, De-anchor", "No, Cancel"},
 			m.ConfirmSelectedIndex,
 			-1,
+			m.ConfirmFocusArea,
 			t,
 		)
 	case "delete_recurring":
@@ -205,6 +207,7 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			[]string{"Only this occurrence", "This and all remaining occurrences"},
 			m.ConfirmSelectedIndex,
 			-1,
+			m.ConfirmFocusArea,
 			t,
 		)
 	case "edit_recurring":
@@ -218,6 +221,7 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			[]string{"Only this occurrence", "This and all remaining occurrences"},
 			m.ConfirmSelectedIndex,
 			-1,
+			m.ConfirmFocusArea,
 			t,
 		)
 	case "exit_focus":
@@ -231,6 +235,7 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			[]string{"1. Mark as complete", "2. Complete and resume", "3. Discard session changes"},
 			m.ConfirmSelectedIndex,
 			-1,
+			m.ConfirmFocusArea,
 			t,
 		)
 	case "log_session_confirm":
@@ -243,6 +248,7 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			[]string{"Yes, Log Time", "No, Just Complete"},
 			m.ConfirmSelectedIndex,
 			-1,
+			m.ConfirmFocusArea,
 			t,
 		)
 	case "start_late_confirm":
@@ -258,6 +264,7 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			[]string{"Start with Full Duration", "Trim to Current Time"},
 			m.ConfirmSelectedIndex,
 			-1,
+			m.ConfirmFocusArea,
 			t,
 		)
 	default: // delete
@@ -270,6 +277,7 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			[]string{"Yes, Delete", "No, Cancel"},
 			m.ConfirmSelectedIndex,
 			0, // Option 0 is destructive (Delete)
+			m.ConfirmFocusArea,
 			t,
 		)
 	}

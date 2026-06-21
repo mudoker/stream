@@ -341,12 +341,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 					if r >= visualRows {
 						break
 					}
-					taskRows[colIndex][r] = line
-					if isSpecial {
-						for c := 1; c < numCols; c++ {
-							taskRows[c][r] = ""
-						}
-					}
+					writeVisualLine(taskRows, numCols, cellWidths, r, colIndex, rc.TotalCol, isSpecial, line)
 				}
 				if isSelected {
 					selectedStartRow = topStartRow
@@ -366,14 +361,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				break
 			}
 			if i == len(cardLines)-1 && cellWidths[colIndex][r] == 0 && r > startRow {
-				taskRows[colIndex][r-1] = line
+				writeVisualLine(taskRows, numCols, cellWidths, r-1, colIndex, rc.TotalCol, isSpecial, line)
 			} else {
-				taskRows[colIndex][r] = line
-			}
-			if isSpecial {
-				for c := 1; c < numCols; c++ {
-					taskRows[c][r] = ""
-				}
+				writeVisualLine(taskRows, numCols, cellWidths, r, colIndex, rc.TotalCol, isSpecial, line)
 			}
 			actualCardHeightWritten++
 		}
@@ -399,12 +389,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 					if r >= visualRows {
 						break
 					}
-					taskRows[colIndex][r] = line
-					if isSpecial {
-						for c := 1; c < numCols; c++ {
-							taskRows[c][r] = ""
-						}
-					}
+					writeVisualLine(taskRows, numCols, cellWidths, r, colIndex, rc.TotalCol, isSpecial, line)
 				}
 				currentRowOffset += len(bottomCommuteLines)
 				if isSelected {
@@ -427,14 +412,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 					break
 				}
 				if i == len(restLines)-1 && cellWidths[colIndex][r] == 0 && r > startRow+currentRowOffset {
-					taskRows[colIndex][r-1] = line
+					writeVisualLine(taskRows, numCols, cellWidths, r-1, colIndex, rc.TotalCol, isSpecial, line)
 				} else {
-					taskRows[colIndex][r] = line
-				}
-				if isSpecial {
-					for c := 1; c < numCols; c++ {
-						taskRows[c][r] = ""
-					}
+					writeVisualLine(taskRows, numCols, cellWidths, r, colIndex, rc.TotalCol, isSpecial, line)
 				}
 			}
 			currentRowOffset += len(restLines)
@@ -590,6 +570,23 @@ func durationToRows(dur time.Duration) int {
 		return 0
 	}
 	return (mins*(viewmodel.RowsPerHour/5) + 59) / 60
+}
+
+func writeVisualLine(taskRows [][]string, numCols int, cellWidths [][]int, r int, colIndex int, totalCol int, isSpecial bool, line string) {
+	if totalCol == 1 || isSpecial {
+		visualCursor := 0
+		for c := 0; c < numCols; c++ {
+			w := cellWidths[c][r]
+			if w == 0 {
+				taskRows[c][r] = ""
+			} else {
+				taskRows[c][r] = theme.SliceAnsi(line, visualCursor, visualCursor+w)
+				visualCursor += w
+			}
+		}
+	} else {
+		taskRows[colIndex][r] = line
+	}
 }
 
 

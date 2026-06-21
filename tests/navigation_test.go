@@ -308,3 +308,100 @@ func TestConfirmModalKeyNavigation(t *testing.T) {
 		t.Error("Expected task to be deleted after confirming")
 	}
 }
+
+func TestCompleteReminderAndLogSessionModals(t *testing.T) {
+	reminder := model.Task{
+		UUID:           "reminder-1",
+		Title:          "A Reminder Task",
+		SchedulingType: model.Reminder,
+		LifecycleState: model.StateReady,
+	}
+
+	floating := model.Task{
+		UUID:           "floating-1",
+		Title:          "A Floating Task",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+
+	m := &viewmodel.Model{
+		CurrentMode:      viewmodel.ModeNormal,
+		Tasks:            []model.Task{reminder, floating},
+		SelectedTaskUUID: "reminder-1",
+	}
+
+	// Test 1: Complete Reminder Modal Key Navigation and Y/N
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	if !m.ConfirmOpen || m.ConfirmActionType != "complete_reminder" {
+		t.Fatalf("Expected complete_reminder confirm modal to open, got ConfirmOpen=%t ConfirmActionType=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+	if m.ConfirmSelectedIndex != 0 {
+		t.Errorf("Expected default selected index to be 0, got %d", m.ConfirmSelectedIndex)
+	}
+
+	// Move to Cancel option using 'j'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if m.ConfirmSelectedIndex != 1 {
+		t.Errorf("Expected selected index to be 1, got %d", m.ConfirmSelectedIndex)
+	}
+
+	// Press Enter to cancel
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.ConfirmOpen {
+		t.Error("Expected confirm modal to close after canceling")
+	}
+	if m.Tasks[0].LifecycleState != model.StateReady {
+		t.Error("Expected reminder state to still be Ready")
+	}
+
+	// Re-open and use 'y' to complete
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if m.ConfirmOpen {
+		t.Error("Expected confirm modal to close after completing")
+	}
+	if m.Tasks[0].LifecycleState != model.StateCompleted {
+		t.Error("Expected reminder state to be Completed")
+	}
+
+	// Test 2: Log Focus Session Modal Key Navigation and Y/N
+	m.SelectedTaskUUID = "floating-1"
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	if !m.ConfirmOpen || m.ConfirmActionType != "log_session_confirm" {
+		t.Fatalf("Expected log_session_confirm confirm modal to open, got ConfirmOpen=%t ConfirmActionType=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+	if m.ConfirmSelectedIndex != 0 {
+		t.Errorf("Expected default selected index to be 0, got %d", m.ConfirmSelectedIndex)
+	}
+
+	// Move to No option using 'l' (or 'right')
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	if m.ConfirmSelectedIndex != 1 {
+		t.Errorf("Expected selected index to be 1, got %d", m.ConfirmSelectedIndex)
+	}
+
+	// Press Enter to complete task without logging hours
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.ConfirmOpen {
+		t.Error("Expected confirm modal to close")
+	}
+	if m.Tasks[1].LifecycleState != model.StateCompleted {
+		t.Error("Expected task state to be Completed")
+	}
+
+	// Re-open (first mark incomplete) and log hours option
+	m.Tasks[1].LifecycleState = model.StateReady
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	if !m.ConfirmOpen || m.ConfirmActionType != "log_session_confirm" {
+		t.Fatal("Expected log_session_confirm to open again")
+	}
+	// Select Yes option (0) and press Enter
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.ConfirmOpen {
+		t.Error("Expected confirm modal to close")
+	}
+	if !m.LogSessionPromptOpen {
+		t.Error("Expected log hours input prompt to open")
+	}
+}
+

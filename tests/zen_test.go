@@ -8,6 +8,7 @@ import (
 	"stream/internal/db"
 	"stream/internal/model"
 	"stream/internal/sync"
+	"stream/internal/view"
 	"stream/internal/viewmodel"
 	"stream/internal/viewmodel/timer"
 
@@ -205,6 +206,17 @@ func TestZenTimerStopAndResume(t *testing.T) {
 	m.HandleZenKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	if !m.ConfirmOpen || m.ConfirmActionType != "exit_focus" {
 		t.Fatal("expected exit_focus confirmation dialog to be open")
+	}
+
+	m.Width = 120
+	m.Height = 40
+	v := view.NewView(&m)
+	viewStr := v.Render()
+	if !strings.Contains(viewStr, "Focus Session Active") {
+		t.Error("Expected view to render the 'Focus Session Active' confirmation modal during Zen Mode")
+	}
+	if !strings.Contains(viewStr, "Abort") && !strings.Contains(viewStr, "ABORT") && !strings.Contains(viewStr, "Stop / Abort") {
+		t.Error("Expected view to still render the underlying Zen Mode timer canvas under the modal")
 	}
 
 	// Choose option 1 (Mark as complete) to save elapsed time and exit

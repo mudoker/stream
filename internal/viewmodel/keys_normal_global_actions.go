@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"stream/internal/model"
+	"stream/internal/viewmodel/common"
 	"stream/internal/viewmodel/jazzlounge"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -119,76 +120,15 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 					m.WarningOpen = true
 					return true, nil
 				}
-
-				dateStr := m.SelectedDay.Format("2006-01-02")
-				foundIdx := -1
-				for idx, d := range task.CompletedDates {
-					if d == dateStr {
-						foundIdx = idx
-						break
-					}
-				}
-
-				if foundIdx >= 0 {
-					// Toggle off: remove from CompletedDates
-					task.CompletedDates = append(task.CompletedDates[:foundIdx], task.CompletedDates[foundIdx+1:]...)
-					m.StatusMsg = fmt.Sprintf("Habit '%s' marked incomplete for %s.", task.Title, dateStr)
-					if len(task.CompletedDates) == 0 {
-						task.LifecycleState = model.StateBacklog
-					}
-				} else {
-					// Toggle on: add to CompletedDates
-					task.CompletedDates = append(task.CompletedDates, dateStr)
-					task.LifecycleState = model.StateCompleted
-					m.StatusMsg = fmt.Sprintf("Habit '%s' completed for %s!", task.Title, dateStr)
-				}
-				task.UpdatedAt = time.Now()
-				m.DB.UpdateTask(task)
-				m.refreshTasks()
-			} else {
-				if task.LifecycleState == model.StateCompleted {
-					task.LifecycleState = model.StateBacklog
-					m.StatusMsg = fmt.Sprintf("Task '%s' marked incomplete.", task.Title)
-					task.UpdatedAt = time.Now()
-					m.DB.UpdateTask(task)
-					m.refreshTasks()
-				} else {
-					if task.SchedulingType == model.Reminder {
-						m.ConfirmTask = task
-						m.ConfirmOpen = true
-						m.ConfirmActionType = "complete_reminder"
-						return true, nil
-					}
-					if m.ZenTimer == nil || m.ZenTimer.Task.UUID != task.UUID {
-						m.ConfirmTask = task
-						m.ConfirmOpen = true
-						m.ConfirmActionType = "log_session_confirm"
-						m.ConfirmSelectedIndex = 0
-						return true, nil
-					} else {
-						task.LifecycleState = model.StateCompleted
-						m.StatusMsg = fmt.Sprintf("Task '%s' completed!", task.Title)
-						task.UpdatedAt = time.Now()
-						m.DB.UpdateTask(task)
-						m.refreshTasks()
-						m.ZenTimer = nil
-					}
-				}
 			}
+			common.ToggleTaskCompletion(m, task, m.SelectedDay)
 		}
 		return true, nil
 	case "d":
 		// Delete Task
 		task, exists := m.GetActiveTask()
 		if exists {
-			m.ConfirmTask = task
-			m.ConfirmOpen = true
-			if task.RecurringParentUUID != "" {
-				m.ConfirmActionType = "delete_recurring"
-				m.ConfirmSelectedIndex = 0
-			} else {
-				m.ConfirmActionType = "delete"
-			}
+			common.InitiateDeleteTask(m, task)
 		}
 		return true, nil
 	case "t":

@@ -250,3 +250,61 @@ func TestWeekScrollingAndTaskAutoScroll(t *testing.T) {
 		t.Errorf("Expected manual scroll up ScrollOffset to be 0, got %d", m.ScrollOffset)
 	}
 }
+
+func TestConfirmModalKeyNavigation(t *testing.T) {
+	task := model.Task{
+		UUID:           "task-1",
+		Title:          "Task to Delete",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+
+	m := &viewmodel.Model{
+		CurrentMode:      viewmodel.ModeNormal,
+		Tasks:            []model.Task{task},
+		SelectedTaskUUID: "task-1",
+	}
+
+	// 1. Open delete modal using 'd'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	if !m.ConfirmOpen || m.ConfirmActionType != "delete" {
+		t.Fatalf("Expected delete confirm modal to open, got ConfirmOpen=%t ConfirmActionType=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+
+	// 2. Default selection index should be 0 (Yes, Delete)
+	if m.ConfirmSelectedIndex != 0 {
+		t.Errorf("Expected default selected index to be 0, got %d", m.ConfirmSelectedIndex)
+	}
+
+	// 3. Move down/right to option 1 (No, Cancel)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if m.ConfirmSelectedIndex != 1 {
+		t.Errorf("Expected selected index to be 1 after pressing 'j', got %d", m.ConfirmSelectedIndex)
+	}
+
+	// 4. Move up/left back to option 0 (Yes, Delete)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	if m.ConfirmSelectedIndex != 0 {
+		t.Errorf("Expected selected index to be 0 after pressing 'k', got %d", m.ConfirmSelectedIndex)
+	}
+
+	// 5. Navigate to option 1 and press enter to cancel deletion
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.ConfirmOpen {
+		t.Error("Expected confirm modal to close after canceling deletion")
+	}
+	if len(m.Tasks) == 0 {
+		t.Error("Expected task to NOT be deleted after canceling")
+	}
+
+	// 6. Re-open delete modal, stay on option 0 (Yes), and press enter to delete
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("d")})
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.ConfirmOpen {
+		t.Error("Expected confirm modal to close after deletion")
+	}
+	if len(m.Tasks) != 0 {
+		t.Error("Expected task to be deleted after confirming")
+	}
+}

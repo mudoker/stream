@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"stream/internal/viewmodel"
+	"stream/internal/view/components"
 	"stream/internal/view/theme"
 
 	"github.com/charmbracelet/lipgloss"
@@ -26,74 +27,6 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")
 
-	renderField := func(num, label string, input string, index int) string {
-		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("%2s", num))
-		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
-		if f.ActiveField == index {
-			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
-		}
-		return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), input)
-	}
-
-	renderDropdown := func(num, label string, value string, index int) string {
-		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("%2s", num))
-		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
-		if f.ActiveField == index {
-			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
-			valStr := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(fmt.Sprintf("◀ %s ▶", value))
-			return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), valStr)
-		}
-		valStr := lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  %s  ", value))
-		return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), valStr)
-	}
-
-	renderDaysSelect := func(num, label string, index int) string {
-		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("%2s", num))
-		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
-		isActiveField := f.ActiveField == index
-		if isActiveField {
-			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
-		}
-
-		dayNames := []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
-		var dayStrs []string
-		for i, name := range dayNames {
-			sel := f.RecurringDaysSelected[i]
-			isCursor := isActiveField && f.RecurringDaysSubIdx == i
-
-			var dStr string
-			if sel && isCursor {
-				// Selected + cursor: bright accent with filled checkbox
-				dStr = lipgloss.NewStyle().
-					Foreground(t.CanvasBg).
-					Background(t.Accent).
-					Bold(true).
-					Render(" ✓" + name + " ")
-			} else if sel && !isCursor {
-				// Selected, no cursor: success color with check
-				dStr = lipgloss.NewStyle().
-					Foreground(t.SuccessColor).
-					Bold(true).
-					Render(" ✓" + name + " ")
-			} else if !sel && isCursor {
-				// Unselected + cursor: accent outline style
-				dStr = lipgloss.NewStyle().
-					Foreground(t.CanvasBg).
-					Background(t.Muted).
-					Render(" ·" + strings.ToLower(name) + " ")
-			} else {
-				// Unselected, no cursor: dim
-				dStr = lipgloss.NewStyle().
-					Foreground(t.Muted).
-					Render("  " + strings.ToLower(name) + " ")
-			}
-			dayStrs = append(dayStrs, dStr)
-		}
-
-		daysRow := strings.Join(dayStrs, "")
-		return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), daysRow)
-	}
-
 	priorityValStr := viewmodel.PriorityOptions[f.PriorityIdx]
 	spValStr := fmt.Sprintf("%d", viewmodel.SPOptions[f.SPIdx])
 	typeValStr := viewmodel.TaskTypeOptions[f.TaskTypeIdx]
@@ -105,75 +38,69 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		return num
 	}
 
-	fields = append(fields, renderField(nextFieldNum(), "Title", f.TitleInput.View(), 0))
-	fields = append(fields, renderField(nextFieldNum(), "Description", f.DescInput.View(), 1))
-	fields = append(fields, renderDropdown(nextFieldNum(), "Priority", priorityValStr, 2))
+	fields = append(fields, components.RenderFormField(nextFieldNum(), "Title", f.TitleInput.View(), f.ActiveField == 0, t))
+	fields = append(fields, components.RenderFormField(nextFieldNum(), "Description", f.DescInput.View(), f.ActiveField == 1, t))
+	fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Priority", priorityValStr, f.ActiveField == 2, t))
 	if f.TaskTypeIdx == 0 {
-		fields = append(fields, renderDropdown(nextFieldNum(), "Story Points", spValStr, 3))
+		fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Story Points", spValStr, f.ActiveField == 3, t))
 	}
-	fields = append(fields, renderDropdown(nextFieldNum(), "Type", typeValStr, 4))
+	fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Type", typeValStr, f.ActiveField == 4, t))
 	if f.TaskTypeIdx == 0 {
 		ancOptStr := "No"
 		if f.IsAnchoredIdx == 1 {
 			ancOptStr = "Yes"
 		}
-		fields = append(fields, renderDropdown(nextFieldNum(), "Is Anchored", ancOptStr, 16))
+		fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Is Anchored", ancOptStr, f.ActiveField == 16, t))
 	}
 
 	if f.TaskTypeIdx == 0 {
 		if f.IsAnchoredIdx == 1 {
-			fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
-			fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
 		} else {
-			fields = append(fields, renderField(nextFieldNum(), "Est. Duration (min)", f.DurationInput.View(), 6))
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Est. Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
 		}
 	} else if f.TaskTypeIdx == 1 {
-		fields = append(fields, renderField(nextFieldNum(), "Due Date", f.DueDateInput.View(), 5))
-		fields = append(fields, renderField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), 6))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "Due Date", f.DueDateInput.View(), f.ActiveField == 5, t))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), f.ActiveField == 6, t))
 	} else if f.TaskTypeIdx == 2 {
-		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
-		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
 	} else if f.TaskTypeIdx == 3 {
-		fields = append(fields, renderField(nextFieldNum(), "Start Date", f.StartDateInput.View(), 14))
-		fields = append(fields, renderField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), 5))
-		fields = append(fields, renderField(nextFieldNum(), "End Date", f.EndDateInput.View(), 15))
-		fields = append(fields, renderField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), 6))
-		fields = append(fields, renderField(nextFieldNum(), "Location", f.LocationInput.View(), 7))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Date", f.StartDateInput.View(), f.ActiveField == 14, t))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.EndDateInput.View(), f.ActiveField == 15, t))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "Location", f.LocationInput.View(), f.ActiveField == 7, t))
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
-			fields = append(fields, renderField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), 8))
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), f.ActiveField == 8, t))
 		}
 	}
 
 	if !f.IsEditing {
 		if f.TaskTypeIdx == 2 {
 			// Habit is always recurring
-			fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
-			fields = append(fields, renderDaysSelect(nextFieldNum(), "Recurring Days", 13))
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), f.ActiveField == 12, t))
+			fields = append(fields, components.RenderDaysSelect(nextFieldNum(), "Recurring Days", f.RecurringDaysSelected[:], f.RecurringDaysSubIdx, f.ActiveField == 13, t))
 		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
 			recOptStr := "No"
 			if f.IsRecurringIdx == 1 {
 				recOptStr = "Yes"
 			}
-			fields = append(fields, renderDropdown(nextFieldNum(), "Is Recurring", recOptStr, 11))
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Is Recurring", recOptStr, f.ActiveField == 11, t))
 			if f.IsRecurringIdx == 1 {
-				fields = append(fields, renderField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), 12))
-				fields = append(fields, renderDaysSelect(nextFieldNum(), "Recurring Days", 13))
+				fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), f.ActiveField == 12, t))
+				fields = append(fields, components.RenderDaysSelect(nextFieldNum(), "Recurring Days", f.RecurringDaysSelected[:], f.RecurringDaysSubIdx, f.ActiveField == 13, t))
 			}
 		}
 	}
 
-	fields = append(fields, renderField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), 9))
+	fields = append(fields, components.RenderFormField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), f.ActiveField == 9, t))
 	fields = append(fields, "")
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")
 
-	submitFg := t.Muted
-	submitText := "  Submit  "
-	if f.ActiveField == 10 {
-		submitFg = t.SuccessColor
-		submitText = "[ Submit ]"
-	}
-	fields = append(fields, "  "+lipgloss.NewStyle().Foreground(submitFg).Bold(true).Render(submitText))
+	fields = append(fields, "  "+components.RenderFormSubmitButton("Submit", f.ActiveField == 10, t))
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
 }
@@ -192,33 +119,14 @@ func RenderWorkspaceFormModal(m *viewmodel.Model, t theme.Theme) string {
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")
 
-	renderField := func(num, label string, input string, index int) string {
-		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(num)
-		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
-		if f.ActiveField == index {
-			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
-		}
-		return fmt.Sprintf("  %s  %-16s %s", numStyle, lblStyle.Render(label), input)
-	}
-
-	fields = append(fields, renderField("1", "Name", f.NameInput.View(), 0))
-	fields = append(fields, renderField("2", "Icon", f.IconInput.View(), 1))
-	fields = append(fields, renderField("3", "Badge", f.BadgeInput.View(), 2))
+	fields = append(fields, components.RenderFormField("1", "Name", f.NameInput.View(), f.ActiveField == 0, t))
+	fields = append(fields, components.RenderFormField("2", "Icon", f.IconInput.View(), f.ActiveField == 1, t))
+	fields = append(fields, components.RenderFormField("3", "Badge", f.BadgeInput.View(), f.ActiveField == 2, t))
 	fields = append(fields, "")
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")
 
-	submitFg := t.Muted
-	submitText := "  Submit  "
-	if f.ActiveField == 3 {
-		submitFg = t.SuccessColor
-		submitText = "[ Submit ]"
-	}
-	submitBtn := lipgloss.NewStyle().
-		Foreground(submitFg).
-		Bold(true).
-		Render(submitText)
-	fields = append(fields, "  "+submitBtn)
+	fields = append(fields, "  "+components.RenderFormSubmitButton("Submit", f.ActiveField == 3, t))
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
 }
@@ -283,33 +191,14 @@ func RenderProfileFormModal(m *viewmodel.Model, t theme.Theme) string {
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")
 
-	renderField := func(num, label string, input string, index int) string {
-		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(num)
-		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
-		if f.ActiveField == index {
-			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
-		}
-		return fmt.Sprintf("  %s  %-20s %s", numStyle, lblStyle.Render(label), input)
-	}
-
-	fields = append(fields, renderField("1", "Display Username", f.UsernameInput.View(), 0))
-	fields = append(fields, renderField("2", "Password/Key", f.PasswordInput.View(), 1))
-	fields = append(fields, renderField("3", "Lock Timeout (Mins)", f.LockTimeoutInput.View(), 2))
+	fields = append(fields, components.RenderFormFieldWide("1", "Display Username", f.UsernameInput.View(), 20, f.ActiveField == 0, t))
+	fields = append(fields, components.RenderFormFieldWide("2", "Password/Key", f.PasswordInput.View(), 20, f.ActiveField == 1, t))
+	fields = append(fields, components.RenderFormFieldWide("3", "Lock Timeout (Mins)", f.LockTimeoutInput.View(), 20, f.ActiveField == 2, t))
 	fields = append(fields, "")
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")
 
-	submitFg := t.Muted
-	submitText := "  Submit  "
-	if f.ActiveField == 3 {
-		submitFg = t.SuccessColor
-		submitText = "[ Submit ]"
-	}
-	submitBtn := lipgloss.NewStyle().
-		Foreground(submitFg).
-		Bold(true).
-		Render(submitText)
-	fields = append(fields, "  "+submitBtn)
+	fields = append(fields, "  "+components.RenderFormSubmitButton("Submit", f.ActiveField == 3, t))
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
 }
@@ -324,47 +213,16 @@ func RenderSyncFormModal(m *viewmodel.Model, t theme.Theme) string {
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")
 
-	renderDropdown := func(num, label string, value string, index int) string {
-		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(num)
-		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
-		if f.ActiveField == index {
-			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
-			valStr := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(fmt.Sprintf("◀ %s ▶", value))
-			return fmt.Sprintf("  %s  %-22s %s", numStyle, lblStyle.Render(label), valStr)
-		}
-		valStr := lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  %s  ", value))
-		return fmt.Sprintf("  %s  %-22s %s", numStyle, lblStyle.Render(label), valStr)
-	}
-
-	renderField := func(num, label string, input string, index int) string {
-		numStyle := lipgloss.NewStyle().Foreground(t.Muted).Render(num)
-		lblStyle := lipgloss.NewStyle().Foreground(t.Fg)
-		if f.ActiveField == index {
-			lblStyle = lblStyle.Foreground(t.Accent).Bold(true)
-		}
-		return fmt.Sprintf("  %s  %-22s %s", numStyle, lblStyle.Render(label), input)
-	}
-
 	modeVal := viewmodel.SyncModeOptions[f.ModeIdx]
-	fields = append(fields, renderDropdown("1", "Sync Mode", modeVal, 0))
-	fields = append(fields, renderField("2", "Auto-Sync Interval", f.IntervalInput.View()+" sec", 1))
+	fields = append(fields, components.RenderFormDropdownWide("1", "Sync Mode", modeVal, 22, f.ActiveField == 0, t))
+	fields = append(fields, components.RenderFormFieldWide("2", "Auto-Sync Interval", f.IntervalInput.View()+" sec", 22, f.ActiveField == 1, t))
 	fields = append(fields, "")
 	fields = append(fields, lipgloss.NewStyle().Foreground(t.Muted).Render("  Offline-first: sync failures never block the UI."))
 	fields = append(fields, "")
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")
 
-	submitFg := t.Muted
-	submitText := "  Submit  "
-	if f.ActiveField == 2 {
-		submitFg = t.SuccessColor
-		submitText = "[ Submit ]"
-	}
-	submitBtn := lipgloss.NewStyle().
-		Foreground(submitFg).
-		Bold(true).
-		Render(submitText)
-	fields = append(fields, "  "+submitBtn)
+	fields = append(fields, "  "+components.RenderFormSubmitButton("Submit", f.ActiveField == 2, t))
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
 }

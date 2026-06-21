@@ -5,8 +5,9 @@ import (
 	"strings"
 
 	"stream/internal/model"
-	"stream/internal/viewmodel"
+	"stream/internal/view/components"
 	"stream/internal/view/theme"
+	"stream/internal/viewmodel"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -165,175 +166,97 @@ func RenderReviewModal(m *viewmodel.Model, t theme.Theme) string {
 }
 
 func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
-	const innerW = 50
-	var lines []string
-
-	if m.ConfirmActionType == "complete_reminder" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Complete Reminder"))
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-		lines = append(lines, "  Are you sure you want to complete")
-		lines = append(lines, "  and remove this reminder task")
-		lines = append(lines, fmt.Sprintf("  \"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)))
-		lines = append(lines, "")
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-
-		yesBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Y] Yes, Complete")
-		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Cancel")
-		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
-	} else if m.ConfirmActionType == "deanchor" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("De-anchor Task"))
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-		lines = append(lines, "  Are you sure you want to de-anchor")
-		lines = append(lines, "  and return this task to the backlog?")
-		lines = append(lines, fmt.Sprintf("  \"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)))
-		lines = append(lines, "")
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-
-		yesBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Confirm")
-		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Any Key] Cancel")
-		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
-	} else if m.ConfirmActionType == "delete_recurring" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("♻️  DELETE RECURRING TASK"))
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-		lines = append(lines, "  This is a recurring task/habit:")
-		lines = append(lines, "  "+lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(theme.SentenceCase(m.ConfirmTask.Title)))
-		lines = append(lines, "")
-		lines = append(lines, "  Choose deletion option:")
-		lines = append(lines, "")
-
-		var opt1, opt2 string
-		if m.ConfirmSelectedIndex == 0 {
-			opt1 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ Only this occurrence ◀")
-		} else {
-			opt1 = lipgloss.NewStyle().Foreground(t.Muted).Render("    Only this occurrence")
-		}
-
-		if m.ConfirmSelectedIndex == 1 {
-			opt2 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ This and all remaining occurrences ◀")
-		} else {
-			opt2 = lipgloss.NewStyle().Foreground(t.Muted).Render("    This and all remaining occurrences")
-		}
-
-		lines = append(lines, opt1)
-		lines = append(lines, opt2)
-
-		lines = append(lines, "")
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-
-		confirmBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Confirm")
-		cancelBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
-		hintText := lipgloss.NewStyle().Foreground(t.Muted).Render("j/k navigate")
-		lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
-	} else if m.ConfirmActionType == "edit_recurring" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("♻️  EDIT RECURRING TASK"))
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-		lines = append(lines, "  This is a recurring task/habit:")
-		lines = append(lines, "  "+lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(theme.SentenceCase(m.ConfirmTask.Title)))
-		lines = append(lines, "")
-		lines = append(lines, "  Choose update option:")
-		lines = append(lines, "")
-
-		var opt1, opt2 string
-		if m.ConfirmSelectedIndex == 0 {
-			opt1 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ Only this occurrence ◀")
-		} else {
-			opt1 = lipgloss.NewStyle().Foreground(t.Muted).Render("    Only this occurrence")
-		}
-
-		if m.ConfirmSelectedIndex == 1 {
-			opt2 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ This and all remaining occurrences ◀")
-		} else {
-			opt2 = lipgloss.NewStyle().Foreground(t.Muted).Render("    This and all remaining occurrences")
-		}
-
-		lines = append(lines, opt1)
-		lines = append(lines, opt2)
-
-		lines = append(lines, "")
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-
-		confirmBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Confirm")
-		cancelBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
-		hintText := lipgloss.NewStyle().Foreground(t.Muted).Render("j/k navigate")
-		lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
-	} else if m.ConfirmActionType == "exit_focus" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Focus Session Active"))
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-		lines = append(lines, "  An active focus session is running for:")
-		lines = append(lines, "  "+lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(theme.SentenceCase(m.ConfirmTask.Title)))
-		lines = append(lines, "")
-		lines = append(lines, "  Choose an option:")
-		lines = append(lines, "")
-
-		var opt1, opt2, opt3 string
-		if m.ConfirmSelectedIndex == 0 {
-			opt1 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ 1. Mark as complete ◀")
-		} else {
-			opt1 = lipgloss.NewStyle().Foreground(t.Muted).Render("    1. Mark as complete")
-		}
-
-		if m.ConfirmSelectedIndex == 1 {
-			opt2 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ 2. Complete and resume ◀")
-		} else {
-			opt2 = lipgloss.NewStyle().Foreground(t.Muted).Render("    2. Complete and resume")
-		}
-
-		if m.ConfirmSelectedIndex == 2 {
-			opt3 = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  ▶ 3. Discard session changes ◀")
-		} else {
-			opt3 = lipgloss.NewStyle().Foreground(t.Muted).Render("    3. Discard session changes")
-		}
-
-		lines = append(lines, opt1)
-		lines = append(lines, opt2)
-		lines = append(lines, opt3)
-
-		lines = append(lines, "")
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-
-		confirmBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Enter] Select")
-		cancelBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[Esc] Cancel")
-		hintText := lipgloss.NewStyle().Foreground(t.Muted).Render("j/k navigate")
-		lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
-	} else if m.ConfirmActionType == "log_session_confirm" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("Log Focus Session?"))
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-		lines = append(lines, "  Would you like to log the focus time spent")
-		lines = append(lines, "  on this completed task?")
-		lines = append(lines, "")
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-
-		yesBtn := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("[Y] Yes, Log Time")
-		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N] No, Just Complete")
-		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
-	} else {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("Confirm Delete"))
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-		lines = append(lines, "  Are you sure you want to delete task")
-		lines = append(lines, fmt.Sprintf("  \"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)))
-		lines = append(lines, "")
-		lines = append(lines, ModalSep(innerW))
-		lines = append(lines, "")
-
-		yesBtn := lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("[Y/Enter] Yes, Delete")
-		noBtn := lipgloss.NewStyle().Foreground(t.Muted).Render("[N/Esc] No, Cancel")
-		lines = append(lines, fmt.Sprintf("  %s      %s", yesBtn, noBtn))
+	switch m.ConfirmActionType {
+	case "complete_reminder":
+		return components.RenderBaseConfirmModal(
+			"Complete Reminder",
+			[]string{
+				"Are you sure you want to complete",
+				"and remove this reminder task",
+				fmt.Sprintf("\"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)),
+			},
+			[]string{"Yes, Complete", "No, Cancel"},
+			m.ConfirmSelectedIndex,
+			-1,
+			t,
+		)
+	case "deanchor":
+		return components.RenderBaseConfirmModal(
+			"De-anchor Task",
+			[]string{
+				"Are you sure you want to de-anchor",
+				"and return this task to the backlog?",
+				fmt.Sprintf("\"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)),
+			},
+			[]string{"Yes, De-anchor", "No, Cancel"},
+			m.ConfirmSelectedIndex,
+			-1,
+			t,
+		)
+	case "delete_recurring":
+		return components.RenderBaseConfirmModal(
+			"♻️  DELETE RECURRING TASK",
+			[]string{
+				"This is a recurring task/habit:",
+				"  " + theme.SentenceCase(m.ConfirmTask.Title),
+				"Choose deletion option:",
+			},
+			[]string{"Only this occurrence", "This and all remaining occurrences"},
+			m.ConfirmSelectedIndex,
+			-1,
+			t,
+		)
+	case "edit_recurring":
+		return components.RenderBaseConfirmModal(
+			"♻️  EDIT RECURRING TASK",
+			[]string{
+				"This is a recurring task/habit:",
+				"  " + theme.SentenceCase(m.ConfirmTask.Title),
+				"Choose update option:",
+			},
+			[]string{"Only this occurrence", "This and all remaining occurrences"},
+			m.ConfirmSelectedIndex,
+			-1,
+			t,
+		)
+	case "exit_focus":
+		return components.RenderBaseConfirmModal(
+			"Focus Session Active",
+			[]string{
+				"An active focus session is running for:",
+				"  " + theme.SentenceCase(m.ConfirmTask.Title),
+				"Choose an option:",
+			},
+			[]string{"1. Mark as complete", "2. Complete and resume", "3. Discard session changes"},
+			m.ConfirmSelectedIndex,
+			-1,
+			t,
+		)
+	case "log_session_confirm":
+		return components.RenderBaseConfirmModal(
+			"Log Focus Session?",
+			[]string{
+				"Would you like to log the focus time spent",
+				"on this completed task?",
+			},
+			[]string{"Yes, Log Time", "No, Just Complete"},
+			m.ConfirmSelectedIndex,
+			-1,
+			t,
+		)
+	default: // delete
+		return components.RenderBaseConfirmModal(
+			"Confirm Delete",
+			[]string{
+				"Are you sure you want to delete task",
+				fmt.Sprintf("\"%s\"?", theme.SentenceCase(m.ConfirmTask.Title)),
+			},
+			[]string{"Yes, Delete", "No, Cancel"},
+			m.ConfirmSelectedIndex,
+			0, // Option 0 is destructive (Delete)
+			t,
+		)
 	}
-
-	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
 }
 
 func RenderAnchorPromptModal(m *viewmodel.Model, t theme.Theme) string {

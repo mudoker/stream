@@ -2,14 +2,12 @@ package viewmodel
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"stream/internal/model"
+	"stream/internal/viewmodel/common"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/google/uuid"
 )
 
 func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
@@ -51,109 +49,48 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 	if m.ConfirmOpen {
 		keyStr := msg.String()
+		numOpts := 2
 		if m.ConfirmActionType == "exit_focus" {
-			if keyStr == "j" || keyStr == "down" {
-				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex + 1) % 3
-			} else if keyStr == "k" || keyStr == "up" {
-				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex - 1 + 3) % 3
-			} else if keyStr == "enter" {
-				m.HandleExitFocusOption(m.ConfirmSelectedIndex)
-			} else if keyStr == "esc" {
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				if m.ZenTimer != nil {
-					m.ZenTimer.IsPaused = false
-				}
-				m.StatusMsg = "Focus session resumed."
-			}
+			numOpts = 3
+		}
+
+		// Handle direct shortcuts for Yes/No
+		if keyStr == "y" || keyStr == "Y" {
+			m.ConfirmSelectedIndex = 0
+			keyStr = "enter"
+		} else if keyStr == "n" || keyStr == "N" {
+			m.ConfirmSelectedIndex = 1
+			keyStr = "enter"
+		}
+
+		// Handle navigation keys
+		if keyStr == "j" || keyStr == "down" || keyStr == "l" || keyStr == "right" {
+			m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex + 1) % numOpts
+			return true, nil
+		} else if keyStr == "k" || keyStr == "up" || keyStr == "h" || keyStr == "left" {
+			m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex - 1 + numOpts) % numOpts
 			return true, nil
 		}
 
-		if m.ConfirmActionType == "deanchor" {
-			if keyStr == "enter" {
-				if m.ConfirmTask.SchedulingType == model.Habit {
-					m.ConfirmTask.TimeWindow = model.TimeWindow{} // clear time window to deanchor
-				} else {
-					m.ConfirmTask.SchedulingType = model.Floating
-				}
-				m.ConfirmTask.LifecycleState = model.StateReady
-				m.ConfirmTask.UpdatedAt = time.Now()
-				if m.DB != nil {
-					m.DB.UpdateTask(m.ConfirmTask)
-					m.refreshTasks()
-				} else {
-					m.updateTaskInMemory(m.ConfirmTask)
-				}
-				m.triggerGCalPushIfAnchored(m.ConfirmTask)
-				m.StatusMsg = fmt.Sprintf("Task '%s' de-anchored to backlog.", m.ConfirmTask.Title)
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-			} else {
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = "De-anchoring canceled."
-			}
-			return true, nil
-		}
-
-		if m.ConfirmActionType == "delete_recurring" {
-			if keyStr == "j" || keyStr == "down" {
-				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex + 1) % 2
-			} else if keyStr == "k" || keyStr == "up" {
-				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex - 1 + 2) % 2
-			} else if keyStr == "enter" {
+		if keyStr == "enter" {
+			switch m.ConfirmActionType {
+			case "exit_focus":
+				common.HandleExitFocusOption(m, m.ConfirmSelectedIndex)
+			case "deanchor":
 				if m.ConfirmSelectedIndex == 0 {
-					m.AdjustSelectionBeforeDeletion(m.ConfirmTask.UUID)
-					m.DB.DeleteTask(m.ConfirmTask.UUID)
-					m.refreshTasks()
-					m.triggerGCalPushIfAnchored(m.ConfirmTask)
-					if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-						m.DetailOpen = false
-					}
-					if zt := m.ZenTimer; zt != nil && zt.Task.UUID == m.ConfirmTask.UUID {
-						m.ZenTimer = nil
-					}
-					m.ConfirmOpen = false
-					m.ConfirmActionType = ""
-					m.StatusMsg = fmt.Sprintf("Occurrence of '%s' deleted.", m.ConfirmTask.Title)
+					common.ConfirmDeanchor(m, m.ConfirmTask)
 				} else {
-					tasksToDelete := []string{}
-					for _, t := range m.Tasks {
-						if t.RecurringParentUUID == m.ConfirmTask.RecurringParentUUID {
-							if t.UUID == m.ConfirmTask.UUID || !t.TimeWindow.Start.Before(m.ConfirmTask.TimeWindow.Start) {
-								tasksToDelete = append(tasksToDelete, t.UUID)
-							}
-						}
-					}
-					m.AdjustSelectionBeforeDeletion(m.ConfirmTask.UUID)
-					for _, uid := range tasksToDelete {
-						m.DB.DeleteTask(uid)
-					}
-					m.refreshTasks()
-					if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-						m.DetailOpen = false
-					}
-					if zt := m.ZenTimer; zt != nil && zt.Task.UUID == m.ConfirmTask.UUID {
-						m.ZenTimer = nil
-					}
 					m.ConfirmOpen = false
 					m.ConfirmActionType = ""
-					m.StatusMsg = "This and all future occurrences deleted."
+					m.StatusMsg = "De-anchoring canceled."
 				}
-			} else if keyStr == "esc" || keyStr == "q" {
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = "Deletion canceled."
-			}
-			return true, nil
-		}
-
-		if m.ConfirmActionType == "edit_recurring" {
-			if keyStr == "j" || keyStr == "down" {
-				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex + 1) % 2
-			} else if keyStr == "k" || keyStr == "up" {
-				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex - 1 + 2) % 2
-			} else if keyStr == "enter" {
+			case "delete_recurring":
+				if m.ConfirmSelectedIndex == 0 {
+					common.DeleteTaskOccurrence(m, m.ConfirmTask)
+				} else {
+					common.DeleteAllOccurrences(m, m.ConfirmTask, m.Tasks)
+				}
+			case "edit_recurring":
 				if m.ConfirmSelectedIndex == 0 {
 					m.DB.UpdateTask(m.PendingEditTask)
 					m.refreshTasks()
@@ -182,12 +119,11 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 								if isCurrent {
 									t.TimeWindow = m.PendingEditTask.TimeWindow
 								} else {
-									if t.SchedulingType == model.Anchored || t.SchedulingType == model.Event || t.SchedulingType == model.Habit {
+									if t.SchedulingType == model.Event || t.SchedulingType == model.Habit || t.SchedulingType == model.Anchored {
 										t.TimeWindow.Start = t.TimeWindow.Start.Add(timeShift)
 										t.TimeWindow.End = t.TimeWindow.Start.Add(durationShift)
 									}
 								}
-
 								m.DB.UpdateTask(t)
 							}
 						}
@@ -197,7 +133,41 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					m.ConfirmActionType = ""
 					m.StatusMsg = "This and all future occurrences updated."
 				}
-			} else if keyStr == "esc" || keyStr == "q" {
+			case "complete_reminder":
+				if m.ConfirmSelectedIndex == 0 {
+					common.CompleteReminder(m, m.ConfirmTask)
+				} else {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.StatusMsg = "Completion canceled."
+				}
+			case "log_session_confirm":
+				if m.ConfirmSelectedIndex == 0 {
+					common.InitiateLogSession(m, m.ConfirmTask)
+				} else {
+					common.CancelLogSession(m, m.ConfirmTask)
+				}
+			default: // delete
+				if m.ConfirmSelectedIndex == 0 {
+					common.DeleteTaskOccurrence(m, m.ConfirmTask)
+				} else {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.StatusMsg = "Deletion canceled."
+				}
+			}
+			return true, nil
+		}
+
+		if keyStr == "esc" || keyStr == "q" {
+			if m.ConfirmActionType == "exit_focus" {
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				if m.ZenTimer != nil {
+					m.ZenTimer.IsPaused = false
+				}
+				m.StatusMsg = "Focus session resumed."
+			} else if m.ConfirmActionType == "edit_recurring" {
 				if m.DB != nil {
 					m.refreshTasks()
 				} else {
@@ -215,91 +185,10 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""
 				m.StatusMsg = "Edit canceled."
-			}
-			return true, nil
-		}
-
-		switch keyStr {
-		case "y", "Y", "enter":
-			if m.ConfirmActionType == "log_session_confirm" {
-				m.LogSessionPromptTask = m.ConfirmTask
-				m.LogSessionFocusInput = textinput.New()
-				
-				var plannedMins int
-				if m.ConfirmTask.SchedulingType == model.Anchored || m.ConfirmTask.SchedulingType == model.Event {
-					plannedMins = int(m.ConfirmTask.TimeWindow.End.Sub(m.ConfirmTask.TimeWindow.Start).Minutes())
-				} else {
-					plannedMins = m.ConfirmTask.StoryPoints * 45
-				}
-				if plannedMins <= 0 {
-					plannedMins = 60
-				}
-				m.LogSessionFocusInput.SetValue(strconv.Itoa(plannedMins))
-				m.LogSessionFocusInput.Focus()
-
-				m.LogSessionBreakInput = textinput.New()
-				m.LogSessionBreakInput.SetValue("0")
-
-				m.LogSessionActiveField = 0
-				m.LogSessionPromptOpen = true
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = "Enter focus and break minutes to log session."
-				return true, nil
-			} else if m.ConfirmActionType == "complete_reminder" {
-				if keyStr == "enter" {
-					m.ConfirmOpen = false
-					m.ConfirmActionType = ""
-					m.StatusMsg = "Completion canceled."
-					return true, nil
-				}
-				m.ConfirmTask.LifecycleState = model.StateCompleted
-				m.ConfirmTask.UpdatedAt = time.Now()
-				m.DB.UpdateTask(m.ConfirmTask)
-				m.refreshTasks()
-				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-					m.DetailOpen = false
-				}
-				m.StatusMsg = fmt.Sprintf("Reminder '%s' completed!", m.ConfirmTask.Title)
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				return true, nil
-			} else {
-				m.AdjustSelectionBeforeDeletion(m.ConfirmTask.UUID)
-				m.DB.DeleteTask(m.ConfirmTask.UUID)
-				m.refreshTasks()
-				m.triggerGCalPushIfAnchored(m.ConfirmTask)
-				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-					m.DetailOpen = false
-				}
-				if zt := m.ZenTimer; zt != nil && zt.Task.UUID == m.ConfirmTask.UUID {
-					m.ZenTimer = nil
-				}
-				m.StatusMsg = fmt.Sprintf("Task '%s' deleted.", m.ConfirmTask.Title)
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				return true, nil
-			}
-		case "n", "N", "esc":
-			if m.ConfirmActionType == "log_session_confirm" {
-				m.ConfirmTask.LifecycleState = model.StateCompleted
-				m.ConfirmTask.UpdatedAt = time.Now()
-				m.DB.UpdateTask(m.ConfirmTask)
-				m.refreshTasks()
-				if m.DetailOpen && m.DetailTask.UUID == m.ConfirmTask.UUID {
-					m.DetailOpen = false
-				}
-				m.StatusMsg = fmt.Sprintf("Task '%s' completed without logging focus time.", m.ConfirmTask.Title)
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-			} else if m.ConfirmActionType == "complete_reminder" {
-				m.ConfirmOpen = false
-				m.ConfirmActionType = ""
-				m.StatusMsg = "Completion canceled."
 			} else {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""
-				m.StatusMsg = "Deletion canceled."
+				m.StatusMsg = "Action canceled."
 			}
 			return true, nil
 		}
@@ -310,91 +199,6 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 }
 
 func (m *Model) HandleExitFocusOption(index int) {
-	if m.ZenTimer == nil {
-		m.ConfirmOpen = false
-		m.ConfirmActionType = ""
-		return
-	}
-
-	m.ZenTimer.RecordElapsedTimes()
-	t := m.ZenTimer.Task
-
-	switch index {
-	case 0: // Mark as complete
-		t.LifecycleState = model.StateCompleted
-		t.UpdatedAt = time.Now()
-		if m.DB != nil {
-			m.DB.UpdateTask(t)
-			m.refreshTasks()
-		}
-		m.ZenTimer = nil
-		m.CurrentMode = ModeNormal
-		m.ConfirmOpen = false
-		m.ConfirmActionType = ""
-		m.StatusMsg = fmt.Sprintf("Task '%s' marked as completed.", t.Title)
-
-	case 1: // Complete and resume
-		originalDur := time.Duration(t.StoryPoints) * 45 * time.Minute
-		if model.IsTaskAnchored(t) {
-			originalDur = t.TimeWindow.End.Sub(t.TimeWindow.Start)
-		}
-		elapsedFocus := time.Duration(t.ExecutionMetrics.ElapsedFocusSeconds) * time.Second
-		remainingDur := originalDur - elapsedFocus
-		if remainingDur < 15*time.Minute {
-			remainingDur = 15 * time.Minute
-		}
-
-		if model.IsTaskAnchored(t) {
-			t.TimeWindow.End = time.Now()
-			if t.TimeWindow.End.Before(t.TimeWindow.Start) {
-				t.TimeWindow.End = t.TimeWindow.Start.Add(1 * time.Minute)
-			}
-		}
-		t.LifecycleState = model.StateCompleted
-		t.UpdatedAt = time.Now()
-		if m.DB != nil {
-			m.DB.UpdateTask(t)
-		}
-
-		sp := int((remainingDur + 44*time.Minute) / (45 * time.Minute))
-		if sp < 1 {
-			sp = 1
-		}
-
-		newTask := model.Task{
-			UUID:           uuid.New().String(),
-			WorkspaceUUID:  t.WorkspaceUUID,
-			Title:          t.Title + " (Resume)",
-			Description:    t.Description,
-			Priority:       t.Priority,
-			StoryPoints:    sp,
-			SchedulingType: model.Floating,
-			LifecycleState: model.StateReady,
-			CreatedAt:      time.Now(),
-			UpdatedAt:      time.Now(),
-		}
-		if m.DB != nil {
-			m.DB.AddTask(newTask)
-			m.refreshTasks()
-		}
-
-		m.ZenTimer = nil
-		m.CurrentMode = ModeNormal
-		m.ConfirmOpen = false
-		m.ConfirmActionType = ""
-		m.StatusMsg = fmt.Sprintf("Completed '%s' and created resuming task '%s'.", t.Title, newTask.Title)
-
-	case 2: // Discard session changes
-		t.LifecycleState = model.StateReady
-		t.UpdatedAt = time.Now()
-		if m.DB != nil {
-			m.DB.UpdateTask(t)
-			m.refreshTasks()
-		}
-		m.ZenTimer = nil
-		m.CurrentMode = ModeNormal
-		m.ConfirmOpen = false
-		m.ConfirmActionType = ""
-		m.StatusMsg = "Focus session discarded."
-	}
+	common.HandleExitFocusOption(m, index)
 }
+

@@ -166,7 +166,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			if startRow < 0 {
 				startRow = 0
 			}
-			limitRow := endRow
+			limitRow := endRow - 1
 			if limitRow >= visualRows {
 				limitRow = visualRows - 1
 			}

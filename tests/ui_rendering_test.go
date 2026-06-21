@@ -466,3 +466,103 @@ func TestConsecutiveTasksDifferentWidthsTimelineRendering(t *testing.T) {
 	}
 }
 
+func TestConsecutiveTasksMismatchedDivisionsTimelineRendering(t *testing.T) {
+	today := time.Now()
+	// Overlapping group 1 (12:00 -> 13:00): 3 tasks, so TotalCol = 3
+	t1_1 := model.Task{
+		UUID:           "task-1-1",
+		Title:          "Task A1",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 12, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+		},
+	}
+	t1_2 := model.Task{
+		UUID:           "task-1-2",
+		Title:          "Task A2",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 12, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+		},
+	}
+	t1_3 := model.Task{
+		UUID:           "task-1-3",
+		Title:          "Task A3",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 12, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+		},
+	}
+
+	// Overlapping group 2 (13:00 -> 14:00): 2 tasks, so TotalCol = 2
+	t2_1 := model.Task{
+		UUID:           "task-2-1",
+		Title:          "Task B1",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 14, 0, 0, 0, time.Local),
+		},
+	}
+	t2_2 := model.Task{
+		UUID:           "task-2-2",
+		Title:          "Task B2",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 14, 0, 0, 0, time.Local),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{t1_1, t1_2, t1_3, t2_1, t2_2},
+		SelectedDay:      today,
+		TimelineHour:     13,
+		SelectedTaskUUID: "task-2-1",
+	}
+	m.Layout.TimelineW = 60
+	m.Layout.WorkspaceW = 80
+	th := theme.NewTheme()
+
+	timelineOut := pages.RenderDayTimeline(m, th, 160)
+	cleanedTimeline := cleanAnsi(timelineOut)
+
+	lines := strings.Split(cleanedTimeline, "\n")
+	idxB1 := -1
+	for idx, line := range lines {
+		if strings.Contains(line, "Task B1") {
+			idxB1 = idx
+			break
+		}
+	}
+
+	if idxB1 == -1 {
+		t.Fatal("Could not find Task B1 title in timeline")
+	}
+
+	var topBorderLine string
+	for i := idxB1 - 1; i >= 0; i-- {
+		line := lines[i]
+		if strings.Contains(line, "├") || strings.Contains(line, "╭") {
+			topBorderLine = line
+			break
+		}
+	}
+
+	if topBorderLine == "" {
+		t.Fatal("Could not find top border line of Task B1")
+	}
+
+	t.Logf("Found Task B1 top border line: %q", topBorderLine)
+
+	if !strings.Contains(topBorderLine, "├") {
+		t.Errorf("Expected top border to contain '├' at the left, got: %q", topBorderLine)
+	}
+	if !strings.Contains(topBorderLine, "╮╭") {
+		t.Errorf("Expected top border junction between Task B1 and Task B2 to be '╮╭' (no pointy edge upwards), got: %q", topBorderLine)
+	}
+}
+

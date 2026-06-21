@@ -239,15 +239,6 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 		}
 
 		if currRc != nil {
-			var currStartCol, currEndCol int
-			if currRc.TotalCol == 1 {
-				currStartCol = 0
-				currEndCol = numCols - 1
-			} else {
-				currStartCol = currRc.ColIndex
-				currEndCol = currRc.ColIndex
-			}
-
 			for _, other := range cols {
 				if other.Task.UUID != task.UUID {
 					if strings.HasSuffix(other.Task.UUID, "_moving") || strings.HasSuffix(other.Task.UUID, "_adjusting") {
@@ -268,19 +259,31 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 					}
 
 					if predEnd.Equal(currStart) {
-						var otherStartCol, otherEndCol int
-						if other.TotalCol == 1 {
-							otherStartCol = 0
-							otherEndCol = numCols - 1
-						} else {
-							otherStartCol = other.ColIndex
-							otherEndCol = other.ColIndex
+						currColStart := currRc.ColIndex
+						otherColStart := other.ColIndex
+						if currRc.TotalCol == 1 {
+							currColStart = 0
 						}
-
-						if currStartCol == otherStartCol {
+						if other.TotalCol == 1 {
+							otherColStart = 0
+						}
+						if currColStart * other.TotalCol == otherColStart * currRc.TotalCol {
 							hasLeftConsecutive = true
 						}
-						if currEndCol == otherEndCol {
+
+						currColEnd := currRc.ColIndex + 1
+						otherColEnd := other.ColIndex + 1
+						currTotalCol := currRc.TotalCol
+						otherTotalCol := other.TotalCol
+						if currRc.TotalCol == 1 {
+							currColEnd = 1
+							currTotalCol = 1
+						}
+						if other.TotalCol == 1 {
+							otherColEnd = 1
+							otherTotalCol = 1
+						}
+						if currColEnd * otherTotalCol == otherColEnd * currTotalCol {
 							hasRightConsecutive = true
 						}
 					}

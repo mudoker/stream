@@ -493,11 +493,15 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 	}
 
+	maxStartR := visualRows - visibleH
+	if maxStartR < 0 {
+		maxStartR = 0
+	}
 	if startR < 0 {
 		startR = 0
 	}
-	if startR > visualRows-visibleH {
-		startR = visualRows - visibleH
+	if startR > maxStartR {
+		startR = maxStartR
 	}
 
 	var visible []string
@@ -505,7 +509,11 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	for i := 0; i < visibleH; i++ {
 		r := startR + i
-		visible = append(visible, allRows[r])
+		if r >= 0 && r < len(allRows) {
+			visible = append(visible, allRows[r])
+		} else {
+			visible = append(visible, "")
+		}
 	}
 
 	return strings.Join(visible, "\n")

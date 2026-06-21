@@ -365,7 +365,11 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			if r >= visualRows {
 				break
 			}
-			taskRows[colIndex][r] = line
+			if i == len(cardLines)-1 && cellWidths[colIndex][r] == 0 && r > startRow {
+				taskRows[colIndex][r-1] = line
+			} else {
+				taskRows[colIndex][r] = line
+			}
 			if isSpecial {
 				for c := 1; c < numCols; c++ {
 					taskRows[c][r] = ""
@@ -422,7 +426,11 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				if r >= visualRows {
 					break
 				}
-				taskRows[colIndex][r] = line
+				if i == len(restLines)-1 && cellWidths[colIndex][r] == 0 && r > startRow+currentRowOffset {
+					taskRows[colIndex][r-1] = line
+				} else {
+					taskRows[colIndex][r] = line
+				}
 				if isSpecial {
 					for c := 1; c < numCols; c++ {
 						taskRows[c][r] = ""
@@ -455,7 +463,11 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		sb.WriteString(gutterRows[r])
 		sb.WriteString(leftSpacerRows[r])
 		for c := 0; c < numCols; c++ {
-			sb.WriteString(taskRows[c][r])
+			if cellWidths[c][r] == 0 {
+				sb.WriteString("")
+			} else {
+				sb.WriteString(taskRows[c][r])
+			}
 		}
 		sb.WriteString(rightSpacerRows[r])
 		allRows[r] = sb.String()

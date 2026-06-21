@@ -95,8 +95,8 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			} else if keyStr == "l" || keyStr == "right" {
 				m.ConfirmFocusArea = 2
 				return true, nil
-			} else if keyStr == "k" || keyStr == "up" {
-				m.ConfirmFocusArea = 0
+			} else if keyStr == "j" || keyStr == "down" || keyStr == "k" || keyStr == "up" {
+				// Scoped to action buttons section, ignore vertical navigation across sections
 				return true, nil
 			}
 		}

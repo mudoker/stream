@@ -467,15 +467,21 @@ func TestConfirmModalFocusNavigation(t *testing.T) {
 		t.Errorf("Expected focus area to switch to 2 on 'l' key, got %d", m.ConfirmFocusArea)
 	}
 
-	// From 2, pressing 'up' / 'k' should return focus to 0 (options list)
+	// From 2, pressing 'up' / 'k' should remain in focus area 2
 	m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	if m.ConfirmFocusArea != 2 {
+		t.Errorf("Expected focus area to remain 2 on 'up' arrow, got %d", m.ConfirmFocusArea)
+	}
+
+	// Move back to options list using Tab (from 2 -> 0)
+	m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	if m.ConfirmFocusArea != 0 {
-		t.Errorf("Expected focus area to return to 0 on 'up' arrow, got %d", m.ConfirmFocusArea)
+		t.Errorf("Expected focus area to cycle back to 0, got %d", m.ConfirmFocusArea)
 	}
 
 	// 8. Press enter on Cancel button
-	// First move to focus area 2
-	m.Update(tea.KeyMsg{Type: tea.KeyShiftTab}) // 0 -> 2
+	// First move to focus area 2 using shift-tab (0 -> 2)
+	m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	if m.ConfirmFocusArea != 2 {
 		t.Fatalf("Expected focus area 2 before testing cancel enter, got %d", m.ConfirmFocusArea)
 	}

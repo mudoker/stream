@@ -71,21 +71,17 @@ func RenderBaseConfirmModal(title string, descLines []string, options []string, 
 	lines = append(lines, "")
 
 	var confirmBtn, cancelBtn string
-	var hintText string
 	if focusArea == 0 {
 		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  ")
 		cancelBtn = lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  ")
-		hintText = lipgloss.NewStyle().Foreground(t.Muted).Render("j/k select, Tab navigate")
 	} else if focusArea == 1 {
 		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▶ Confirm ◀")
 		cancelBtn = lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  ")
-		hintText = lipgloss.NewStyle().Foreground(t.Muted).Render("Enter choose, Tab navigate")
 	} else {
 		confirmBtn = lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  ")
 		cancelBtn = lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("▶ Cancel ◀")
-		hintText = lipgloss.NewStyle().Foreground(t.Muted).Render("Enter choose, Tab navigate")
 	}
-	lines = append(lines, fmt.Sprintf("  %s   %s   %s", confirmBtn, cancelBtn, hintText))
+	lines = append(lines, fmt.Sprintf("  %s      %s", confirmBtn, cancelBtn))
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(lines, "\n"), innerW))
 }

@@ -383,3 +383,86 @@ func TestConsecutiveTasksWithRestBufferTimelineRendering(t *testing.T) {
 	}
 }
 
+func TestConsecutiveTasksDifferentWidthsTimelineRendering(t *testing.T) {
+	today := time.Now()
+	// Task 1: Lunch Break (Full-width, ColIndex=0, TotalCol=1)
+	t1 := model.Task{
+		UUID:           "task-lunch",
+		Title:          "Lunch Break",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 12, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+		},
+	}
+	// Task 2: Combat with VOID (Half-width, ColIndex=0, TotalCol=2)
+	t2 := model.Task{
+		UUID:           "task-combat",
+		Title:          "Combat with VOID",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 14, 0, 0, 0, time.Local),
+		},
+	}
+	// Task 3: Zen Focus (Half-width, ColIndex=1, TotalCol=2)
+	t3 := model.Task{
+		UUID:           "task-zen",
+		Title:          "Zen Focus",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 14, 0, 0, 0, time.Local),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{t1, t2, t3},
+		SelectedDay:      today,
+		TimelineHour:     13,
+		SelectedTaskUUID: "task-combat",
+	}
+	m.Layout.TimelineW = 40
+	m.Layout.WorkspaceW = 80
+	th := theme.NewTheme()
+
+	timelineOut := pages.RenderDayTimeline(m, th, 160)
+	cleanedTimeline := cleanAnsi(timelineOut)
+
+	lines := strings.Split(cleanedTimeline, "\n")
+	idxCombat := -1
+	for idx, line := range lines {
+		if strings.Contains(line, "Comba") {
+			idxCombat = idx
+			break
+		}
+	}
+
+	t.Logf("Cleaned Timeline:\n%s", cleanedTimeline)
+	if idxCombat == -1 {
+		t.Fatal("Could not find Combat with void task title in timeline")
+	}
+
+	var topBorderLine string
+	for i := idxCombat - 1; i >= 0; i-- {
+		line := lines[i]
+		if strings.Contains(line, "├") || strings.Contains(line, "╭") {
+			topBorderLine = line
+			break
+		}
+	}
+
+	if topBorderLine == "" {
+		t.Fatal("Could not find top border line of Combat with VOID")
+	}
+
+	t.Logf("Found Combat with VOID top border line: %q", topBorderLine)
+
+	if !strings.Contains(topBorderLine, "├") {
+		t.Errorf("Expected top border to contain '├' at the left, got: %q", topBorderLine)
+	}
+	if !strings.Contains(topBorderLine, "╮╭") {
+		t.Errorf("Expected top border junction between Combat and Zen to be '╮╭' (no pointy edge upwards), got: %q", topBorderLine)
+	}
+}
+

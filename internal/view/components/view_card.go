@@ -199,8 +199,9 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 
 	topLeftChar, topRightChar, bottomLeftChar, bottomRightChar, horizChar, vertChar := cardBorderChars(task, hasRest)
 
-	// Check if this task has a consecutive predecessor in the same column
-	hasConsecutivePredecessor := false
+	// Check if this task has consecutive predecessors in overlapping columns
+	hasLeftConsecutive := false
+	hasRightConsecutive := false
 	if !strings.HasSuffix(task.UUID, "_moving") && !strings.HasSuffix(task.UUID, "_adjusting") {
 		clones := make(map[string]bool)
 		for _, tVal := range m.Tasks {
@@ -221,16 +222,34 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 			}
 		}
 		cols := viewmodel.ResolveOverlaps(dayTasks)
-		colIndex := -1
+
+		numCols := 1
 		for _, rc := range cols {
-			if rc.Task.UUID == task.UUID {
-				colIndex = rc.ColIndex
+			if rc.TotalCol > numCols {
+				numCols = rc.TotalCol
+			}
+		}
+
+		var currRc *viewmodel.ScheduledColumn
+		for i := range cols {
+			if cols[i].Task.UUID == task.UUID {
+				currRc = &cols[i]
 				break
 			}
 		}
-		if colIndex != -1 {
+
+		if currRc != nil {
+			var currStartCol, currEndCol int
+			if currRc.TotalCol == 1 {
+				currStartCol = 0
+				currEndCol = numCols - 1
+			} else {
+				currStartCol = currRc.ColIndex
+				currEndCol = currRc.ColIndex
+			}
+
 			for _, other := range cols {
-				if other.ColIndex == colIndex && other.Task.UUID != task.UUID {
+				if other.Task.UUID != task.UUID {
 					if strings.HasSuffix(other.Task.UUID, "_moving") || strings.HasSuffix(other.Task.UUID, "_adjusting") {
 						continue
 					}
@@ -249,16 +268,31 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 					}
 
 					if predEnd.Equal(currStart) {
-						hasConsecutivePredecessor = true
-						break
+						var otherStartCol, otherEndCol int
+						if other.TotalCol == 1 {
+							otherStartCol = 0
+							otherEndCol = numCols - 1
+						} else {
+							otherStartCol = other.ColIndex
+							otherEndCol = other.ColIndex
+						}
+
+						if currStartCol == otherStartCol {
+							hasLeftConsecutive = true
+						}
+						if currEndCol == otherEndCol {
+							hasRightConsecutive = true
+						}
 					}
 				}
 			}
 		}
 	}
 
-	if hasConsecutivePredecessor {
+	if hasLeftConsecutive {
 		topLeftChar = "├"
+	}
+	if hasRightConsecutive {
 		topRightChar = "┤"
 	}
 

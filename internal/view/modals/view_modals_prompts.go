@@ -222,6 +222,20 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			m.ConfirmFocusArea,
 			t,
 		)
+	case "save_tag_confirm":
+		return components.RenderBaseConfirmModal(
+			"🏷️  SAVE NEW TAG(S)",
+			[]string{
+				"You entered new tag(s):",
+				"  " + strings.Join(m.PendingNewTags, ", "),
+				"Save them to system autocomplete?",
+			},
+			[]string{"Yes, Save and Submit", "No, Just Submit"},
+			m.ConfirmSelectedIndex,
+			-1,
+			m.ConfirmFocusArea,
+			t,
+		)
 	case "exit_focus":
 		return components.RenderBaseConfirmModal(
 			"Focus Session Active",

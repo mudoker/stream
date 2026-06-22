@@ -1,7 +1,9 @@
 package viewmodel
 
 import (
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"stream/internal/db"
@@ -294,6 +296,44 @@ func (m *Model) GetWorkspaceName(wsUUID string) string {
 		}
 	}
 	return ""
+}
+
+func (m *Model) GetTagsAutocompleteSuggestion() string {
+	if m.DB == nil {
+		return ""
+	}
+	val := m.Form.TagsInput.Value()
+	parts := strings.Split(val, ",")
+	if len(parts) == 0 {
+		return ""
+	}
+	lastToken := strings.TrimSpace(parts[len(parts)-1])
+	if lastToken == "" {
+		return ""
+	}
+
+	tags := m.DB.GetTags()
+	sort.Slice(tags, func(i, j int) bool {
+		return tags[i].Frequency > tags[j].Frequency
+	})
+
+	for _, tag := range tags {
+		if strings.HasPrefix(strings.ToLower(tag.Name), strings.ToLower(lastToken)) && len(tag.Name) > len(lastToken) {
+			return tag.Name[len(lastToken):]
+		}
+	}
+	return ""
+}
+
+func (m *Model) AutocompleteTag(sug string) {
+	val := m.Form.TagsInput.Value()
+	lastCommaIdx := strings.LastIndex(val, ",")
+	if lastCommaIdx == -1 {
+		m.Form.TagsInput.SetValue(val + sug + ", ")
+	} else {
+		m.Form.TagsInput.SetValue(val[:lastCommaIdx+1] + " " + strings.TrimSpace(val[lastCommaIdx+1:]) + sug + ", ")
+	}
+	m.Form.TagsInput.SetCursor(len(m.Form.TagsInput.Value()))
 }
 
 

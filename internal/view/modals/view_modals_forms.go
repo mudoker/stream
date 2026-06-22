@@ -92,7 +92,13 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		}
 	}
 
-	fields = append(fields, components.RenderFormField(nextFieldNum(), "Tags (csv)", f.TagsInput.View(), f.ActiveField == 9, t))
+	tagsView := f.TagsInput.View()
+	if f.ActiveField == 9 {
+		if sug := m.GetTagsAutocompleteSuggestion(); sug != "" {
+			tagsView += lipgloss.NewStyle().Foreground(t.Muted).Render(sug)
+		}
+	}
+	fields = append(fields, components.RenderFormField(nextFieldNum(), "Tags (csv)", tagsView, f.ActiveField == 9, t))
 	fields = append(fields, "")
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")

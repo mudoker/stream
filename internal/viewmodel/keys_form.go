@@ -43,6 +43,13 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Form.ActiveField = visible[curIdx]
 		m.focusFormFields()
 		return m, nil
+	case "ctrl+l":
+		if m.Form.ActiveField == 9 {
+			if sug := m.GetTagsAutocompleteSuggestion(); sug != "" {
+				m.AutocompleteTag(sug)
+				return m, nil
+			}
+		}
 	case "left":
 		switch m.Form.ActiveField {
 		case 2:
@@ -75,6 +82,11 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 4:
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % len(TaskTypeOptions)
 			return m, nil
+		case 9:
+			if sug := m.GetTagsAutocompleteSuggestion(); sug != "" {
+				m.AutocompleteTag(sug)
+				return m, nil
+			}
 		case 11:
 			m.Form.IsRecurringIdx = (m.Form.IsRecurringIdx + 1) % 2
 			return m, nil
@@ -418,6 +430,91 @@ func (m *Model) SubmitForm() {
 		}
 	}
 
+	// Check for new tags
+	var newTags []string
+	existingTagsMap := make(map[string]bool)
+	for _, tVal := range m.DB.GetTags() {
+		existingTagsMap[strings.ToLower(tVal.Name)] = true
+	}
+	for _, tag := range newTask.Tags {
+		if !existingTagsMap[strings.ToLower(tag)] {
+			newTags = append(newTags, tag)
+		}
+	}
+
+	if len(newTags) > 0 {
+		m.PendingTaskToSubmit = newTask
+		m.PendingNewTags = newTags
+		m.ConfirmOpen = true
+		m.ConfirmActionType = "save_tag_confirm"
+		m.ConfirmSelectedIndex = 0
+		m.ConfirmFocusArea = 0
+		m.StatusMsg = fmt.Sprintf("Save new tag(s): %s?", strings.Join(newTags, ", "))
+		return
+	}
+
+	m.FinalizeSubmitTask(newTask)
+}
+
+func (m *Model) FinalizeSubmitTask(newTask model.Task) {
+	title := newTask.Title
+	isEdit := m.IsEditing
+	taskType := m.Form.TaskTypeIdx
+	var existingTask model.Task
+	if isEdit {
+		var exists bool
+		existingTask, exists = m.DB.GetTask(m.EditingTaskUUID)
+		if !exists {
+			return
+		}
+	}
+
+	// Increment frequencies for tags that are in the system list
+	tags := m.DB.GetTags()
+	tagsMap := make(map[string]int)
+	for i, tVal := range tags {
+		tagsMap[strings.ToLower(tVal.Name)] = i
+	}
+	updatedAny := false
+	for _, tag := range newTask.Tags {
+		if idx, found := tagsMap[strings.ToLower(tag)]; found {
+			tags[idx].Frequency++
+			updatedAny = true
+		}
+	}
+	if updatedAny {
+		m.DB.SaveTags(tags)
+	}
+
+	now := time.Now()
+	baseDay := m.SelectedDay
+	dueDay := baseDay
+
+	var startTime time.Time
+	if taskType == 0 || taskType == 1 || taskType == 2 {
+		startDateStr := strings.TrimSpace(m.Form.StartDateInput.Value())
+		if d, err := time.Parse("2006-01-02", startDateStr); err == nil {
+			dueDay = d
+		}
+		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
+		var hour, min, sec int
+		if timeStr == "" {
+			hour, min, sec = 9, 0, 0
+		} else {
+			hour, min = ParseFlexibleTime(timeStr, 9, 0)
+			sec = 0
+		}
+		startTime = time.Date(dueDay.Year(), dueDay.Month(), dueDay.Day(), hour, min, sec, 0, now.Location())
+	} else if taskType == 3 {
+		startDateStr := strings.TrimSpace(m.Form.StartDateInput.Value())
+		if d, err := time.Parse("2006-01-02", startDateStr); err == nil {
+			dueDay = d
+		}
+		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
+		hour, min := ParseFlexibleTime(timeStr, 9, 0)
+		startTime = time.Date(dueDay.Year(), dueDay.Month(), dueDay.Day(), hour, min, 0, 0, now.Location())
+	}
+
 	if isEdit {
 		if existingTask.RecurringParentUUID != "" {
 			m.PendingEditTask = newTask
@@ -486,6 +583,10 @@ func (m *Model) SubmitForm() {
 			current := startTime
 			count := 0
 			timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
+			durVal := 60
+			if d, err := strconv.Atoi(m.Form.DurationInput.Value()); err == nil && d > 0 {
+				durVal = d
+			}
 			for !current.After(endDate) {
 				if days[current.Weekday()] {
 					instance := newTask
@@ -499,7 +600,7 @@ func (m *Model) SubmitForm() {
 							}
 						} else {
 							instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), startTime.Hour(), startTime.Minute(), startTime.Second(), 0, startTime.Location())
-							instance.TimeWindow.End = instance.TimeWindow.Start.Add(time.Duration(duration) * time.Minute)
+							instance.TimeWindow.End = instance.TimeWindow.Start.Add(time.Duration(durVal) * time.Minute)
 						}
 						instance.LifecycleState = model.StateReady
 					} else {

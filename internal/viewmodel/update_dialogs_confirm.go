@@ -112,6 +112,19 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 		if keyStr == "enter" {
 			switch m.ConfirmActionType {
+			case "save_tag_confirm":
+				if m.ConfirmSelectedIndex == 0 {
+					tags := m.DB.GetTags()
+					for _, tagName := range m.PendingNewTags {
+						tags = append(tags, model.TagInfo{Name: tagName, Frequency: 1})
+					}
+					m.DB.SaveTags(tags)
+				}
+				m.FinalizeSubmitTask(m.PendingTaskToSubmit)
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.PendingNewTags = nil
+				m.CurrentMode = ModeNormal
 			case "exit_focus":
 				common.HandleExitFocusOption(m, m.ConfirmSelectedIndex)
 			case "deanchor":

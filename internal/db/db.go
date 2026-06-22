@@ -99,6 +99,19 @@ func (db *JSONDB) UpdateUserSettings(s model.UserSettings) error {
 	return db.saveSettings()
 }
 
+func (db *JSONDB) GetTags() []model.TagInfo {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	return db.userSettings.Tags
+}
+
+func (db *JSONDB) SaveTags(tags []model.TagInfo) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.userSettings.Tags = tags
+	return db.saveSettings()
+}
+
 func (db *JSONDB) GetConfigDir() string {
 	return db.configDir
 }

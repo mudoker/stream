@@ -112,5 +112,15 @@ func (db *JSONDB) load() error {
 		}
 	}
 
+	if len(db.userSettings.Tags) == 0 {
+		db.userSettings.Tags = []model.TagInfo{
+			{Name: "work", Frequency: 5},
+			{Name: "personal", Frequency: 3},
+			{Name: "learning", Frequency: 2},
+			{Name: "health", Frequency: 1},
+			{Name: "admin", Frequency: 1},
+		}
+	}
+
 	return nil
 }

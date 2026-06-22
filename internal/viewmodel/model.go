@@ -36,6 +36,7 @@ const (
 	ModeWorkspacePicker UIState = "WS_PICKER"
 	ModeProfileForm     UIState = "PROFILE_WIZARD"
 	ModeSyncForm        UIState = "SYNC_SETTINGS"
+	ModeTagsCRUD        UIState = "TAGS_CRUD"
 )
 
 type TickMsg struct {
@@ -100,6 +101,8 @@ type Model struct {
 	ConfirmOpen bool
 	ConfirmTask model.Task
 	PendingEditTask model.Task
+	PendingTaskToSubmit model.Task
+	PendingNewTags      []string
 	ConfirmActionType string
 	ConfirmSelectedIndex int
 	ConfirmFocusArea     int
@@ -151,6 +154,10 @@ type Model struct {
 	UpdatePromptOpen        bool
 	UpdateCommits           []string
 	UpdatePromptSelectedIdx int
+
+	TagsCRUDState        string // "BROWSE", "CREATE", "EDIT"
+	TagsCRUDSelectedIndex int
+	TagsCRUDInput        textinput.Model
 }
 
 func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
@@ -189,6 +196,9 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		AuthNoticeOpen:              false,
 		LastTodoShelfTaskUUID:       "",
 		LastPromptedTimes:           make(map[string]time.Time),
+		TagsCRUDState:               "BROWSE",
+		TagsCRUDSelectedIndex:       0,
+		TagsCRUDInput:               textinput.New(),
 	}
 
 	m.refreshWorkspaces()

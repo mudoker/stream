@@ -119,6 +119,11 @@ const (
 	GCalSyncTwoWay GCalSyncMode = "two-way"
 )
 
+type TagInfo struct {
+	Name      string `json:"name"`
+	Frequency int    `json:"frequency"`
+}
+
 type UserSettings struct {
 	Username                 string       `json:"username"`
 	PasswordHash             string       `json:"password_hash"`
@@ -127,6 +132,7 @@ type UserSettings struct {
 	GCalSyncIntervalSeconds  int          `json:"gcal_sync_interval_seconds,omitempty"`
 	GCalSyncIntervalMinutes  int          `json:"gcal_sync_interval_minutes,omitempty"` // legacy, migrated on load
 	UpdateSnoozedUntil       time.Time    `json:"update_snoozed_until,omitempty"`
+	Tags                     []TagInfo    `json:"tags,omitempty"`
 }
 
 func IsGCalSyncable(task Task) bool {

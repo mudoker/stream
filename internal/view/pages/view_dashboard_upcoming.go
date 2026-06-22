@@ -23,6 +23,9 @@ func renderUpcomingPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 
 	var upcoming []model.Task
 	for _, task := range m.Tasks {
+		if m.ActiveWorkspaceUUID != "ALL_WORKSPACES" && task.WorkspaceUUID != m.ActiveWorkspaceUUID {
+			continue
+		}
 		if task.LifecycleState == model.StateCompleted {
 			continue
 		}
@@ -91,7 +94,7 @@ func renderUpcomingPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 
 		pCounts := make(map[model.Priority]int)
 		for _, task := range m.Tasks {
-			if task.LifecycleState != model.StateCompleted {
+			if (m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || task.WorkspaceUUID == m.ActiveWorkspaceUUID) && task.LifecycleState != model.StateCompleted {
 				pCounts[task.Priority]++
 			}
 		}

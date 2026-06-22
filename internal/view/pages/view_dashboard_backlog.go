@@ -26,17 +26,19 @@ func renderBacklogHealthPanel(m *viewmodel.Model, t theme.Theme, w, h int) strin
 	wsCompCounts := make(map[string]int)
 
 	for _, task := range m.Tasks {
-		if task.SchedulingType == model.Floating && task.LifecycleState != model.StateCompleted {
-			totalBacklog++
-			if task.LifecycleState == model.StateReady {
-				readyCount++
+		if m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || task.WorkspaceUUID == m.ActiveWorkspaceUUID {
+			if task.SchedulingType == model.Floating && task.LifecycleState != model.StateCompleted {
+				totalBacklog++
+				if task.LifecycleState == model.StateReady {
+					readyCount++
+				}
+				if task.LifecycleState == model.StateOverdue {
+					overdueCount++
+				}
 			}
 			if task.LifecycleState == model.StateOverdue {
 				overdueCount++
 			}
-		}
-		if task.LifecycleState == model.StateOverdue {
-			overdueCount++
 		}
 		for _, ws := range m.Workspaces {
 			if task.WorkspaceUUID == ws.UUID {

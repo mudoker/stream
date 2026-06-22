@@ -29,7 +29,8 @@ func renderCapacityPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 	for i := 0; i < 7; i++ {
 		day := weekStart.AddDate(0, 0, i)
 		for _, task := range m.Tasks {
-			if task.TimeWindow.Start.Year() == day.Year() &&
+			if (m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || task.WorkspaceUUID == m.ActiveWorkspaceUUID) &&
+				task.TimeWindow.Start.Year() == day.Year() &&
 				task.TimeWindow.Start.Month() == day.Month() &&
 				task.TimeWindow.Start.Day() == day.Day() {
 				weeklyPoints[day.Weekday()] += task.StoryPoints

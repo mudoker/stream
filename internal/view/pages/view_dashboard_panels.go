@@ -72,7 +72,7 @@ func renderRecentActivityPanel(m *viewmodel.Model, t theme.Theme, w, h int) stri
 
 	var completedTasks []model.Task
 	for _, task := range m.Tasks {
-		if task.LifecycleState == model.StateCompleted {
+		if (m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || task.WorkspaceUUID == m.ActiveWorkspaceUUID) && task.LifecycleState == model.StateCompleted {
 			completedTasks = append(completedTasks, task)
 		}
 	}

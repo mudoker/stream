@@ -193,3 +193,131 @@ func TestCalculateAnalyticsStats_PurityAndTags(t *testing.T) {
 		t.Errorf("Expected go tag second with 3600s, got %v", stats.Tags[1])
 	}
 }
+
+func TestCalculateAnalyticsStats_WorkspaceFilter(t *testing.T) {
+	today := time.Now()
+
+	m := &viewmodel.Model{
+		ActiveWorkspaceUUID: "ws-1",
+		Tasks: []model.Task{
+			{
+				UUID:           "t1",
+				Title:          "Task in ws-1",
+				SchedulingType: model.Anchored,
+				LifecycleState: model.StateCompleted,
+				UpdatedAt:      today,
+				WorkspaceUUID:  "ws-1",
+				TimeWindow: model.TimeWindow{
+					Start: today,
+					End:   today.Add(1 * time.Hour),
+				},
+			},
+			{
+				UUID:           "t2",
+				Title:          "Task in ws-2",
+				SchedulingType: model.Anchored,
+				LifecycleState: model.StateCompleted,
+				UpdatedAt:      today,
+				WorkspaceUUID:  "ws-2",
+				TimeWindow: model.TimeWindow{
+					Start: today,
+					End:   today.Add(2 * time.Hour),
+				},
+			},
+		},
+	}
+
+	stats := m.CalculateAnalyticsStats()
+
+	// Only t1 should be counted, so total hours should be 1.0, and total count/completed count should be 1.
+	if stats.TotalHrs != 1.0 {
+		t.Errorf("Expected 1.0 total hours (only ws-1 counted), got %.1f", stats.TotalHrs)
+	}
+	if stats.CompletedCount != 1 {
+		t.Errorf("Expected 1 completed count, got %d", stats.CompletedCount)
+	}
+	if stats.TotalCount != 1 {
+		t.Errorf("Expected 1 total count, got %d", stats.TotalCount)
+	}
+}
+
+func TestCalculateAnalyticsStats_AllWorkspaceAggregation(t *testing.T) {
+	today := time.Now()
+
+	m := &viewmodel.Model{
+		ActiveWorkspaceUUID: "ALL_WORKSPACES",
+		Tasks: []model.Task{
+			{
+				UUID:           "t1",
+				Title:          "Task in ws-1",
+				SchedulingType: model.Anchored,
+				LifecycleState: model.StateCompleted,
+				UpdatedAt:      today,
+				WorkspaceUUID:  "ws-1",
+				TimeWindow: model.TimeWindow{
+					Start: today,
+					End:   today.Add(1 * time.Hour),
+				},
+			},
+			{
+				UUID:           "t2",
+				Title:          "Task in ws-2",
+				SchedulingType: model.Anchored,
+				LifecycleState: model.StateCompleted,
+				UpdatedAt:      today,
+				WorkspaceUUID:  "ws-2",
+				TimeWindow: model.TimeWindow{
+					Start: today,
+					End:   today.Add(2 * time.Hour),
+				},
+			},
+		},
+	}
+
+	stats := m.CalculateAnalyticsStats()
+
+	// Both tasks should be counted in ALL_WORKSPACES, so total hours should be 3.0, and completed count/total count should be 2.
+	if stats.TotalHrs != 3.0 {
+		t.Errorf("Expected 3.0 total hours (both workspaces counted), got %.1f", stats.TotalHrs)
+	}
+	if stats.CompletedCount != 2 {
+		t.Errorf("Expected 2 completed count, got %d", stats.CompletedCount)
+	}
+	if stats.TotalCount != 2 {
+		t.Errorf("Expected 2 total count, got %d", stats.TotalCount)
+	}
+}
+
+func TestGetTodoShelfTasks_AllWorkspaceAggregation(t *testing.T) {
+	today := time.Now()
+
+	m := &viewmodel.Model{
+		ActiveWorkspaceUUID: "ALL_WORKSPACES",
+		SelectedDay:         today,
+		Tasks: []model.Task{
+			{
+				UUID:           "t1",
+				Title:          "Task in ws-1",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+				WorkspaceUUID:  "ws-1",
+				CreatedAt:      today,
+			},
+			{
+				UUID:           "t2",
+				Title:          "Task in ws-2",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+				WorkspaceUUID:  "ws-2",
+				CreatedAt:      today,
+			},
+		},
+	}
+
+	shelf := m.GetTodoShelfTasks()
+	if len(shelf) != 2 {
+		t.Errorf("Expected 2 tasks in todo shelf under All workspace, got %d", len(shelf))
+	}
+}
+
+

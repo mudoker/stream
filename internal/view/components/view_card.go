@@ -128,37 +128,76 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 		contentAreaW = 1
 	}
 
-	var contentLines []string
+	// Build all optional line strings
+	var wsLine string
+	if wsName := m.GetWorkspaceName(task.WorkspaceUUID); wsName != "" {
+		wsStr := "💼 " + wsName
+		wsLine = lipgloss.NewStyle().Foreground(t.Muted).Render(truncateStr(wsStr, contentAreaW))
+	}
+
+	var locLine string
 	if task.SchedulingType == model.Event && task.Location != "" {
 		locStr := "📍 " + task.Location
-		locRunes := []rune(locStr)
-		if len(locRunes) > contentAreaW {
-			if contentAreaW > 2 {
-				locStr = string(locRunes[:contentAreaW-1]) + "…"
-			} else {
-				locStr = string(locRunes[:contentAreaW])
-			}
-		}
-		locLine := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(locStr)
-		if h == 3 {
-			contentLines = []string{titleLine}
-		} else if h == 4 {
-			contentLines = []string{titleLine, locLine}
-		} else if h == 5 {
-			contentLines = []string{titleLine, locLine, metaLine}
-		} else {
-			sepLine := strings.Repeat("─", contentAreaW)
-			contentLines = []string{titleLine, sepLine, locLine, metaLine}
-		}
+		locLine = lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(truncateStr(locStr, contentAreaW))
+	}
+
+	typeStr := getTaskTypeStr(task)
+	typeLine := lipgloss.NewStyle().Foreground(t.Muted).Render(truncateStr(typeStr, contentAreaW))
+
+	var recurLine string
+	if recurStr := getRecurringDaysStr(m, task); recurStr != "" {
+		recurLine = lipgloss.NewStyle().Foreground(t.FocusPurple).Render(truncateStr(recurStr, contentAreaW))
+	}
+
+	var tagsLine string
+	if tagsStr := getTagsStr(task); tagsStr != "" {
+		tagsLine = lipgloss.NewStyle().Foreground(t.Accent).Render(truncateStr(tagsStr, contentAreaW))
+	}
+
+	var contentLines []string
+	if contentH == 1 {
+		contentLines = []string{titleLine}
 	} else {
-		if h == 3 {
-			contentLines = []string{titleLine}
-		} else if h == 4 {
-			contentLines = []string{titleLine, metaLine}
-		} else {
-			sepLine := strings.Repeat("─", contentAreaW)
-			contentLines = []string{titleLine, sepLine, metaLine}
+		// Collect middle candidate lines in order of visual priority:
+		// 1. Workspace Name
+		// 2. Location
+		// 3. Recurring days
+		// 4. Tags
+		// 5. Scheduling Type
+		var middleCandidates []string
+		if wsLine != "" {
+			middleCandidates = append(middleCandidates, wsLine)
 		}
+		if locLine != "" {
+			middleCandidates = append(middleCandidates, locLine)
+		}
+		if recurLine != "" {
+			middleCandidates = append(middleCandidates, recurLine)
+		}
+		if tagsLine != "" {
+			middleCandidates = append(middleCandidates, tagsLine)
+		}
+		middleCandidates = append(middleCandidates, typeLine)
+
+		// Decide if we have enough height to include a separator line.
+		// A separator is included if the available content height is at least 6.
+		includeSeparator := contentH >= 6
+		middleH := contentH - 2
+		if includeSeparator {
+			middleH = contentH - 3
+		}
+
+		if len(middleCandidates) > middleH {
+			middleCandidates = middleCandidates[:middleH]
+		}
+
+		contentLines = append(contentLines, titleLine)
+		if includeSeparator {
+			sepLine := strings.Repeat("─", contentAreaW)
+			contentLines = append(contentLines, sepLine)
+		}
+		contentLines = append(contentLines, middleCandidates...)
+		contentLines = append(contentLines, metaLine)
 	}
 
 	heightContent := h - 2
@@ -202,6 +241,8 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 	// Check if this task has consecutive predecessors in overlapping columns
 	hasLeftConsecutive := false
 	hasRightConsecutive := false
+	var cols []viewmodel.ScheduledColumn
+	var currRc *viewmodel.ScheduledColumn
 	if !strings.HasSuffix(task.UUID, "_moving") && !strings.HasSuffix(task.UUID, "_adjusting") {
 		clones := make(map[string]bool)
 		for _, tVal := range m.Tasks {
@@ -221,7 +262,7 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 				dayTasks = append(dayTasks, tVal)
 			}
 		}
-		cols := viewmodel.ResolveOverlaps(dayTasks)
+		cols = viewmodel.ResolveOverlaps(dayTasks)
 
 		numCols := 1
 		for _, rc := range cols {
@@ -230,7 +271,6 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 			}
 		}
 
-		var currRc *viewmodel.ScheduledColumn
 		for i := range cols {
 			if cols[i].Task.UUID == task.UUID {
 				currRc = &cols[i]
@@ -253,12 +293,7 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 						predEnd = predEnd.Add(restDur)
 					}
 
-					currStart := task.TimeWindow.Start
-					if task.SchedulingType == model.Event && strings.TrimSpace(task.Location) != "" && task.CommuteBuffer > 0 {
-						currStart = currStart.Add(-time.Duration(task.CommuteBuffer) * time.Minute)
-					}
-
-					if predEnd.Equal(currStart) {
+					if predEnd.Equal(task.TimeWindow.Start) {
 						currColStart := currRc.ColIndex
 						otherColStart := other.ColIndex
 						if currRc.TotalCol == 1 {
@@ -289,6 +324,15 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 					}
 				}
 			}
+
+			// For full-width tasks, only allow consecutive borders if both left and right match.
+			// This prevents asymmetric T-junctions (like a pointy corner on only one side).
+			if currRc.TotalCol == 1 {
+				if !hasLeftConsecutive || !hasRightConsecutive {
+					hasLeftConsecutive = false
+					hasRightConsecutive = false
+				}
+			}
 		}
 	}
 
@@ -316,4 +360,84 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 	cardLines = append(cardLines, bottomLine)
 
 	return strings.Join(cardLines, "\n")
+}
+
+func getRecurringDaysStr(m *viewmodel.Model, task model.Task) string {
+	if task.RecurringParentUUID == "" {
+		return ""
+	}
+	weekdays := make(map[time.Weekday]bool)
+	for _, tVal := range m.Tasks {
+		if tVal.RecurringParentUUID == task.RecurringParentUUID && !tVal.TimeWindow.Start.IsZero() {
+			weekdays[tVal.TimeWindow.Start.Weekday()] = true
+		}
+	}
+	if len(weekdays) == 0 {
+		return ""
+	}
+	if len(weekdays) == 7 {
+		return "🔄 Daily"
+	}
+	if len(weekdays) == 5 && weekdays[time.Monday] && weekdays[time.Tuesday] && weekdays[time.Wednesday] && weekdays[time.Thursday] && weekdays[time.Friday] && !weekdays[time.Saturday] && !weekdays[time.Sunday] {
+		return "🔄 Weekdays"
+	}
+	if len(weekdays) == 2 && weekdays[time.Saturday] && weekdays[time.Sunday] && !weekdays[time.Monday] && !weekdays[time.Tuesday] && !weekdays[time.Wednesday] && !weekdays[time.Thursday] && !weekdays[time.Friday] {
+		return "🔄 Weekends"
+	}
+	orderedDays := []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday, time.Sunday}
+	shortNames := map[time.Weekday]string{
+		time.Monday:    "Mon",
+		time.Tuesday:   "Tue",
+		time.Wednesday: "Wed",
+		time.Thursday:  "Thu",
+		time.Friday:    "Fri",
+		time.Saturday:  "Sat",
+		time.Sunday:    "Sun",
+	}
+	var days []string
+	for _, d := range orderedDays {
+		if weekdays[d] {
+			days = append(days, shortNames[d])
+		}
+	}
+	return "🔄 " + strings.Join(days, " ")
+}
+
+func getTaskTypeStr(task model.Task) string {
+	switch task.SchedulingType {
+	case model.Anchored, model.Floating:
+		return "📋 Task"
+	case model.Reminder:
+		return "🔔 Reminder"
+	case model.Recurring:
+		return "🔄 Recurring"
+	case model.Habit:
+		return "⚡ Habit"
+	case model.Event:
+		return "📅 Event"
+	default:
+		return string(task.SchedulingType)
+	}
+}
+
+func getTagsStr(task model.Task) string {
+	if len(task.Tags) == 0 {
+		return ""
+	}
+	var tagStrings []string
+	for _, tag := range task.Tags {
+		tagStrings = append(tagStrings, "#"+tag)
+	}
+	return strings.Join(tagStrings, " ")
+}
+
+func truncateStr(s string, limit int) string {
+	runes := []rune(s)
+	if len(runes) > limit {
+		if limit > 2 {
+			return string(runes[:limit-1]) + "…"
+		}
+		return string(runes[:limit])
+	}
+	return s
 }

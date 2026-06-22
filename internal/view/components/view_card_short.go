@@ -110,8 +110,17 @@ func RenderShortCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h in
 			timeStyle = timeStyle.Faint(true)
 		}
 		timeStyled := timeStyle.Render(timeStr)
-		meta := " " + pBadge + "  " + timeStyled
 
+		wsName := m.GetWorkspaceName(task.WorkspaceUUID)
+		var wsStr string
+		if wsName != "" {
+			wsStr = "  💼 " + wsName
+		}
+		meta := " " + pBadge + "  " + timeStyled + wsStr
+
+		if lipgloss.Width(meta) > contentW {
+			meta = " " + pBadge + "  " + timeStyled
+		}
 		if lipgloss.Width(meta) > contentW {
 			meta = " " + pBadge
 		}
@@ -128,7 +137,12 @@ func RenderShortCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h in
 		rows = append(rows, metaLine)
 	}
 	if h >= 3 {
-		meta2 := fmt.Sprintf(" %d SP", task.StoryPoints)
+		wsName := m.GetWorkspaceName(task.WorkspaceUUID)
+		var wsStr string
+		if wsName != "" {
+			wsStr = "  💼 " + wsName
+		}
+		meta2 := fmt.Sprintf(" %d SP%s", task.StoryPoints, wsStr)
 		meta2Runes := []rune(meta2)
 		if len(meta2Runes) > contentW {
 			meta2 = string(meta2Runes[:contentW])

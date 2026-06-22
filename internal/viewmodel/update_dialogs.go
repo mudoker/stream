@@ -107,6 +107,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSyncFormKeys(msg)
 	case ModeWorkspacePicker:
 		return m.handleWorkspacePickerKeys(msg)
+	case ModeTagsCRUD:
+		return m.handleTagsCRUDKeys(msg)
 	case ModeNormal:
 		return m.HandleNormalKeys(msg)
 	}

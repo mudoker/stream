@@ -338,6 +338,12 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		m.JazzLoungeSelectedIndex = 0
 		m.StatusMsg = "Jazz Lounge Player opened."
 
+	case "tags":
+		m.TagsCRUDState = "BROWSE"
+		m.TagsCRUDSelectedIndex = 0
+		m.CurrentMode = ModeTagsCRUD
+		m.StatusMsg = "Manage Tags opened."
+
 	default:
 		m.StatusMsg = fmt.Sprintf("Unknown command: %s", cmdName)
 	}

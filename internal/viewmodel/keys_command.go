@@ -41,6 +41,7 @@ func (m *Model) GetCommandList() []CommandEntry {
 		CommandEntry{"auth", "Start Google Calendar authorization"},
 		CommandEntry{"stop", "Stop active focus timer session"},
 		CommandEntry{"music", "Open jazz lounge music player modal"},
+		CommandEntry{"tags", "Manage system tags (CRUD)"},
 	)
 
 	for _, ws := range m.Workspaces {

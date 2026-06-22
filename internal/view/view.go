@@ -207,7 +207,7 @@ func (v *View) Render() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.LogSessionPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen || m.JazzLoungeOpen || m.UpdatePromptOpen {
+	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.LogSessionPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen || m.JazzLoungeOpen || m.UpdatePromptOpen || m.CurrentMode == viewmodel.ModeTagsCRUD {
 		var modalStr string
 		switch {
 		case m.WarningOpen:
@@ -244,6 +244,8 @@ func (v *View) Render() string {
 			modalStr = modals.RenderDetailModal(m, v.Theme)
 		case m.JazzLoungeOpen:
 			modalStr = modals.RenderJazzLoungeModal(m, v.Theme)
+		case m.CurrentMode == viewmodel.ModeTagsCRUD:
+			modalStr = modals.RenderTagsCRUDModal(m, v.Theme)
 		}
 
 		modalW := lipgloss.Width(modalStr)

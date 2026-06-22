@@ -24,7 +24,7 @@ func renderVelocityTrendPanel(m *viewmodel.Model, t theme.Theme, w, h int, stats
 	compLastWeek := 0
 
 	for _, task := range m.Tasks {
-		if task.LifecycleState == model.StateCompleted {
+		if (m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || task.WorkspaceUUID == m.ActiveWorkspaceUUID) && task.LifecycleState == model.StateCompleted {
 			if task.UpdatedAt.After(sevenDaysAgo) && task.UpdatedAt.Before(today) {
 				compThisWeek++
 			} else if task.UpdatedAt.After(fourteenDaysAgo) && task.UpdatedAt.Before(sevenDaysAgo) {

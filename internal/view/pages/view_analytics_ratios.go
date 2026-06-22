@@ -20,7 +20,7 @@ func renderHourHeatmapPanel(m *viewmodel.Model, t theme.Theme, w, h int) string 
 	eveningSecs := 0
 
 	for _, task := range m.Tasks {
-		if task.SchedulingType == model.Anchored {
+		if (m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || task.WorkspaceUUID == m.ActiveWorkspaceUUID) && task.SchedulingType == model.Anchored {
 			hour := task.TimeWindow.Start.Hour()
 			dur := task.ExecutionMetrics.ElapsedFocusSeconds
 			if dur == 0 {

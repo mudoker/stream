@@ -47,6 +47,9 @@ func (m *Model) CalculateAnalyticsStats() AnalyticsStats {
 	tagSecs := make(map[string]int)
 
 	for _, t := range m.Tasks {
+		if m.ActiveWorkspaceUUID != "ALL_WORKSPACES" && t.WorkspaceUUID != m.ActiveWorkspaceUUID {
+			continue
+		}
 		totalCount++
 		if t.LifecycleState == model.StateCompleted {
 			completedCount++
@@ -161,6 +164,9 @@ func (m *Model) CalculateAnalyticsStats() AnalyticsStats {
 	completedInLast7Days := 0
 	totalInLast7Days := 0
 	for _, t := range m.Tasks {
+		if m.ActiveWorkspaceUUID != "ALL_WORKSPACES" && t.WorkspaceUUID != m.ActiveWorkspaceUUID {
+			continue
+		}
 		inLast7Days := false
 		if model.IsTaskAnchored(t) {
 			inLast7Days = t.TimeWindow.Start.After(sevenDaysAgo)
@@ -213,6 +219,9 @@ func (m *Model) CalculateAnalyticsStats() AnalyticsStats {
 
 	dailyFocusSecs := make(map[string]int)
 	for _, t := range m.Tasks {
+		if m.ActiveWorkspaceUUID != "ALL_WORKSPACES" && t.WorkspaceUUID != m.ActiveWorkspaceUUID {
+			continue
+		}
 		if t.LifecycleState == model.StateCompleted {
 			dateStr := t.UpdatedAt.Format("2006-01-02")
 			dur := t.ExecutionMetrics.ElapsedFocusSeconds

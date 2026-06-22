@@ -94,7 +94,7 @@ func renderFocusSessionTimelinePanel(m *viewmodel.Model, t theme.Theme, w, h int
 
 	var timelineTasks []model.Task
 	for _, task := range m.Tasks {
-		if task.SchedulingType == model.Anchored && viewmodel.SameDay(task.TimeWindow.Start, today) {
+		if (m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || task.WorkspaceUUID == m.ActiveWorkspaceUUID) && task.SchedulingType == model.Anchored && viewmodel.SameDay(task.TimeWindow.Start, today) {
 			timelineTasks = append(timelineTasks, task)
 		}
 	}

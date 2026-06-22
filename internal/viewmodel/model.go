@@ -103,6 +103,7 @@ type Model struct {
 	ConfirmActionType string
 	ConfirmSelectedIndex int
 	ConfirmFocusArea     int
+	RecurringEditFromForm bool
 	WarningOpen bool
 	WarningMsg  string
 

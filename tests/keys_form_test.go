@@ -884,6 +884,49 @@ func TestFloatingTaskFormCreation(t *testing.T) {
 	}
 }
 
+func TestFormPrepopulateSelectedDay(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	// Set selected day to a specific day in the future
+	targetDate := time.Date(2026, 6, 25, 10, 30, 0, 0, time.Local)
+	m.SelectedDay = targetDate
+
+	// Press 'i' to open the creation form
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+
+	// Check that the form fields are pre-populated with targetDate
+	expectedDateStr := "2026-06-25"
+	expectedTimeStr := targetDate.Format("15:04")
+
+	if m.Form.StartDateInput.Value() != expectedDateStr {
+		t.Errorf("expected StartDateInput to be %q, got %q", expectedDateStr, m.Form.StartDateInput.Value())
+	}
+	if m.Form.EndDateInput.Value() != expectedDateStr {
+		t.Errorf("expected EndDateInput to be %q, got %q", expectedDateStr, m.Form.EndDateInput.Value())
+	}
+	if m.Form.DueDateInput.Value() != expectedDateStr {
+		t.Errorf("expected DueDateInput to be %q, got %q", expectedDateStr, m.Form.DueDateInput.Value())
+	}
+
+	expectedRecurEndStr := targetDate.AddDate(0, 0, 7).Format("2006-01-02")
+	if m.Form.RecurringEndDateInput.Value() != expectedRecurEndStr {
+		t.Errorf("expected RecurringEndDateInput to be %q, got %q", expectedRecurEndStr, m.Form.RecurringEndDateInput.Value())
+	}
+
+	if m.Form.StartTimeInput.Value() != expectedTimeStr {
+		t.Errorf("expected StartTimeInput to be %q, got %q", expectedTimeStr, m.Form.StartTimeInput.Value())
+	}
+}
+
 
 
 

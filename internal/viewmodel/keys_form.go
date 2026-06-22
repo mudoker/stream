@@ -354,16 +354,11 @@ func (m *Model) SubmitForm() {
 		newTask.StoryPoints = 0
 
 		startDateStr := strings.TrimSpace(m.Form.StartDateInput.Value())
-		endDateStr := strings.TrimSpace(m.Form.EndDateInput.Value())
 		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
 
 		startDay, errS := time.Parse("2006-01-02", startDateStr)
 		if errS != nil {
 			startDay = baseDay
-		}
-		endDay, errE := time.Parse("2006-01-02", endDateStr)
-		if errE != nil {
-			endDay = startDay
 		}
 
 		hour, min := ParseFlexibleTime(timeStr, 9, 0)
@@ -374,7 +369,7 @@ func (m *Model) SubmitForm() {
 			duration = d
 		}
 
-		endTime := time.Date(endDay.Year(), endDay.Month(), endDay.Day(), hour, min, 0, 0, now.Location()).Add(time.Duration(duration) * time.Minute)
+		endTime := startTime.Add(time.Duration(duration) * time.Minute)
 
 		newTask.TimeWindow = model.TimeWindow{
 			Start: startTime,
@@ -430,6 +425,7 @@ func (m *Model) SubmitForm() {
 			m.ConfirmOpen = true
 			m.ConfirmActionType = "edit_recurring"
 			m.ConfirmSelectedIndex = 0
+			m.RecurringEditFromForm = true
 			m.IsEditing = false
 			m.Form.IsEditing = false
 			m.EditingTaskUUID = ""

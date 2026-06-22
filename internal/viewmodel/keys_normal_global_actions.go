@@ -53,7 +53,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		return true, nil
 	case "i":
 		m.CurrentMode = ModeForm
-		m.Form = NewTaskForm()
+		m.Form = NewTaskFormWithDate(m.SelectedDay)
 		m.Form.TitleInput.Focus()
 		return true, nil
 	case "a":

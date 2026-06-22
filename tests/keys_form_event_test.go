@@ -132,15 +132,14 @@ func TestEventTaskFormCreationStartEndDates(t *testing.T) {
 	m := viewmodel.NewModel(database, syncEngine)
 	m.Form = viewmodel.NewTaskForm()
 
-	// Fill the form fields for an Event with different start/end dates
-	m.Form.TitleInput.SetValue("Multi-day Event")
+	// Fill the form fields for an Event (scoped within a single day)
+	m.Form.TitleInput.SetValue("Single-day Event")
 	m.Form.DescInput.SetValue("Hackathon weekend")
 	m.Form.PriorityIdx = 1
 	m.Form.TaskTypeIdx = 3 // Event
 	m.Form.StartDateInput.SetValue("2026-06-20")
 	m.Form.StartTimeInput.SetValue("09:00")
-	m.Form.EndDateInput.SetValue("2026-06-22")
-	m.Form.DurationInput.SetValue("180") // 3 hours duration relative to endDay
+	m.Form.DurationInput.SetValue("180") // 3 hours duration
 
 	// Submit form
 	m.SubmitForm()
@@ -156,7 +155,7 @@ func TestEventTaskFormCreationStartEndDates(t *testing.T) {
 	}
 
 	expectedStartStr := "2026-06-20 09:00:00"
-	expectedEndStr := "2026-06-22 12:00:00" // 09:00 + 180 min
+	expectedEndStr := "2026-06-20 12:00:00" // 09:00 + 180 min
 
 	actualStartStr := task.TimeWindow.Start.Local().Format("2006-01-02 15:04:05")
 	actualEndStr := task.TimeWindow.End.Local().Format("2006-01-02 15:04:05")

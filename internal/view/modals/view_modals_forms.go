@@ -69,7 +69,6 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	} else if f.TaskTypeIdx == 3 {
 		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Date", f.StartDateInput.View(), f.ActiveField == 14, t))
 		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.EndDateInput.View(), f.ActiveField == 15, t))
 		fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
 		fields = append(fields, components.RenderFormField(nextFieldNum(), "Location", f.LocationInput.View(), f.ActiveField == 7, t))
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
@@ -77,21 +76,19 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		}
 	}
 
-	if !f.IsEditing {
-		if f.TaskTypeIdx == 2 {
-			// Habit is always recurring
+	if f.TaskTypeIdx == 2 {
+		// Habit is always recurring
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), f.ActiveField == 12, t))
+		fields = append(fields, components.RenderDaysSelect(nextFieldNum(), "Recurring Days", f.RecurringDaysSelected[:], f.RecurringDaysSubIdx, f.ActiveField == 13, t))
+	} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
+		recOptStr := "No"
+		if f.IsRecurringIdx == 1 {
+			recOptStr = "Yes"
+		}
+		fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Is Recurring", recOptStr, f.ActiveField == 11, t))
+		if f.IsRecurringIdx == 1 {
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), f.ActiveField == 12, t))
 			fields = append(fields, components.RenderDaysSelect(nextFieldNum(), "Recurring Days", f.RecurringDaysSelected[:], f.RecurringDaysSubIdx, f.ActiveField == 13, t))
-		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
-			recOptStr := "No"
-			if f.IsRecurringIdx == 1 {
-				recOptStr = "Yes"
-			}
-			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Is Recurring", recOptStr, f.ActiveField == 11, t))
-			if f.IsRecurringIdx == 1 {
-				fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), f.ActiveField == 12, t))
-				fields = append(fields, components.RenderDaysSelect(nextFieldNum(), "Recurring Days", f.RecurringDaysSelected[:], f.RecurringDaysSubIdx, f.ActiveField == 13, t))
-			}
 		}
 	}
 

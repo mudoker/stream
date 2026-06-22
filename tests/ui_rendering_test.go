@@ -566,3 +566,237 @@ func TestConsecutiveTasksMismatchedDivisionsTimelineRendering(t *testing.T) {
 	}
 }
 
+func TestConsecutiveTasksWithCommuteBufferTimelineRendering(t *testing.T) {
+	today := time.Now()
+	// Task 1: Lunch Break (ends at 12:30, has no commute/rest)
+	t1 := model.Task{
+		UUID:           "task-lunch",
+		Title:          "Lunch Break",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 12, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 12, 30, 0, 0, time.Local),
+		},
+	}
+	// Task 2: Combat with VOID (starts at 13:00, but has a 30m commute buffer, so commute starts at 12:30)
+	t2 := model.Task{
+		UUID:           "task-combat",
+		Title:          "Combat with VOID",
+		SchedulingType: model.Event,
+		Location:       "Void Arena",
+		CommuteBuffer:  30,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 14, 0, 0, 0, time.Local),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{t1, t2},
+		SelectedDay:      today,
+		TimelineHour:     13,
+		SelectedTaskUUID: "task-combat",
+	}
+	m.Layout.TimelineW = 40
+	m.Layout.WorkspaceW = 80
+	th := theme.NewTheme()
+
+	timelineOut := pages.RenderDayTimeline(m, th, 160)
+	cleanedTimeline := cleanAnsi(timelineOut)
+
+	lines := strings.Split(cleanedTimeline, "\n")
+	idxCombat := -1
+	for idx, line := range lines {
+		if strings.Contains(line, "Comba") {
+			idxCombat = idx
+			break
+		}
+	}
+
+	if idxCombat == -1 {
+		t.Fatal("Could not find Combat with void task title in timeline")
+	}
+
+	var topBorderLine string
+	for i := idxCombat - 1; i >= 0; i-- {
+		line := lines[i]
+		if strings.Contains(line, "╭") || strings.Contains(line, "├") {
+			topBorderLine = line
+			break
+		}
+	}
+
+	if topBorderLine == "" {
+		t.Fatal("Could not find top border line of Combat with VOID")
+	}
+
+	t.Logf("Found Combat top border line: %q", topBorderLine)
+
+	if strings.Contains(topBorderLine, "├") || strings.Contains(topBorderLine, "┤") {
+		t.Errorf("Expected Combat top border to contain only rounded corners '╭'/'╮', but found T-junctions: %q", topBorderLine)
+	}
+}
+
+func TestConsecutiveFullWidthTaskWithHalfWidthPredecessor(t *testing.T) {
+	today := time.Now()
+	// Task 1: Workout (starts at 18:00, ends at 19:30, in column 1 of 2)
+	t1 := model.Task{
+		UUID:           "task-workout",
+		Title:          "Workout",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 18, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 19, 30, 0, 0, time.Local),
+		},
+	}
+	// Task 2: Dinner (starts at 19:30, ends at 20:30, in column 0 of 1)
+	t2 := model.Task{
+		UUID:           "task-dinner",
+		Title:          "Dinner",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 19, 30, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 20, 30, 0, 0, time.Local),
+		},
+	}
+	// Task 3: Combat with VOID (starts at 13:00, ends at 17:15, which forces Workout to column 1 via ResolveOverlaps overlap)
+	t3 := model.Task{
+		UUID:           "task-combat-void",
+		Title:          "Combat with VOID",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 13, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 18, 5, 0, 0, time.Local),
+		},
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{t1, t2, t3},
+		SelectedDay:      today,
+		TimelineHour:     19,
+		SelectedTaskUUID: "task-dinner",
+	}
+	m.Layout.TimelineW = 40
+	m.Layout.WorkspaceW = 80
+	th := theme.NewTheme()
+
+	timelineOut := pages.RenderDayTimeline(m, th, 160)
+	cleanedTimeline := cleanAnsi(timelineOut)
+
+	lines := strings.Split(cleanedTimeline, "\n")
+	idxDinner := -1
+	for idx, line := range lines {
+		if strings.Contains(line, "Dinner") {
+			idxDinner = idx
+			break
+		}
+	}
+
+	if idxDinner == -1 {
+		t.Fatal("Could not find Dinner task title in timeline")
+	}
+
+	var topBorderLine string
+	for i := idxDinner - 1; i >= 0; i-- {
+		line := lines[i]
+		if strings.Contains(line, "╭") || strings.Contains(line, "├") {
+			topBorderLine = line
+			break
+		}
+	}
+
+	if topBorderLine == "" {
+		t.Fatal("Could not find top border line of Dinner")
+	}
+
+	t.Logf("Found Dinner top border line: %q", topBorderLine)
+
+	if strings.Contains(topBorderLine, "├") || strings.Contains(topBorderLine, "┤") {
+		t.Errorf("Expected Dinner top border to contain only rounded corners '╭'/'╮', but found T-junctions: %q", topBorderLine)
+	}
+}
+
+func TestResponsiveCardDetailsRendering(t *testing.T) {
+	today := time.Now()
+	// Create a recurring event task with location, tags, etc.
+	task := model.Task{
+		UUID:           "task-responsive-card",
+		Title:          "Gym session",
+		SchedulingType: model.Event,
+		Location:       "Iron Temple Gym",
+		Tags:           []string{"health", "fitness"},
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day(), 10, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day(), 11, 0, 0, 0, time.Local),
+		},
+		RecurringParentUUID: "parent-recurring-gym",
+	}
+
+	// Another task with same RecurringParentUUID to establish recurring days (e.g. Mon, Wed, Fri)
+	task2 := model.Task{
+		UUID:           "task-responsive-card-2",
+		Title:          "Gym session 2",
+		SchedulingType: model.Event,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(today.Year(), today.Month(), today.Day()+2, 10, 0, 0, 0, time.Local),
+			End:   time.Date(today.Year(), today.Month(), today.Day()+2, 11, 0, 0, 0, time.Local),
+		},
+		RecurringParentUUID: "parent-recurring-gym",
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{task, task2},
+		SelectedDay:      today,
+		TimelineHour:     10,
+		SelectedTaskUUID: "task-responsive-card",
+	}
+	th := theme.NewTheme()
+
+	// Test 1: h = 3 (contentH = 1). Should only show title.
+	card3 := components.RenderCard(m, th, task, 40, 3, false, false)
+	cleaned3 := cleanAnsi(card3)
+	if !strings.Contains(cleaned3, "Gym session") {
+		t.Error("Expected title to be rendered for h=3")
+	}
+	if strings.Contains(cleaned3, "Iron Temple Gym") || strings.Contains(cleaned3, "#health") || strings.Contains(cleaned3, "Event") {
+		t.Error("Expected no extra details for h=3")
+	}
+
+	// Test 2: h = 5 (contentH = 3). Should show title, location, and metadata.
+	card5 := components.RenderCard(m, th, task, 40, 5, false, false)
+	cleaned5 := cleanAnsi(card5)
+	if !strings.Contains(cleaned5, "Gym session") {
+		t.Error("Expected title for h=5")
+	}
+	if !strings.Contains(cleaned5, "Iron Temple Gym") {
+		t.Error("Expected location for h=5")
+	}
+	if strings.Contains(cleaned5, "#health") {
+		t.Error("Expected tags not to fit yet for h=5")
+	}
+
+	// Test 3: h = 11 (contentH = 7). Should include separator and all details.
+	card11 := components.RenderCard(m, th, task, 40, 11, false, false)
+	cleaned11 := cleanAnsi(card11)
+	if !strings.Contains(cleaned11, "Gym session") {
+		t.Error("Expected title for h=11")
+	}
+	if !strings.Contains(cleaned11, "Iron Temple Gym") {
+		t.Error("Expected location for h=11")
+	}
+	if !strings.Contains(cleaned11, "🔄") { // recurring icon
+		t.Error("Expected recurring days icon for h=11")
+	}
+	if !strings.Contains(cleaned11, "#health") || !strings.Contains(cleaned11, "#fitness") {
+		t.Error("Expected tags for h=11")
+	}
+	if !strings.Contains(cleaned11, "Event") {
+		t.Error("Expected type 'Event' for h=11")
+	}
+	if !strings.Contains(cleaned11, "───") { // separator line
+		t.Error("Expected separator line for h=11")
+	}
+}
+
+
+

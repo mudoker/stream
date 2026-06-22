@@ -149,6 +149,7 @@ func (m *Model) confirmTaskDurationAdjust() {
 			m.ConfirmOpen = true
 			m.ConfirmActionType = "edit_recurring"
 			m.ConfirmSelectedIndex = 0
+			m.RecurringEditFromForm = false
 			m.CurrentMode = ModeNormal
 			m.TaskMovePrefix = ""
 			m.StatusMsg = "Choose recurring update option."

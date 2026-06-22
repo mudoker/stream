@@ -39,6 +39,10 @@ type TaskForm struct {
 }
 
 func NewTaskForm() TaskForm {
+	return NewTaskFormWithDate(time.Now())
+}
+
+func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 	t := textinput.New()
 	t.Placeholder = "Refactor auth engine..."
 	t.Focus()
@@ -46,10 +50,9 @@ func NewTaskForm() TaskForm {
 	d := textinput.New()
 	d.Placeholder = "Fix memory leak in pool..."
 
-	now := time.Now()
 	st := textinput.New()
-	st.Placeholder = now.Format("15:04")
-	st.SetValue(now.Format("15:04"))
+	st.Placeholder = baseDate.Format("15:04")
+	st.SetValue(baseDate.Format("15:04"))
 
 	dur := textinput.New()
 	dur.Placeholder = "60"
@@ -59,8 +62,8 @@ func NewTaskForm() TaskForm {
 	tags.Placeholder = "engineering, refactor, admin"
 
 	dd := textinput.New()
-	dd.Placeholder = now.Format("2006-01-02")
-	dd.SetValue(now.Format("2006-01-02"))
+	dd.Placeholder = baseDate.Format("2006-01-02")
+	dd.SetValue(baseDate.Format("2006-01-02"))
 
 	loc := textinput.New()
 	loc.Placeholder = "Office / Headquarters / Zoom"
@@ -70,28 +73,28 @@ func NewTaskForm() TaskForm {
 	commute.SetValue("0")
 
 	reEnd := textinput.New()
-	reEnd.Placeholder = now.AddDate(0, 0, 7).Format("2006-01-02")
-	reEnd.SetValue(now.AddDate(0, 0, 7).Format("2006-01-02"))
+	reEnd.Placeholder = baseDate.AddDate(0, 0, 7).Format("2006-01-02")
+	reEnd.SetValue(baseDate.AddDate(0, 0, 7).Format("2006-01-02"))
 
 	reDays := textinput.New()
 	reDays.Placeholder = "Mon, Wed, Fri"
 	reDays.SetValue("Mon, Tue, Wed, Thu, Fri")
 
 	startDate := textinput.New()
-	startDate.Placeholder = now.Format("2006-01-02")
-	startDate.SetValue(now.Format("2006-01-02"))
+	startDate.Placeholder = baseDate.Format("2006-01-02")
+	startDate.SetValue(baseDate.Format("2006-01-02"))
 
 	endDate := textinput.New()
-	endDate.Placeholder = now.Format("2006-01-02")
-	endDate.SetValue(now.Format("2006-01-02"))
+	endDate.Placeholder = baseDate.Format("2006-01-02")
+	endDate.SetValue(baseDate.Format("2006-01-02"))
 
 	form := TaskForm{
 		PriorityIdx:           2,
 		SPIdx:                 2,
 		TaskTypeIdx:           0,
 		IsAnchoredIdx:         1,
-		StartHour:             now.Hour(),
-		StartMin:              now.Minute(),
+		StartHour:             baseDate.Hour(),
+		StartMin:              baseDate.Minute(),
 		DurationMins:          60,
 		ActiveField:           0,
 		TitleInput:            t,
@@ -142,22 +145,20 @@ func (f TaskForm) VisibleFields() []int {
 		// Habit: Start Time (5), Duration (6)
 		fields = append(fields, 5, 6)
 	} else if f.TaskTypeIdx == 3 {
-		// Event: Start Date (14), Start Time (5), End Date (15), Duration (6), Location (7)
-		fields = append(fields, 14, 5, 15, 6, 7)
+		// Event: Start Date (14), Start Time (5), Duration (6), Location (7)
+		fields = append(fields, 14, 5, 6, 7)
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
 			fields = append(fields, 8)
 		}
 	}
 
-	if !f.IsEditing {
-		if f.TaskTypeIdx == 2 {
-			// Habit is always recurring
+	if f.TaskTypeIdx == 2 {
+		// Habit is always recurring
+		fields = append(fields, 12, 13)
+	} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
+		fields = append(fields, 11)
+		if f.IsRecurringIdx == 1 {
 			fields = append(fields, 12, 13)
-		} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
-			fields = append(fields, 11)
-			if f.IsRecurringIdx == 1 {
-				fields = append(fields, 12, 13)
-			}
 		}
 	}
 

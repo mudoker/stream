@@ -98,6 +98,59 @@ func (m *Model) startEditMode(task model.Task) {
 
 	m.Form.TagsInput.SetValue(strings.Join(task.Tags, ", "))
 
+	// Reset recurring form fields first
+	m.Form.IsRecurringIdx = 0
+	m.Form.RecurringEndDateInput.SetValue("")
+	m.Form.RecurringDaysInput.SetValue("")
+	for i := range m.Form.RecurringDaysSelected {
+		m.Form.RecurringDaysSelected[i] = false
+	}
+
+	// Populate recurring fields if editing a recurring task/habit
+	if task.RecurringParentUUID != "" || task.SchedulingType == model.Habit {
+		m.Form.IsRecurringIdx = 1
+		var maxEnd time.Time
+		weekdays := make(map[time.Weekday]bool)
+		for _, tVal := range m.Tasks {
+			if tVal.RecurringParentUUID == task.RecurringParentUUID && task.RecurringParentUUID != "" {
+				if tVal.TimeWindow.Start.After(maxEnd) {
+					maxEnd = tVal.TimeWindow.Start
+				}
+				weekdays[tVal.TimeWindow.Start.Weekday()] = true
+			}
+		}
+		// If no other parent instances, use default values from task or active day
+		if maxEnd.IsZero() {
+			if !task.TimeWindow.Start.IsZero() {
+				maxEnd = task.TimeWindow.Start.AddDate(0, 0, 7)
+				weekdays[task.TimeWindow.Start.Weekday()] = true
+			} else {
+				maxEnd = m.SelectedDay.AddDate(0, 0, 7)
+				weekdays[m.SelectedDay.Weekday()] = true
+			}
+		}
+		m.Form.RecurringEndDateInput.SetValue(maxEnd.Format("2006-01-02"))
+
+		var dayNames []string
+		orderedDays := []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday, time.Sunday}
+		shortNames := map[time.Weekday]string{
+			time.Monday:    "mon",
+			time.Tuesday:   "tue",
+			time.Wednesday: "wed",
+			time.Thursday:  "thu",
+			time.Friday:    "fri",
+			time.Saturday:  "sat",
+			time.Sunday:    "sun",
+		}
+		for i, d := range orderedDays {
+			m.Form.RecurringDaysSelected[i] = weekdays[d]
+			if weekdays[d] {
+				dayNames = append(dayNames, shortNames[d])
+			}
+		}
+		m.Form.RecurringDaysInput.SetValue(strings.Join(dayNames, ", "))
+	}
+
 	m.Form.ActiveField = 0
 	m.focusFormFields()
 	m.CurrentMode = ModeForm

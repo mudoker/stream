@@ -22,7 +22,16 @@ func (m *Model) refreshWorkspaces() {
 	if m.DB == nil {
 		return
 	}
-	m.Workspaces = m.DB.GetWorkspaces()
+	realWS := m.DB.GetWorkspaces()
+	allWS := model.Workspace{
+		UUID:      "ALL_WORKSPACES",
+		Name:      "All",
+		Icon:      "🌐",
+		Badge:     "[All]",
+		CreatedAt: time.Time{},
+		UpdatedAt: time.Time{},
+	}
+	m.Workspaces = append([]model.Workspace{allWS}, realWS...)
 	if m.ActiveWorkspaceUUID == "" && len(m.Workspaces) > 0 {
 		m.ActiveWorkspaceUUID = m.Workspaces[0].UUID
 	}
@@ -33,12 +42,7 @@ func (m *Model) refreshTasks() {
 		return
 	}
 	allTasks := m.DB.GetTasks()
-	m.Tasks = nil
-	for _, t := range allTasks {
-		if t.WorkspaceUUID == m.ActiveWorkspaceUUID {
-			m.Tasks = append(m.Tasks, t)
-		}
-	}
+	m.Tasks = allTasks
 
 	now := time.Now()
 	updatedAny := false
@@ -282,4 +286,14 @@ func (m *Model) DeleteTask(uuid string) {
 		}
 	}
 }
+
+func (m *Model) GetWorkspaceName(wsUUID string) string {
+	for _, ws := range m.Workspaces {
+		if ws.UUID == wsUUID {
+			return ws.Name
+		}
+	}
+	return ""
+}
+
 

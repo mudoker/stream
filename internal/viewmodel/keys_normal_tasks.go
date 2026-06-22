@@ -58,7 +58,13 @@ func (m *Model) GetActiveTask() (model.Task, bool) {
 }
 
 func (m *Model) GetTodoShelfTasks() []model.Task {
-	return tasks.GetTodoShelfTasks(m.Tasks, m.SelectedDay)
+	var wsTasks []model.Task
+	for _, t := range m.Tasks {
+		if m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || t.WorkspaceUUID == m.ActiveWorkspaceUUID {
+			wsTasks = append(wsTasks, t)
+		}
+	}
+	return tasks.GetTodoShelfTasks(wsTasks, m.SelectedDay)
 }
 
 func (m *Model) GetAllActiveTasks() []model.Task {
@@ -111,6 +117,9 @@ func (m *Model) GetAgendaTasks() []model.Task {
 	today := time.Now()
 	var agendaTasks []model.Task
 	for _, t := range m.Tasks {
+		if m.ActiveWorkspaceUUID != "ALL_WORKSPACES" && t.WorkspaceUUID != m.ActiveWorkspaceUUID {
+			continue
+		}
 		isTodayOrUpcoming := false
 		if model.IsTaskAnchored(t) {
 			isTodayOrUpcoming = t.TimeWindow.Start.Year() == today.Year() &&
@@ -150,6 +159,9 @@ func (m *Model) GetUpcomingTask() (model.Task, bool) {
 	now := time.Now()
 	var candidates []model.Task
 	for _, t := range m.Tasks {
+		if m.ActiveWorkspaceUUID != "ALL_WORKSPACES" && t.WorkspaceUUID != m.ActiveWorkspaceUUID {
+			continue
+		}
 		if model.IsTaskAnchored(t) && t.LifecycleState != model.StateCompleted {
 			if t.TimeWindow.Start.After(now) {
 				candidates = append(candidates, t)

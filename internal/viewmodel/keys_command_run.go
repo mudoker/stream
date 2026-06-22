@@ -170,6 +170,10 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			m.StatusMsg = "No active workspace to edit."
 			return m, nil
 		}
+		if activeWS.UUID == "ALL_WORKSPACES" {
+			m.StatusMsg = "Cannot edit the virtual 'All' workspace."
+			return m, nil
+		}
 		m.IsEditingWorkspace = true
 		m.EditingWorkspaceUUID = activeWS.UUID
 		m.WorkspaceForm = NewWorkspaceForm()
@@ -204,6 +208,11 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		if wsToDelete.UUID == "ALL_WORKSPACES" {
+			m.StatusMsg = "Cannot delete the virtual 'All' workspace."
+			return m, nil
+		}
+
 		if len(m.Workspaces) <= 1 {
 			m.StatusMsg = "Cannot delete the last workspace."
 			return m, nil
@@ -228,6 +237,9 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		deferred := 0
 		secs := 0
 		for _, t := range m.Tasks {
+			if m.ActiveWorkspaceUUID != "ALL_WORKSPACES" && t.WorkspaceUUID != m.ActiveWorkspaceUUID {
+				continue
+			}
 			isToday := false
 			if t.SchedulingType == model.Anchored {
 				isToday = t.TimeWindow.Start.Year() == today.Year() && t.TimeWindow.Start.Month() == today.Month() && t.TimeWindow.Start.Day() == today.Day()

@@ -32,7 +32,7 @@ func TestEventTaskFormCreation(t *testing.T) {
 	m.Form.DurationInput.SetValue("120")
 	m.Form.LocationInput.SetValue("Mountain View")
 	m.Form.CommuteInput.SetValue("30")
-	m.Form.TagsInput.SetValue("tech, google")
+	m.Form.TagsInput.SetValue("work, personal")
 
 	// Submit the form
 	m.SubmitForm()
@@ -87,7 +87,7 @@ func TestEventTaskFormCreationNoLocation(t *testing.T) {
 	m.Form.DurationInput.SetValue("60")
 	m.Form.LocationInput.SetValue("") // empty location
 	m.Form.CommuteInput.SetValue("30") // entered but location is empty
-	m.Form.TagsInput.SetValue("meeting")
+	m.Form.TagsInput.SetValue("work")
 
 	// Verify field 8 is not visible
 	visible := m.Form.VisibleFields()

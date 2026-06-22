@@ -126,6 +126,10 @@ func TestHabitCreationFormSubmit(t *testing.T) {
 	}
 
 	m := viewmodel.NewModel(database, syncEngine)
+	tags := database.GetTags()
+	tags = append(tags, model.TagInfo{Name: "daily", Frequency: 1})
+	database.SaveTags(tags)
+
 	m.Form = viewmodel.NewTaskForm()
 	m.Form.TitleInput.SetValue("Drink Water")
 	m.Form.DescInput.SetValue("8 glasses a day")
@@ -305,7 +309,7 @@ func TestRecurringTaskLifecycle(t *testing.T) {
 	// SelectedDay 2026-06-14 is a Sunday.
 	// Mon: 15, Tue: 16, Wed: 17, Thu: 18, Fri: 19, Sat: 20
 	// Recurring days: Mon, Wed, Fri (15, 17, 19) -> 3 occurrences.
-	m.Form = viewmodel.NewTaskForm()
+	m.Form = viewmodel.NewTaskFormWithDate(m.SelectedDay)
 	m.Form.TitleInput.SetValue("Gym Workout")
 	m.Form.DescInput.SetValue("Push day")
 	m.Form.PriorityIdx = 1 // High

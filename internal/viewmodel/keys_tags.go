@@ -34,38 +34,66 @@ func (m *Model) handleTagsCRUDKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 			if m.TagsCRUDState == "CREATE" {
-				// Check for duplicates
-				exists := false
-				for _, t := range tags {
-					if strings.EqualFold(t.Name, newName) {
-						exists = true
-						break
+				parts := strings.Split(newName, ",")
+				addedAny := false
+				var addedList []string
+				for _, part := range parts {
+					trimmedPart := strings.TrimSpace(part)
+					if trimmedPart == "" {
+						continue
+					}
+					exists := false
+					for _, t := range tags {
+						if strings.EqualFold(t.Name, trimmedPart) {
+							exists = true
+							break
+						}
+					}
+					if !exists {
+						tags = append(tags, model.TagInfo{Name: trimmedPart, Frequency: 1})
+						addedList = append(addedList, trimmedPart)
+						addedAny = true
 					}
 				}
-				if exists {
-					m.StatusMsg = fmt.Sprintf("Tag '%s' already exists.", newName)
-					return m, nil
+				if addedAny {
+					m.DB.SaveTags(tags)
+					m.StatusMsg = fmt.Sprintf("Added tag(s): %s", strings.Join(addedList, ", "))
+				} else {
+					m.StatusMsg = "No new tags were added (already exist)."
 				}
-				tags = append(tags, model.TagInfo{Name: newName, Frequency: 1})
-				m.DB.SaveTags(tags)
-				m.StatusMsg = fmt.Sprintf("Tag '%s' created.", newName)
 			} else { // EDIT
-				// Check for duplicates (excluding current item)
-				existsIdx := -1
-				for i, t := range tags {
-					if i != m.TagsCRUDSelectedIndex && strings.EqualFold(t.Name, newName) {
-						existsIdx = i
-						break
+				oldTag := tags[m.TagsCRUDSelectedIndex]
+				oldName := oldTag.Name
+				// Remove old tag first from our working copy
+				tags = append(tags[:m.TagsCRUDSelectedIndex], tags[m.TagsCRUDSelectedIndex+1:]...)
+
+				parts := strings.Split(newName, ",")
+				addedAny := false
+				var addedList []string
+				for _, part := range parts {
+					trimmedPart := strings.TrimSpace(part)
+					if trimmedPart == "" {
+						continue
+					}
+					exists := false
+					for _, t := range tags {
+						if strings.EqualFold(t.Name, trimmedPart) {
+							exists = true
+							break
+						}
+					}
+					if !exists {
+						tags = append(tags, model.TagInfo{Name: trimmedPart, Frequency: oldTag.Frequency})
+						addedList = append(addedList, trimmedPart)
+						addedAny = true
 					}
 				}
-				if existsIdx != -1 {
-					m.StatusMsg = fmt.Sprintf("Tag name '%s' already exists.", newName)
-					return m, nil
-				}
-				oldName := tags[m.TagsCRUDSelectedIndex].Name
-				tags[m.TagsCRUDSelectedIndex].Name = newName
 				m.DB.SaveTags(tags)
-				m.StatusMsg = fmt.Sprintf("Tag '%s' renamed to '%s'.", oldName, newName)
+				if addedAny {
+					m.StatusMsg = fmt.Sprintf("Renamed '%s' to: %s", oldName, strings.Join(addedList, ", "))
+				} else {
+					m.StatusMsg = fmt.Sprintf("Deleted '%s' (renamed to existing tags).", oldName)
+				}
 			}
 			m.TagsCRUDState = "BROWSE"
 			m.TagsCRUDInput.Blur()

@@ -315,3 +315,97 @@ func TestTagsCRUDModal(t *testing.T) {
 		t.Errorf("expected mode to return to ModeNormal, got %s", m.CurrentMode)
 	}
 }
+
+func TestTagsCRUDModalCommaSeparated(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	modelVal := viewmodel.NewModel(database, syncEngine)
+	m := &modelVal
+
+	// Open CRUD tags modal
+	res, _ := m.RunCommand("tags")
+	m = res.(*viewmodel.Model)
+
+	initialCount := len(database.GetTags())
+
+	// Press "c" to Create new tags with comma
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	m = res.(*viewmodel.Model)
+
+	m.TagsCRUDInput.SetValue("engineering, business")
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = res.(*viewmodel.Model)
+
+	tags := database.GetTags()
+	if len(tags) != initialCount+2 {
+		t.Errorf("expected %d tags, got %d", initialCount+2, len(tags))
+	}
+
+	foundEngineering := false
+	foundBusiness := false
+	for _, tag := range tags {
+		if tag.Name == "engineering" {
+			foundEngineering = true
+		}
+		if tag.Name == "business" {
+			foundBusiness = true
+		}
+	}
+	if !foundEngineering || !foundBusiness {
+		t.Error("expected both 'engineering' and 'business' tags to be added")
+	}
+
+	// Now try renaming one tag into comma-separated tags
+	sort.Slice(tags, func(i, j int) bool {
+		if tags[i].Frequency != tags[j].Frequency {
+			return tags[i].Frequency > tags[j].Frequency
+		}
+		return strings.ToLower(tags[i].Name) < strings.ToLower(tags[j].Name)
+	})
+	businessIdx := -1
+	for idx, tag := range tags {
+		if tag.Name == "business" {
+			businessIdx = idx
+			break
+		}
+	}
+	if businessIdx == -1 {
+		t.Fatal("could not find business tag index")
+	}
+
+	m.TagsCRUDSelectedIndex = businessIdx
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m = res.(*viewmodel.Model)
+
+	m.TagsCRUDInput.SetValue("marketing, finance")
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = res.(*viewmodel.Model)
+
+	tagsAfterEdit := database.GetTags()
+	foundMarketing := false
+	foundFinance := false
+	for _, tag := range tagsAfterEdit {
+		if tag.Name == "marketing" {
+			foundMarketing = true
+		}
+		if tag.Name == "finance" {
+			foundFinance = true
+		}
+		if tag.Name == "business" {
+			t.Error("expected 'business' tag to be removed")
+		}
+	}
+	if !foundMarketing || !foundFinance {
+		t.Error("expected both 'marketing' and 'finance' tags to be added after renaming")
+	}
+}
+

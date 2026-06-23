@@ -15,14 +15,34 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 	if m.LogSessionPromptOpen {
 		switch msg.String() {
 		case "tab", "down":
-			m.LogSessionActiveField = (m.LogSessionActiveField + 1) % 2
+			m.LogSessionActiveField = (m.LogSessionActiveField + 1) % 4
 			m.focusLogSessionPromptFields()
 			return true, nil
 		case "shift+tab", "up":
-			m.LogSessionActiveField = (m.LogSessionActiveField - 1 + 2) % 2
+			m.LogSessionActiveField = (m.LogSessionActiveField - 1 + 4) % 4
 			m.focusLogSessionPromptFields()
 			return true, nil
+		case "left", "h":
+			if m.LogSessionActiveField == 3 {
+				m.LogSessionActiveField = 2
+				m.focusLogSessionPromptFields()
+				return true, nil
+			}
+		case "right", "l":
+			if m.LogSessionActiveField == 2 {
+				m.LogSessionActiveField = 3
+				m.focusLogSessionPromptFields()
+				return true, nil
+			}
 		case "enter":
+			if m.LogSessionActiveField == 3 {
+				// Cancel button selected
+				m.LogSessionPromptOpen = false
+				m.StatusMsg = "Completion canceled."
+				return true, nil
+			}
+
+			// Save button or form fields selected -> Save
 			focusStr := m.LogSessionFocusInput.Value()
 			focusMins := 0
 			if val, err := strconv.Atoi(focusStr); err == nil && val > 0 {
@@ -61,7 +81,7 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 		var cmd tea.Cmd
 		if m.LogSessionActiveField == 0 {
 			m.LogSessionFocusInput, cmd = m.LogSessionFocusInput.Update(msg)
-		} else {
+		} else if m.LogSessionActiveField == 1 {
 			m.LogSessionBreakInput, cmd = m.LogSessionBreakInput.Update(msg)
 		}
 		return true, cmd

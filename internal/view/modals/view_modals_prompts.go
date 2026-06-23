@@ -484,11 +484,37 @@ func RenderLogSessionPromptModal(m *viewmodel.Model, t theme.Theme) string {
 	bodyLines = append(bodyLines, renderField("Focus duration (min)", m.LogSessionFocusInput.View(), m.LogSessionActiveField == 0))
 	bodyLines = append(bodyLines, renderField("Break duration (min)", m.LogSessionBreakInput.View(), m.LogSessionActiveField == 1))
 
-	hint := lipgloss.NewStyle().Foreground(t.Muted).Render("Tab switch  Enter save  Esc cancel")
+	var saveBtn, cancelBtn string
+	if m.LogSessionActiveField == 2 {
+		saveBtn = lipgloss.NewStyle().
+			Background(t.SuccessColor).
+			Foreground(lipgloss.Color("#1e1e2e")).
+			Bold(true).
+			Render(" 💾 Log Focus Session ")
+	} else {
+		saveBtn = lipgloss.NewStyle().
+			Foreground(t.SuccessColor).
+			Render("  [ Log Focus Session ]  ")
+	}
+
+	if m.LogSessionActiveField == 3 {
+		cancelBtn = lipgloss.NewStyle().
+			Background(t.Accent).
+			Foreground(lipgloss.Color("#1e1e2e")).
+			Bold(true).
+			Render(" ❌ Cancel ")
+	} else {
+		cancelBtn = lipgloss.NewStyle().
+			Foreground(t.Muted).
+			Render("  [ Cancel ]  ")
+	}
+
+	hint := lipgloss.NewStyle().Foreground(t.Muted).Render("Tab/Arrows switch  Enter select  Esc cancel")
 
 	return components.RenderBaseModal(components.BaseModalConfig{
 		Title:      "Log Focus Session",
 		BodyLines:  bodyLines,
+		Buttons:    []string{saveBtn, cancelBtn},
 		FooterText: hint,
 		InnerWidth: innerW,
 		Theme:      t,

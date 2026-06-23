@@ -202,4 +202,74 @@ func TestManualSessionLogging(t *testing.T) {
 	if updated2.ExecutionMetrics.ElapsedFocusSeconds != 0 {
 		t.Errorf("expected 0 focus time logged, got %d", updated2.ExecutionMetrics.ElapsedFocusSeconds)
 	}
+
+	// 5. Test Log Session prompt modal buttons navigation
+	task3 := model.Task{
+		UUID:           "task-log-test-3",
+		Title:          "Log Buttons Task",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(14 * time.Hour),
+			End:   day.Add(15 * time.Hour),
+		},
+	}
+	database.AddTask(task3)
+	m.refreshTasks()
+	m.SelectedTaskUUID = "task-log-test-3"
+
+	// Complete task -> prompt confirm
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	// Press "y" -> opens Log Session prompt modal
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if !m.LogSessionPromptOpen {
+		t.Fatalf("expected LogSessionPromptOpen to be active")
+	}
+
+	// Default active field should be 0 (Focus input)
+	if m.LogSessionActiveField != 0 {
+		t.Errorf("expected LogSessionActiveField=0, got %d", m.LogSessionActiveField)
+	}
+
+	// Press Tab -> active field 1 (Break input)
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyTab})
+	if m.LogSessionActiveField != 1 {
+		t.Errorf("expected LogSessionActiveField=1, got %d", m.LogSessionActiveField)
+	}
+
+	// Press Tab -> active field 2 (Save button)
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyTab})
+	if m.LogSessionActiveField != 2 {
+		t.Errorf("expected LogSessionActiveField=2, got %d", m.LogSessionActiveField)
+	}
+
+	// Press Tab -> active field 3 (Cancel button)
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyTab})
+	if m.LogSessionActiveField != 3 {
+		t.Errorf("expected LogSessionActiveField=3, got %d", m.LogSessionActiveField)
+	}
+
+	// Press Left -> active field 2 (Save button)
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyLeft})
+	if m.LogSessionActiveField != 2 {
+		t.Errorf("expected LogSessionActiveField=2 after Left, got %d", m.LogSessionActiveField)
+	}
+
+	// Press Right -> active field 3 (Cancel button)
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRight})
+	if m.LogSessionActiveField != 3 {
+		t.Errorf("expected LogSessionActiveField=3 after Right, got %d", m.LogSessionActiveField)
+	}
+
+	// Press Enter while on Cancel button -> modal should close and task should NOT be completed
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.LogSessionPromptOpen {
+		t.Fatal("expected LogSessionPromptOpen to be closed after Enter on cancel button")
+	}
+
+	updated3, _ := m.DB.GetTask("task-log-test-3")
+	if updated3.LifecycleState != model.StateOverdue {
+		t.Errorf("expected task to remain overdue (canceled completion), got %s", updated3.LifecycleState)
+	}
 }

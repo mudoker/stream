@@ -1,6 +1,7 @@
 package viewmodel
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -42,6 +43,21 @@ func NewTaskForm() TaskForm {
 	return NewTaskFormWithDate(time.Now())
 }
 
+// smartDefaultTime returns the current time rounded up to the next 30-minute mark.
+// This gives users a sensible default start time when opening the new task form.
+func smartDefaultTime() string {
+	now := time.Now()
+	min := now.Minute()
+	var h, m int
+	if min < 30 {
+		h, m = now.Hour(), 30
+	} else {
+		h = (now.Hour() + 1) % 24
+		m = 0
+	}
+	return fmt.Sprintf("%02d:%02d", h, m)
+}
+
 func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 	t := textinput.New()
 	t.Placeholder = "Refactor auth engine..."
@@ -50,9 +66,10 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 	d := textinput.New()
 	d.Placeholder = "Fix memory leak in pool..."
 
+	defaultTime := smartDefaultTime()
 	st := textinput.New()
-	st.Placeholder = baseDate.Format("15:04")
-	st.SetValue(baseDate.Format("15:04"))
+	st.Placeholder = defaultTime
+	st.SetValue(defaultTime)
 
 	dur := textinput.New()
 	dur.Placeholder = "60"

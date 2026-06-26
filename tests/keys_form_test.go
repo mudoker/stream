@@ -907,9 +907,8 @@ func TestFormPrepopulateSelectedDay(t *testing.T) {
 	// Press 'i' to open the creation form
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
 
-	// Check that the form fields are pre-populated with targetDate
+	// Check that the date fields are pre-populated with targetDate's date component
 	expectedDateStr := "2026-06-25"
-	expectedTimeStr := targetDate.Format("15:04")
 
 	if m.Form.StartDateInput.Value() != expectedDateStr {
 		t.Errorf("expected StartDateInput to be %q, got %q", expectedDateStr, m.Form.StartDateInput.Value())
@@ -926,12 +925,11 @@ func TestFormPrepopulateSelectedDay(t *testing.T) {
 		t.Errorf("expected RecurringEndDateInput to be %q, got %q", expectedRecurEndStr, m.Form.RecurringEndDateInput.Value())
 	}
 
-	if m.Form.StartTimeInput.Value() != expectedTimeStr {
-		t.Errorf("expected StartTimeInput to be %q, got %q", expectedTimeStr, m.Form.StartTimeInput.Value())
+	// StartTimeInput should now be pre-filled with the smart default time
+	// (current time rounded to next 30-min mark), NOT SelectedDay's time.
+	// We verify it is a valid HH:MM time string.
+	startTimeVal := m.Form.StartTimeInput.Value()
+	if len(startTimeVal) != 5 || startTimeVal[2] != ':' {
+		t.Errorf("expected StartTimeInput to be a valid HH:MM string, got %q", startTimeVal)
 	}
 }
-
-
-
-
-

@@ -55,14 +55,7 @@ func RenderShortCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h in
 	if hasCollision {
 		titleStr = "⚠️ " + titleStr
 	}
-	titleRunes := []rune(titleStr)
-	if len(titleRunes) > contentW-1 {
-		if contentW > 2 {
-			titleStr = string(titleRunes[:contentW-2]) + "…"
-		} else {
-			titleStr = string(titleRunes[:contentW-1])
-		}
-	}
+	titleStr = truncateStr(titleStr, contentW-1)
 
 	text := " " + titleStr
 
@@ -143,10 +136,7 @@ func RenderShortCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h in
 			wsStr = "  💼 " + wsName
 		}
 		meta2 := fmt.Sprintf(" %d SP%s", task.StoryPoints, wsStr)
-		meta2Runes := []rune(meta2)
-		if len(meta2Runes) > contentW {
-			meta2 = string(meta2Runes[:contentW])
-		}
+		meta2 = truncateStr(meta2, contentW)
 		meta2Style := lipgloss.NewStyle().Foreground(t.Muted)
 		if strings.HasSuffix(task.UUID, "_moving") || strings.HasSuffix(task.UUID, "_adjusting") {
 			meta2Style = meta2Style.Faint(true)

@@ -135,32 +135,63 @@ func SentenceCase(s string) string {
 }
 
 func SliceAnsi(s string, start, end int) string {
-	var sb strings.Builder
-	var runes = []rune(s)
-	var inEscape = false
-	var visualCount = 0
-
-	for i := 0; i < len(runes); i++ {
-		r := runes[i]
-		if r == '\x1b' {
-			inEscape = true
-			sb.WriteRune(r)
-			continue
-		}
-		if inEscape {
-			sb.WriteRune(r)
-			if r == 'm' {
-				inEscape = false
-			}
-			continue
-		}
-
-		if visualCount >= start && visualCount < end {
-			sb.WriteRune(r)
-		}
-		visualCount++
+	cells := ParseLineToCells(s)
+	if start < 0 {
+		start = 0
 	}
-	return sb.String()
+	if end > len(cells) {
+		end = len(cells)
+	}
+	if start >= end {
+		return ""
+	}
+
+	slicedCells := make([]Cell, end-start)
+	copy(slicedCells, cells[start:end])
+
+	for i := 0; i < len(slicedCells); i++ {
+		if slicedCells[i].IsContinuation {
+			hasParent := false
+			for j := i - 1; j >= 0; j-- {
+				if !slicedCells[j].IsContinuation {
+					hasParent = true
+					break
+				}
+			}
+			if !hasParent {
+				slicedCells[i] = Cell{
+					Text:           " ",
+					Style:          slicedCells[i].Style,
+					IsContinuation: false,
+				}
+			}
+		}
+	}
+
+	for i := 0; i < len(slicedCells); i++ {
+		if !slicedCells[i].IsContinuation {
+			origIdx := start + i
+			w := 1
+			for origIdx+w < len(cells) && cells[origIdx+w].IsContinuation {
+				w++
+			}
+			actualW := 1
+			for i+actualW < len(slicedCells) && slicedCells[i+actualW].IsContinuation {
+				actualW++
+			}
+			if actualW < w {
+				for k := 0; k < actualW; k++ {
+					slicedCells[i+k] = Cell{
+						Text:           " ",
+						Style:          slicedCells[i+k].Style,
+						IsContinuation: false,
+					}
+				}
+			}
+		}
+	}
+
+	return CellsToLine(slicedCells)
 }
 
 type Cell struct {
@@ -241,7 +272,9 @@ func CellsToLine(cells []Cell) string {
 			sb.WriteString(" ")
 		}
 	}
-	sb.WriteString("\x1b[0m")
+	if lastStyle != "" {
+		sb.WriteString("\x1b[0m")
+	}
 	return sb.String()
 }
 

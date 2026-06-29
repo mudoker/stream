@@ -29,6 +29,27 @@ func TestSliceAnsi(t *testing.T) {
 	if lipgloss.Width(slicedOut) != 0 {
 		t.Errorf("Expected visual length 0, got %d", lipgloss.Width(slicedOut))
 	}
+
+	// Test wide characters (CJK / Emoji)
+	cjk := "hello 界" // "界" is visual width 2
+	slicedCjk := theme.SliceAnsi(cjk, 6, 8) // slices "界"
+	if slicedCjk != "界" {
+		t.Errorf("Expected '界', got '%s'", slicedCjk)
+	}
+
+	slicedCjkTrunc := theme.SliceAnsi(cjk, 6, 7) // slices only 1 column of "界"
+	if slicedCjkTrunc != " " {
+		t.Errorf("Expected ' ' (space replacement for truncated double-width char), got '%s'", slicedCjkTrunc)
+	}
+
+	emoji := "🚗 Commute" // "🚗" is visual width 2
+	slicedEmoji := theme.SliceAnsi(emoji, 0, 5) // "🚗 Co" (2 + 1 + 1 + 1 = 5)
+	if lipgloss.Width(slicedEmoji) != 5 {
+		t.Errorf("Expected visual width 5, got %d", lipgloss.Width(slicedEmoji))
+	}
+	if !strings.HasPrefix(slicedEmoji, "🚗") {
+		t.Errorf("Expected prefix '🚗', got '%s'", slicedEmoji)
+	}
 }
 
 func TestOverlayString(t *testing.T) {

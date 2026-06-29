@@ -10,6 +10,7 @@ import (
 	"stream/internal/view/theme"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // RenderCard renders a complete multi-line Lipgloss card block.
@@ -100,16 +101,8 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 		contentH = 1
 	}
 
-	// Truncate title using safe rune slicing
-	titleStr := cardTitleStr(task, isCompleted)
-	titleRunes := []rune(titleStr)
-	if len(titleRunes) > contentW-1 {
-		if contentW > 2 {
-			titleStr = string(titleRunes[:contentW-2]) + "…"
-		} else {
-			titleStr = string(titleRunes[:contentW-1])
-		}
-	}
+	// Truncate title using safe visual width truncation
+	titleStr := truncateStr(cardTitleStr(task, isCompleted), contentW-1)
 
 	// Construct and scale metadata row to fit contentW-1
 	metaStr := cardMetaStr(t, task, contentW, priorityBadge, timeStr)
@@ -432,12 +425,39 @@ func getTagsStr(task model.Task) string {
 }
 
 func truncateStr(s string, limit int) string {
+	var sb strings.Builder
 	runes := []rune(s)
-	if len(runes) > limit {
-		if limit > 2 {
-			return string(runes[:limit-1]) + "…"
-		}
-		return string(runes[:limit])
+
+	totalW := 0
+	for _, r := range runes {
+		totalW += runewidth.RuneWidth(r)
 	}
-	return s
+
+	if totalW <= limit {
+		return s
+	}
+
+	targetW := limit
+	if limit > 2 {
+		targetW = limit - 1
+	}
+
+	currentW := 0
+	for _, r := range runes {
+		w := runewidth.RuneWidth(r)
+		if w == 0 {
+			sb.WriteRune(r)
+			continue
+		}
+		if currentW+w > targetW {
+			break
+		}
+		sb.WriteRune(r)
+		currentW += w
+	}
+
+	if limit > 2 {
+		sb.WriteString("…")
+	}
+	return sb.String()
 }

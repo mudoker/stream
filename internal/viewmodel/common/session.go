@@ -12,16 +12,28 @@ import (
 func InitiateLogSession(ctx ModelContext, task model.Task) {
 	ctx.SetLogSessionPromptTask(task)
 
-	var plannedMins int
-	if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
-		plannedMins = int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+	var focusMins int
+	if task.ExecutionMetrics.ElapsedFocusSeconds > 0 {
+		focusMins = (task.ExecutionMetrics.ElapsedFocusSeconds + 30) / 60
 	} else {
-		plannedMins = task.StoryPoints * 45
+		if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
+			focusMins = int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+		} else {
+			focusMins = task.StoryPoints * 45
+		}
+		if focusMins <= 0 {
+			focusMins = 60
+		}
 	}
-	if plannedMins <= 0 {
-		plannedMins = 60
+
+	var breakMins int
+	if task.ExecutionMetrics.ElapsedBreakSeconds > 0 {
+		breakMins = (task.ExecutionMetrics.ElapsedBreakSeconds + 30) / 60
+	} else {
+		breakMins = 0
 	}
-	ctx.InitLogSessionInputs(plannedMins)
+
+	ctx.InitLogSessionInputs(focusMins, breakMins)
 
 	ctx.SetLogSessionPromptOpen(true)
 	ctx.SetConfirmOpen(false)

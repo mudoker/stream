@@ -272,4 +272,43 @@ func TestManualSessionLogging(t *testing.T) {
 	if updated3.LifecycleState != model.StateOverdue {
 		t.Errorf("expected task to remain overdue (canceled completion), got %s", updated3.LifecycleState)
 	}
+
+	// 6. Test inheritance of existing execution metrics
+	task4 := model.Task{
+		UUID:           "task-log-test-4",
+		Title:          "Inherit Metrics Task",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(16 * time.Hour),
+			End:   day.Add(17 * time.Hour),
+		},
+		ExecutionMetrics: model.ExecutionMetrics{
+			ElapsedFocusSeconds: 1500, // 25 minutes
+			ElapsedBreakSeconds: 300,  // 5 minutes
+		},
+	}
+	database.AddTask(task4)
+	m.refreshTasks()
+	m.SelectedTaskUUID = "task-log-test-4"
+
+	// Complete task -> prompt confirm
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	// Press "y" -> opens Log Session prompt modal
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if !m.LogSessionPromptOpen {
+		t.Fatalf("expected LogSessionPromptOpen to be active")
+	}
+
+	// Should inherit focus and break minutes
+	if m.LogSessionFocusInput.Value() != "25" {
+		t.Errorf("expected inherited focus input value '25', got %q", m.LogSessionFocusInput.Value())
+	}
+	if m.LogSessionBreakInput.Value() != "5" {
+		t.Errorf("expected inherited break input value '5', got %q", m.LogSessionBreakInput.Value())
+	}
+
+	// Press Esc to cancel
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEsc})
 }

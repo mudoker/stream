@@ -37,5 +37,5 @@ type ModelContext interface {
 	SetCurrentMode(mode string)
 	SetLogSessionPromptOpen(open bool)
 	SetLogSessionPromptTask(task model.Task)
-	InitLogSessionInputs(plannedMins int)
+	InitLogSessionInputs(focusMins, breakMins int)
 }

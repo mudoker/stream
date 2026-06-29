@@ -249,13 +249,13 @@ func (m *Model) SetLogSessionPromptTask(task model.Task) {
 	m.LogSessionPromptTask = task
 }
 
-func (m *Model) InitLogSessionInputs(plannedMins int) {
+func (m *Model) InitLogSessionInputs(focusMins, breakMins int) {
 	m.LogSessionFocusInput = textinput.New()
-	m.LogSessionFocusInput.SetValue(strconv.Itoa(plannedMins))
+	m.LogSessionFocusInput.SetValue(strconv.Itoa(focusMins))
 	m.LogSessionFocusInput.Focus()
 
 	m.LogSessionBreakInput = textinput.New()
-	m.LogSessionBreakInput.SetValue("0")
+	m.LogSessionBreakInput.SetValue(strconv.Itoa(breakMins))
 
 	m.LogSessionActiveField = 0
 }

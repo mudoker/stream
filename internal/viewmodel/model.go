@@ -69,6 +69,9 @@ type Model struct {
 	TodoShelfFocus       bool
 	SidebarFocus         bool
 	TimelineHour         int
+	DayScrollOffset      int
+	DayScrollOffsetHour  int
+	DayScrollOffsetHeight int
 
 	CommandInput textinput.Model
 
@@ -185,6 +188,9 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		CommandInput:                cmdInput,
 		TodoShelfFocus:              false,
 		TimelineHour:                time.Now().Hour(),
+		DayScrollOffset:             -1,
+		DayScrollOffsetHour:         -1,
+		DayScrollOffsetHeight:       -1,
 		Form:                        NewTaskForm(),
 		WorkspaceForm:               NewWorkspaceForm(),
 		ProfileForm:                 NewProfileForm(settings.Username, settings.LockTimeoutMinutes),

@@ -470,8 +470,13 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		visibleH = 8
 	}
 
-	centerRow := m.TimelineHour * visualRowsPerHour
-	startR := centerRow - visibleH/2
+	if m.DayScrollOffset == -1 || m.TimelineHour != m.DayScrollOffsetHour || visibleH != m.DayScrollOffsetHeight {
+		m.DayScrollOffset = m.TimelineHour*visualRowsPerHour - visibleH/2
+		m.DayScrollOffsetHour = m.TimelineHour
+		m.DayScrollOffsetHeight = visibleH
+	}
+
+	startR := m.DayScrollOffset
 
 	// ── Smart Focus Tracking Adjustment Mechanism ───────────────────
 	if selectedStartRow != -1 && (m.SelectedTaskUUID != m.PrevSelectedTaskUUID || m.CurrentMode == viewmodel.ModeTaskMove) {
@@ -494,6 +499,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		if m.TimelineHour > 23 {
 			m.TimelineHour = 23
 		}
+		m.DayScrollOffsetHour = m.TimelineHour
 	}
 
 	maxStartR := visualRows - visibleH
@@ -506,6 +512,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 	if startR > maxStartR {
 		startR = maxStartR
 	}
+
+	m.DayScrollOffset = startR
 
 	var visible []string
 	visible = append(visible, headerLine, sep, "")

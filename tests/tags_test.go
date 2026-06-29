@@ -54,8 +54,8 @@ func TestTagsAutocompleteAndConsent(t *testing.T) {
 	}
 
 	m.AutocompleteTag(sug)
-	if m.Form.TagsInput.Value() != "work, personal, " {
-		t.Errorf("expected autocomplete input value to be 'work, personal, ', got '%s'", m.Form.TagsInput.Value())
+	if m.Form.TagsInput.Value() != "work, personal" {
+		t.Errorf("expected autocomplete input value to be 'work, personal', got '%s'", m.Form.TagsInput.Value())
 	}
 
 	// 3. Submit task with a new tag: should ask for consent

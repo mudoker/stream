@@ -329,9 +329,9 @@ func (m *Model) AutocompleteTag(sug string) {
 	val := m.Form.TagsInput.Value()
 	lastCommaIdx := strings.LastIndex(val, ",")
 	if lastCommaIdx == -1 {
-		m.Form.TagsInput.SetValue(val + sug + ", ")
+		m.Form.TagsInput.SetValue(val + sug)
 	} else {
-		m.Form.TagsInput.SetValue(val[:lastCommaIdx+1] + " " + strings.TrimSpace(val[lastCommaIdx+1:]) + sug + ", ")
+		m.Form.TagsInput.SetValue(val[:lastCommaIdx+1] + " " + strings.TrimSpace(val[lastCommaIdx+1:]) + sug)
 	}
 	m.Form.TagsInput.SetCursor(len(m.Form.TagsInput.Value()))
 }

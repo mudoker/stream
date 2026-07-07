@@ -11,18 +11,19 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func (m *Model) EnterTaskDurationAdjustMode() {
+func (m *Model) EnterTaskDurationAdjustMode(adjustTop bool) {
 	task, exists := m.GetActiveTask()
 	if !exists {
 		m.StatusMsg = "No task selected to adjust duration."
 		return
 	}
 	if !model.IsTaskAnchored(task) {
-		m.StatusMsg = "Only anchored tasks, events, and habits can have their duration adjusted with V."
+		m.StatusMsg = "Only anchored tasks, events, and habits can have their duration adjusted."
 		return
 	}
 
 	m.CurrentMode = ModeTaskDurationAdjust
+	m.TaskDurationAdjustTop = adjustTop
 	m.TaskMovePrefix = ""
 	m.TaskMoveOriginalTimeWindow = task.TimeWindow
 
@@ -38,7 +39,11 @@ func (m *Model) EnterTaskDurationAdjustMode() {
 
 	m.AutoScrollToSelectedTask()
 
-	m.StatusMsg = fmt.Sprintf("Adjusting duration for '%s'. Use j/k or count+j/k to increase/decrease by 15m. Enter to confirm, Esc to cancel.", task.Title)
+	if adjustTop {
+		m.StatusMsg = fmt.Sprintf("Adjusting start time (top) for '%s'. Use j/k or count+j/k to move top border down/up by 15m. Enter to confirm, Esc to cancel.", task.Title)
+	} else {
+		m.StatusMsg = fmt.Sprintf("Adjusting duration for '%s'. Use j/k or count+j/k to increase/decrease by 15m. Enter to confirm, Esc to cancel.", task.Title)
+	}
 }
 
 func (m *Model) HandleTaskDurationAdjustKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -72,19 +77,32 @@ func (m *Model) applyTaskDurationAdjust(direction int) {
 		return
 	}
 	if !model.IsTaskAnchored(task) {
-		m.StatusMsg = "Only anchored tasks, events, and habits can have their duration adjusted with V."
+		m.StatusMsg = "Only anchored tasks, events, and habits can have their duration adjusted."
 		return
 	}
 
 	delta := time.Duration(steps*constants.TaskDurationStepMinutes) * time.Minute
-	newEnd := task.TimeWindow.End.Add(delta)
 
-	// Ensure duration is at least 15 minutes
-	if newEnd.Sub(task.TimeWindow.Start) < constants.MinTaskDurationMinutes*time.Minute {
-		newEnd = task.TimeWindow.Start.Add(constants.MinTaskDurationMinutes * time.Minute)
+	if m.TaskDurationAdjustTop {
+		newStart := task.TimeWindow.Start.Add(delta)
+
+		// Ensure duration is at least 15 minutes
+		if task.TimeWindow.End.Sub(newStart) < constants.MinTaskDurationMinutes*time.Minute {
+			newStart = task.TimeWindow.End.Add(-constants.MinTaskDurationMinutes * time.Minute)
+		}
+
+		task.TimeWindow.Start = newStart
+	} else {
+		newEnd := task.TimeWindow.End.Add(delta)
+
+		// Ensure duration is at least 15 minutes
+		if newEnd.Sub(task.TimeWindow.Start) < constants.MinTaskDurationMinutes*time.Minute {
+			newEnd = task.TimeWindow.Start.Add(constants.MinTaskDurationMinutes * time.Minute)
+		}
+
+		task.TimeWindow.End = newEnd
 	}
 
-	task.TimeWindow.End = newEnd
 	m.updateTaskInMemory(task)
 	m.AutoScrollToSelectedTask()
 	m.TaskMovePrefix = ""

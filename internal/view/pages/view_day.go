@@ -138,7 +138,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 			// Determine visual start row based on commute buffer
 			commuteRows := 0
-			if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+			if rc.Task.HasCommuteBuffer() {
 				commuteRows = durationToRows(time.Duration(rc.Task.CommuteBuffer) * time.Minute)
 			}
 
@@ -154,7 +154,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			}
 
 			// Adjust endRow for commute buffer and rest buffer
-			if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+			if rc.Task.HasCommuteBuffer() {
 				endRow += commuteRows
 			}
 			restDur := viewmodel.CalculateTaskRestTime(rc.Task)
@@ -284,7 +284,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 		// Determine visual start row based on commute buffer
 		commuteRows := 0
-		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+		if rc.Task.HasCommuteBuffer() {
 			commuteRows = durationToRows(time.Duration(rc.Task.CommuteBuffer) * time.Minute)
 		}
 
@@ -324,7 +324,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 
 		// Render Top Commute Buffer
-		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+		if rc.Task.HasCommuteBuffer() {
 			commuteDur := time.Duration(rc.Task.CommuteBuffer) * time.Minute
 			commuteRows := durationToRows(commuteDur)
 			topStartRow := startRow - commuteRows
@@ -372,7 +372,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		currentRowOffset := actualCardHeightWritten
 
 		// Render Bottom Commute Buffer
-		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+		if rc.Task.HasCommuteBuffer() {
 			commuteDur := time.Duration(rc.Task.CommuteBuffer) * time.Minute
 			commuteRows := durationToRows(commuteDur)
 			bottomEndRow := startRow + h + commuteRows

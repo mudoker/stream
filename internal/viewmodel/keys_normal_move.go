@@ -1,7 +1,6 @@
 package viewmodel
 
 import (
-	"strings"
 	"time"
 
 	"stream/internal/model"
@@ -114,7 +113,7 @@ func (m *Model) AutoScrollToSelectedTask() {
 	}
 
 	commuteRows := 0
-	if selectedTask.SchedulingType == model.Event && strings.TrimSpace(selectedTask.Location) != "" && selectedTask.CommuteBuffer > 0 {
+	if selectedTask.HasCommuteBuffer() {
 		commuteRows = (selectedTask.CommuteBuffer*visualRowsPerHour + 59) / 60
 	}
 
@@ -124,7 +123,7 @@ func (m *Model) AutoScrollToSelectedTask() {
 	}
 
 	taskEnd := rect.Bottom
-	if selectedTask.SchedulingType == model.Event && strings.TrimSpace(selectedTask.Location) != "" && selectedTask.CommuteBuffer > 0 {
+	if selectedTask.HasCommuteBuffer() {
 		taskEnd += commuteRows
 	}
 	restDur := CalculateTaskRestTime(selectedTask)

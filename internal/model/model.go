@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"time"
 )
 
@@ -105,6 +106,10 @@ func (t *Task) SortingWeight() int {
 		pVal = 0
 	}
 	return pVal + t.StoryPoints
+}
+
+func (t Task) HasCommuteBuffer() bool {
+	return (t.SchedulingType == Event || t.SchedulingType == Habit) && strings.TrimSpace(t.Location) != "" && t.CommuteBuffer > 0
 }
 
 func IsTaskAnchored(t Task) bool {

@@ -278,7 +278,7 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 						continue
 					}
 					predEnd := other.Task.TimeWindow.End
-					if other.Task.SchedulingType == model.Event && strings.TrimSpace(other.Task.Location) != "" && other.Task.CommuteBuffer > 0 {
+					if other.Task.HasCommuteBuffer() {
 						predEnd = predEnd.Add(time.Duration(other.Task.CommuteBuffer) * time.Minute)
 					}
 					restDur := viewmodel.CalculateTaskRestTime(other.Task)

@@ -85,7 +85,7 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 
 		// Determine visual start row based on commute buffer
 		commuteRows := 0
-		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+		if rc.Task.HasCommuteBuffer() {
 			commuteRows = (rc.Task.CommuteBuffer*(RowsPerHour/5) + 59) / 60
 		}
 
@@ -113,7 +113,7 @@ func (m *Model) BuildDayTaskRects(tasks []model.Task) []TaskRect {
 		maxRowOccupied := startRow + h - 1
 
 		// Add commute buffer bottom
-		if rc.Task.SchedulingType == model.Event && strings.TrimSpace(rc.Task.Location) != "" && rc.Task.CommuteBuffer > 0 {
+		if rc.Task.HasCommuteBuffer() {
 			maxRowOccupied += commuteRows
 		}
 

@@ -339,8 +339,8 @@ func TestHabitStartEditAndMove(t *testing.T) {
 
 	m.SelectedTaskUUID = habitUUID
 
-	// Press 'v' to enter move mode
-	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
+	// Press 'y' to enter move mode
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
 	m = res.(*viewmodel.Model)
 	if m.CurrentMode != viewmodel.ModeTaskMove {
 		t.Fatalf("expected to be in ModeTaskMove, got %v", m.CurrentMode)

@@ -599,7 +599,7 @@ func TestTaskDurationAdjustModeWorkflow(t *testing.T) {
 		SelectedTaskUUID: "task-1",
 	}
 
-	m.EnterTaskDurationAdjustMode()
+	m.EnterTaskDurationAdjustMode(false)
 	if m.CurrentMode != viewmodel.ModeTaskDurationAdjust {
 		t.Fatal("expected mode to be ModeTaskDurationAdjust")
 	}
@@ -659,7 +659,7 @@ func TestTaskDurationAdjustCancel(t *testing.T) {
 		SelectedTaskUUID: "task-1",
 	}
 
-	m.EnterTaskDurationAdjustMode()
+	m.EnterTaskDurationAdjustMode(false)
 	m.HandleTaskDurationAdjustKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	m.HandleTaskDurationAdjustKeys(tea.KeyMsg{Type: tea.KeyEsc})
 
@@ -787,7 +787,7 @@ func TestTaskDurationAdjustModeHabit(t *testing.T) {
 		SelectedTaskUUID: "habit-1",
 	}
 
-	m.EnterTaskDurationAdjustMode()
+	m.EnterTaskDurationAdjustMode(false)
 	if m.CurrentMode != viewmodel.ModeTaskDurationAdjust {
 		t.Fatal("expected habit to be adjustable with V")
 	}

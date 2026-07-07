@@ -69,7 +69,7 @@ func TestEventMoveAndDurationAdjust(t *testing.T) {
 	m.SelectedTaskUUID = "event-1"
 
 	// 3. Test EnterTaskDurationAdjustMode
-	m.EnterTaskDurationAdjustMode()
+	m.EnterTaskDurationAdjustMode(false)
 	if m.CurrentMode != viewmodel.ModeTaskDurationAdjust {
 		t.Errorf("expected ModeTaskDurationAdjust, got %v", m.CurrentMode)
 	}
@@ -89,5 +89,90 @@ func TestEventMoveAndDurationAdjust(t *testing.T) {
 	actualDuration := adjustedTask.TimeWindow.End.Sub(adjustedTask.TimeWindow.Start)
 	if actualDuration != expectedDuration {
 		t.Errorf("expected duration %v, got %v", expectedDuration, actualDuration)
+	}
+}
+
+func TestDurationAdjustTop(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	modelVal := viewmodel.NewModel(database, syncEngine)
+	m := &modelVal
+	
+	now := time.Now()
+	eventTask := model.Task{
+		UUID:           "event-top-adjust",
+		Title:          "Keynote Event Top",
+		SchedulingType: model.Event,
+		Location:       "Online",
+		TimeWindow: model.TimeWindow{
+			Start: now,
+			End:   now.Add(60 * time.Minute),
+		},
+	}
+	database.AddTask(eventTask)
+	m.SelectedTaskUUID = "event-top-adjust"
+	m.Tasks = []model.Task{eventTask}
+
+	// 1. Test EnterTaskDurationAdjustMode(true) via 'v' key in Update
+	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
+	m = res.(*viewmodel.Model)
+	if m.CurrentMode != viewmodel.ModeTaskDurationAdjust {
+		t.Errorf("expected ModeTaskDurationAdjust, got %v", m.CurrentMode)
+	}
+	if !m.TaskDurationAdjustTop {
+		t.Errorf("expected TaskDurationAdjustTop to be true")
+	}
+
+	// 2. Apply top adjust down (pressing 'j' -> moves start time later, i.e., shrinks the task by 15m)
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = res.(*viewmodel.Model)
+
+	// Confirm duration adjust
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = res.(*viewmodel.Model)
+
+	if m.CurrentMode != viewmodel.ModeNormal {
+		t.Errorf("expected to return to ModeNormal, got %v", m.CurrentMode)
+	}
+
+	tasks := database.GetTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	adjustedTask := tasks[0]
+	expectedStart := now.Add(15 * time.Minute)
+	if adjustedTask.TimeWindow.Start.Sub(expectedStart).Abs() > time.Second {
+		t.Errorf("expected start time %v, got %v", expectedStart, adjustedTask.TimeWindow.Start)
+	}
+	expectedEnd := now.Add(60 * time.Minute)
+	if adjustedTask.TimeWindow.End.Sub(expectedEnd).Abs() > time.Second {
+		t.Errorf("expected end time to remain unchanged %v, got %v", expectedEnd, adjustedTask.TimeWindow.End)
+	}
+
+	// 3. Test expand top adjust (pressing 'k' -> moves start time earlier, i.e., expands the task by 15m)
+	m.Tasks = []model.Task{adjustedTask}
+	m.SelectedTaskUUID = "event-top-adjust"
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("v")})
+	m = res.(*viewmodel.Model)
+
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m = res.(*viewmodel.Model)
+
+	// Confirm duration adjust
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = res.(*viewmodel.Model)
+
+	tasks = database.GetTasks()
+	adjustedTask = tasks[0]
+	if adjustedTask.TimeWindow.Start.Sub(now).Abs() > time.Second {
+		t.Errorf("expected start time to revert to %v, got %v", now, adjustedTask.TimeWindow.Start)
 	}
 }

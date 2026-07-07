@@ -144,6 +144,7 @@ type Model struct {
 
 	TaskMovePrefix             string
 	TaskMoveOriginalTimeWindow model.TimeWindow
+	TaskDurationAdjustTop      bool
 	ZenPrefix                  string
 
 	ProfileForm                 ProfileForm

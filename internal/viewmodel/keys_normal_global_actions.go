@@ -104,11 +104,14 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 			m.DetailOpen = true
 		}
 		return true, nil
-	case "v":
+	case "y":
 		m.EnterTaskMoveMode()
 		return true, nil
+	case "v":
+		m.EnterTaskDurationAdjustMode(true)
+		return true, nil
 	case "V":
-		m.EnterTaskDurationAdjustMode()
+		m.EnterTaskDurationAdjustMode(false)
 		return true, nil
 	case "x":
 		// Complete Task

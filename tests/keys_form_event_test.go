@@ -167,3 +167,75 @@ func TestEventTaskFormCreationStartEndDates(t *testing.T) {
 		t.Errorf("expected end %s, got %s", expectedEndStr, actualEndStr)
 	}
 }
+
+func TestHabitFormCreationWithLocationAndBuffer(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	m.Form = viewmodel.NewTaskForm()
+
+	// Fill the form fields for a Habit
+	m.Form.TitleInput.SetValue("Run in Park")
+	m.Form.DescInput.SetValue("Morning cardio")
+	m.Form.PriorityIdx = 2
+	m.Form.TaskTypeIdx = 2 // Habit task type
+	m.Form.StartTimeInput.SetValue("07:00")
+	m.Form.DurationInput.SetValue("45")
+	m.Form.LocationInput.SetValue("Central Park")
+	m.Form.CommuteInput.SetValue("15")
+
+	// Verify visible fields lists location (7) and commute buffer (8)
+	visible := m.Form.VisibleFields()
+	hasLocation := false
+	hasCommute := false
+	for _, fld := range visible {
+		if fld == 7 {
+			hasLocation = true
+		}
+		if fld == 8 {
+			hasCommute = true
+		}
+	}
+	if !hasLocation || !hasCommute {
+		t.Errorf("expected fields 7 (Location) and 8 (Commute) to be visible, got %v", visible)
+	}
+
+	// Submit the form
+	m.SubmitForm()
+
+	// Retrieve the created task from database
+	tasks := database.GetTasks()
+	var task model.Task
+	found := false
+	for _, tVal := range tasks {
+		if tVal.Title == "Run in Park" {
+			task = tVal
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected to find task with Title 'Run in Park' in database, got tasks: %v", tasks)
+	}
+
+	if task.SchedulingType != model.Habit {
+		t.Errorf("expected SchedulingType 'HABIT', got '%s'", task.SchedulingType)
+	}
+	if task.Location != "Central Park" {
+		t.Errorf("expected Location 'Central Park', got '%s'", task.Location)
+	}
+	if task.CommuteBuffer != 15 {
+		t.Errorf("expected CommuteBuffer 15, got %d", task.CommuteBuffer)
+	}
+	if !task.HasCommuteBuffer() {
+		t.Errorf("expected HasCommuteBuffer() to return true")
+	}
+}

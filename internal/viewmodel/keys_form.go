@@ -150,13 +150,13 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
 		}
 	case 7:
-		if m.Form.TaskTypeIdx == 3 {
+		if m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 2 {
 			m.Form.LocationInput, cmd = m.Form.LocationInput.Update(msg)
 		} else {
 			m.Form.TagsInput, cmd = m.Form.TagsInput.Update(msg)
 		}
 	case 8:
-		if m.Form.TaskTypeIdx == 3 {
+		if m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 2 {
 			m.Form.CommuteInput, cmd = m.Form.CommuteInput.Update(msg)
 		}
 	case 9:

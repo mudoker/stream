@@ -206,13 +206,13 @@ func (m *Model) focusFormFields() {
 			m.Form.StartTimeInput.Focus()
 		}
 	case 7:
-		if m.Form.TaskTypeIdx == 3 {
+		if m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 2 {
 			m.Form.LocationInput.Focus()
 		} else {
 			m.Form.TagsInput.Focus()
 		}
 	case 8:
-		if m.Form.TaskTypeIdx == 3 {
+		if m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 2 {
 			m.Form.CommuteInput.Focus()
 		}
 	case 9:
@@ -423,6 +423,14 @@ func (m *Model) SubmitForm() {
 				End:   startTime.Add(time.Duration(duration) * time.Minute),
 			}
 		}
+		newTask.Location = m.Form.LocationInput.Value()
+		commuteMins := 0
+		if strings.TrimSpace(newTask.Location) != "" {
+			if c, err := strconv.Atoi(m.Form.CommuteInput.Value()); err == nil && c > 0 {
+				commuteMins = c
+			}
+		}
+		newTask.CommuteBuffer = commuteMins
 		if isEdit && existingTask.LifecycleState == model.StateCompleted {
 			newTask.LifecycleState = model.StateCompleted
 		} else {

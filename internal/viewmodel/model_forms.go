@@ -159,8 +159,11 @@ func (f TaskForm) VisibleFields() []int {
 		// Reminder: Due Date (5), Due Time (6)
 		fields = append(fields, 5, 6)
 	} else if f.TaskTypeIdx == 2 {
-		// Habit: Start Time (5), Duration (6)
-		fields = append(fields, 5, 6)
+		// Habit: Start Time (5), Duration (6), Location (7), Commute buffer (8)
+		fields = append(fields, 5, 6, 7)
+		if strings.TrimSpace(f.LocationInput.Value()) != "" {
+			fields = append(fields, 8)
+		}
 	} else if f.TaskTypeIdx == 3 {
 		// Event: Start Date (14), Start Time (5), Duration (6), Location (7)
 		fields = append(fields, 14, 5, 6, 7)

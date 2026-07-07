@@ -66,6 +66,10 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	} else if f.TaskTypeIdx == 2 {
 		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
 		fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
+		fields = append(fields, components.RenderFormField(nextFieldNum(), "Location", f.LocationInput.View(), f.ActiveField == 7, t))
+		if strings.TrimSpace(f.LocationInput.Value()) != "" {
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), f.ActiveField == 8, t))
+		}
 	} else if f.TaskTypeIdx == 3 {
 		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Date", f.StartDateInput.View(), f.ActiveField == 14, t))
 		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))

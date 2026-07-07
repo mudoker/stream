@@ -87,6 +87,8 @@ func (m *Model) startEditMode(task model.Task) {
 			m.Form.StartTimeInput.SetValue("")
 			m.Form.DurationInput.SetValue("60")
 		}
+		m.Form.LocationInput.SetValue(task.Location)
+		m.Form.CommuteInput.SetValue(fmt.Sprintf("%d", task.CommuteBuffer))
 	} else if task.SchedulingType == model.Event {
 		m.Form.TaskTypeIdx = 3
 		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))

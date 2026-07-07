@@ -194,27 +194,21 @@ func (m *Model) focusFormFields() {
 	case 1:
 		m.Form.DescInput.Focus()
 	case 5:
-		if (m.Form.TaskTypeIdx == 0 && m.Form.IsAnchoredIdx == 1) || m.Form.TaskTypeIdx == 2 || m.Form.TaskTypeIdx == 3 {
-			m.Form.StartTimeInput.Focus()
-		} else if m.Form.TaskTypeIdx == 1 {
+		if m.Form.TaskTypeIdx == 1 {
 			m.Form.DueDateInput.Focus()
+		} else {
+			m.Form.StartTimeInput.Focus()
 		}
 	case 6:
-		if m.Form.TaskTypeIdx == 0 || m.Form.TaskTypeIdx == 2 || m.Form.TaskTypeIdx == 3 {
-			m.Form.DurationInput.Focus()
-		} else if m.Form.TaskTypeIdx == 1 {
+		if m.Form.TaskTypeIdx == 1 {
 			m.Form.StartTimeInput.Focus()
+		} else {
+			m.Form.DurationInput.Focus()
 		}
 	case 7:
-		if m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 2 {
-			m.Form.LocationInput.Focus()
-		} else {
-			m.Form.TagsInput.Focus()
-		}
+		m.Form.LocationInput.Focus()
 	case 8:
-		if m.Form.TaskTypeIdx == 3 || m.Form.TaskTypeIdx == 2 {
-			m.Form.CommuteInput.Focus()
-		}
+		m.Form.CommuteInput.Focus()
 	case 9:
 		m.Form.TagsInput.Focus()
 	case 12:

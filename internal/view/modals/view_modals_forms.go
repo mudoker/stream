@@ -31,6 +31,13 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	spValStr := fmt.Sprintf("%d", viewmodel.SPOptions[f.SPIdx])
 	typeValStr := viewmodel.TaskTypeOptions[f.TaskTypeIdx]
 
+	tagsView := f.TagsInput.View()
+	if f.ActiveField == 9 {
+		if sug := m.GetTagsAutocompleteSuggestion(); sug != "" {
+			tagsView += lipgloss.NewStyle().Foreground(t.Muted).Render(sug)
+		}
+	}
+
 	fieldNum := 1
 	nextFieldNum := func() string {
 		num := strconv.Itoa(fieldNum)
@@ -38,75 +45,62 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		return num
 	}
 
-	fields = append(fields, components.RenderFormField(nextFieldNum(), "Title", f.TitleInput.View(), f.ActiveField == 0, t))
-	fields = append(fields, components.RenderFormField(nextFieldNum(), "Description", f.DescInput.View(), f.ActiveField == 1, t))
-	fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Priority", priorityValStr, f.ActiveField == 2, t))
-	if f.TaskTypeIdx == 0 {
-		fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Story Points", spValStr, f.ActiveField == 3, t))
-	}
-	fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Type", typeValStr, f.ActiveField == 4, t))
-	if f.TaskTypeIdx == 0 {
-		ancOptStr := "No"
-		if f.IsAnchoredIdx == 1 {
-			ancOptStr = "Yes"
-		}
-		fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Is Anchored", ancOptStr, f.ActiveField == 16, t))
-	}
-
-	if f.TaskTypeIdx == 0 {
-		if f.IsAnchoredIdx == 1 {
-			fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
-			fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
-		} else {
-			fields = append(fields, components.RenderFormField(nextFieldNum(), "Est. Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
-		}
-	} else if f.TaskTypeIdx == 1 {
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "Due Date", f.DueDateInput.View(), f.ActiveField == 5, t))
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), f.ActiveField == 6, t))
-	} else if f.TaskTypeIdx == 2 {
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "Location", f.LocationInput.View(), f.ActiveField == 7, t))
-		if strings.TrimSpace(f.LocationInput.Value()) != "" {
+	for _, fieldID := range f.VisibleFields() {
+		switch fieldID {
+		case 0:
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Title", f.TitleInput.View(), f.ActiveField == 0, t))
+		case 1:
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Description", f.DescInput.View(), f.ActiveField == 1, t))
+		case 2:
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Priority", priorityValStr, f.ActiveField == 2, t))
+		case 3:
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Story Points", spValStr, f.ActiveField == 3, t))
+		case 4:
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Type", typeValStr, f.ActiveField == 4, t))
+		case 16:
+			ancOptStr := "No"
+			if f.IsAnchoredIdx == 1 {
+				ancOptStr = "Yes"
+			}
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Is Anchored", ancOptStr, f.ActiveField == 16, t))
+		case 5:
+			if f.TaskTypeIdx == 1 {
+				fields = append(fields, components.RenderFormField(nextFieldNum(), "Due Date", f.DueDateInput.View(), f.ActiveField == 5, t))
+			} else {
+				fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
+			}
+		case 6:
+			if f.TaskTypeIdx == 0 && f.IsAnchoredIdx == 0 {
+				fields = append(fields, components.RenderFormField(nextFieldNum(), "Est. Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
+			} else if f.TaskTypeIdx == 1 {
+				fields = append(fields, components.RenderFormField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), f.ActiveField == 6, t))
+			} else {
+				fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
+			}
+		case 14:
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Date", f.StartDateInput.View(), f.ActiveField == 14, t))
+		case 7:
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Location", f.LocationInput.View(), f.ActiveField == 7, t))
+		case 8:
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), f.ActiveField == 8, t))
-		}
-	} else if f.TaskTypeIdx == 3 {
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Date", f.StartDateInput.View(), f.ActiveField == 14, t))
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "Location", f.LocationInput.View(), f.ActiveField == 7, t))
-		if strings.TrimSpace(f.LocationInput.Value()) != "" {
-			fields = append(fields, components.RenderFormField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), f.ActiveField == 8, t))
-		}
-	}
-
-	if f.TaskTypeIdx == 2 {
-		// Habit is always recurring
-		fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), f.ActiveField == 12, t))
-		fields = append(fields, components.RenderDaysSelect(nextFieldNum(), "Recurring Days", f.RecurringDaysSelected[:], f.RecurringDaysSubIdx, f.ActiveField == 13, t))
-	} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
-		recOptStr := "No"
-		if f.IsRecurringIdx == 1 {
-			recOptStr = "Yes"
-		}
-		fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Is Recurring", recOptStr, f.ActiveField == 11, t))
-		if f.IsRecurringIdx == 1 {
+		case 11:
+			recOptStr := "No"
+			if f.IsRecurringIdx == 1 {
+				recOptStr = "Yes"
+			}
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Is Recurring", recOptStr, f.ActiveField == 11, t))
+		case 12:
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), f.ActiveField == 12, t))
+		case 13:
 			fields = append(fields, components.RenderDaysSelect(nextFieldNum(), "Recurring Days", f.RecurringDaysSelected[:], f.RecurringDaysSubIdx, f.ActiveField == 13, t))
+		case 9:
+			fields = append(fields, components.RenderFormField(nextFieldNum(), "Tags (csv)", tagsView, f.ActiveField == 9, t))
 		}
 	}
 
-	tagsView := f.TagsInput.View()
-	if f.ActiveField == 9 {
-		if sug := m.GetTagsAutocompleteSuggestion(); sug != "" {
-			tagsView += lipgloss.NewStyle().Foreground(t.Muted).Render(sug)
-		}
-	}
-	fields = append(fields, components.RenderFormField(nextFieldNum(), "Tags (csv)", tagsView, f.ActiveField == 9, t))
 	fields = append(fields, "")
 	fields = append(fields, ModalSep(innerW))
 	fields = append(fields, "")
-
 	fields = append(fields, "  "+components.RenderFormSubmitButton("Submit", f.ActiveField == 10, t))
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))

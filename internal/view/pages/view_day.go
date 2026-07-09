@@ -487,7 +487,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				startR = selectedStartRow
 			}
 			if selectedEndRow > endR {
-				startR = selectedEndRow - visibleH
+				startR = selectedStartRow
 			}
 		}
 

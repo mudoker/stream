@@ -935,5 +935,37 @@ func TestConsecutiveTasksMoveRendering(t *testing.T) {
 	}
 }
 
+func TestAutoScrollToSelectedTask_ScrollDownAlignsTop(t *testing.T) {
+	// A task that is below the viewport
+	start := time.Date(2026, 6, 6, 15, 0, 0, 0, time.Local)
+	task := model.Task{
+		UUID:           "task-scroll-down",
+		Title:          "Scroll Down Task",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: start,
+			End:   start.Add(time.Hour),
+		},
+		LifecycleState: model.StateScheduled,
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{task},
+		SelectedTaskUUID: "task-scroll-down",
+		Height:           20, // visibleH = 17, scale = 5 (12 rows per hour, total 288 rows)
+		TimelineHour:     8,  // viewport starts at 8
+		SelectedDay:      time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local),
+	}
+
+	m.AutoScrollToSelectedTask()
+
+	// Since we scrolled down to 15:00, the viewport should align to the top of the task (15:00)
+	// (taskStart = 15 * 12 = 180 rows, visibleH = 17 rows, visualRowsPerHour = 12)
+	// target TimelineHour should center taskStart (180 + 17/2) / 12 = 188 / 12 = 15
+	if m.TimelineHour != 15 {
+		t.Errorf("expected TimelineHour to be aligned to task start hour 15, got %d", m.TimelineHour)
+	}
+}
+
 
 

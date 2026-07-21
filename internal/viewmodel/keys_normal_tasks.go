@@ -90,7 +90,7 @@ func (m *Model) GetAllActiveTasks() []model.Task {
 }
 
 func (m *Model) GetDayTasks() []model.Task {
-	return tasks.GetDayTasks(m.Tasks, m.SelectedDay)
+	return tasks.GetDayTasks(m.Tasks, m.SelectedDay, m.TaskMoveIsClone)
 }
 
 func (m *Model) updateTaskInMemory(updated model.Task) {

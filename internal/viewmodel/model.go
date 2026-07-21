@@ -144,6 +144,7 @@ type Model struct {
 
 	TaskMovePrefix             string
 	TaskMoveOriginalTimeWindow model.TimeWindow
+	TaskMoveIsClone            bool
 	TaskDurationAdjustTop      bool
 	ZenPrefix                  string
 

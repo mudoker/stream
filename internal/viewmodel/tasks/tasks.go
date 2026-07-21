@@ -52,13 +52,16 @@ func ImportSort(tasks []model.Task) {
 	})
 }
 
-func GetDayTasks(allTasks []model.Task, day time.Time) []model.Task {
+func GetDayTasks(allTasks []model.Task, day time.Time, isCloneMove ...bool) []model.Task {
 	clones := make(map[string]bool)
-	for _, t := range allTasks {
-		if strings.HasSuffix(t.UUID, "_moving") {
-			clones[strings.TrimSuffix(t.UUID, "_moving")] = true
-		} else if strings.HasSuffix(t.UUID, "_adjusting") {
-			clones[strings.TrimSuffix(t.UUID, "_adjusting")] = true
+	isClone := len(isCloneMove) > 0 && isCloneMove[0]
+	if !isClone {
+		for _, t := range allTasks {
+			if strings.HasSuffix(t.UUID, "_moving") {
+				clones[strings.TrimSuffix(t.UUID, "_moving")] = true
+			} else if strings.HasSuffix(t.UUID, "_adjusting") {
+				clones[strings.TrimSuffix(t.UUID, "_adjusting")] = true
+			}
 		}
 	}
 

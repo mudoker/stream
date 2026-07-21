@@ -107,6 +107,9 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 	case "y":
 		m.EnterTaskMoveMode()
 		return true, nil
+	case "Y":
+		m.EnterTaskCloneMoveMode()
+		return true, nil
 	case "v":
 		m.EnterTaskDurationAdjustMode(true)
 		return true, nil

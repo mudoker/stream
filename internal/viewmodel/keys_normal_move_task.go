@@ -12,17 +12,30 @@ import (
 )
 
 func (m *Model) EnterTaskMoveMode() {
+	m.enterTaskMoveModeInternal(false)
+}
+
+func (m *Model) EnterTaskCloneMoveMode() {
+	m.enterTaskMoveModeInternal(true)
+}
+
+func (m *Model) enterTaskMoveModeInternal(isClone bool) {
 	task, exists := m.GetActiveTask()
 	if !exists {
 		m.StatusMsg = "No task selected to move."
 		return
 	}
 	if !model.IsTaskAnchored(task) {
-		m.StatusMsg = "Only anchored tasks, events, and habits can be moved with v."
+		if isClone {
+			m.StatusMsg = "Only anchored tasks, events, and habits can be cloned with Y."
+		} else {
+			m.StatusMsg = "Only anchored tasks, events, and habits can be moved with y."
+		}
 		return
 	}
 
 	m.CurrentMode = ModeTaskMove
+	m.TaskMoveIsClone = isClone
 	m.TaskMovePrefix = ""
 	m.TaskMoveOriginalTimeWindow = task.TimeWindow
 
@@ -36,7 +49,11 @@ func (m *Model) EnterTaskMoveMode() {
 	// Focus selection on the clone
 	m.SelectedTaskUUID = clone.UUID
 
-	m.StatusMsg = fmt.Sprintf("Locked '%s'. Use j/k or count+j/k to move in %dm steps. Enter to confirm, Esc to cancel.", task.Title, constants.TaskMoveStepMinutes)
+	if isClone {
+		m.StatusMsg = fmt.Sprintf("Cloning '%s'. Use j/k or count+j/k to position in %dm steps. Enter to confirm, Esc to cancel.", task.Title, constants.TaskMoveStepMinutes)
+	} else {
+		m.StatusMsg = fmt.Sprintf("Locked '%s'. Use j/k or count+j/k to move in %dm steps. Enter to confirm, Esc to cancel.", task.Title, constants.TaskMoveStepMinutes)
+	}
 }
 
 func (m *Model) HandleTaskMoveKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -80,7 +97,11 @@ func (m *Model) applyTaskMove(direction int) {
 		return
 	}
 	if !model.IsTaskAnchored(task) {
-		m.StatusMsg = "Only anchored tasks, events, and habits can be moved with v."
+		if m.TaskMoveIsClone {
+			m.StatusMsg = "Only anchored tasks, events, and habits can be cloned with Y."
+		} else {
+			m.StatusMsg = "Only anchored tasks, events, and habits can be moved with y."
+		}
 		return
 	}
 
@@ -94,5 +115,9 @@ func (m *Model) applyTaskMove(direction int) {
 	if direction < 0 {
 		moveDir = "up"
 	}
-	m.StatusMsg = fmt.Sprintf("Moved '%s' %d minutes %s. Enter to confirm, Esc to cancel.", task.Title, absInt(steps*constants.TaskMoveStepMinutes), moveDir)
+	actionStr := "Moved"
+	if m.TaskMoveIsClone {
+		actionStr = "Positioned clone of"
+	}
+	m.StatusMsg = fmt.Sprintf("%s '%s' %d minutes %s. Enter to confirm, Esc to cancel.", actionStr, task.Title, absInt(steps*constants.TaskMoveStepMinutes), moveDir)
 }

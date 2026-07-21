@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"stream/internal/model"
+
+	"github.com/google/uuid"
 )
 
 func (m *Model) confirmTaskMove() {
@@ -36,6 +38,53 @@ func (m *Model) confirmTaskMove() {
 
 	if !cloneFound {
 		m.CurrentMode = ModeNormal
+		m.TaskMoveIsClone = false
+		return
+	}
+
+	if m.TaskMoveIsClone {
+		var originalTask model.Task
+		originalFound := false
+		for _, t := range m.Tasks {
+			if t.UUID == originalUUID {
+				originalTask = t
+				originalFound = true
+				break
+			}
+		}
+
+		if !originalFound {
+			m.CurrentMode = ModeNormal
+			m.TaskMoveIsClone = false
+			return
+		}
+
+		newTask := originalTask
+		newTask.UUID = uuid.New().String()
+		newTask.TimeWindow = finalTimeWindow
+		if newTask.LifecycleState == model.StateOverdue {
+			newTask.LifecycleState = model.StateScheduled
+		}
+		newTask.GCalMetadata = model.GCalMetadata{}
+
+		if m.DB != nil {
+			if err := m.DB.AddTask(newTask); err != nil {
+				m.StatusMsg = fmt.Sprintf("Failed to clone task: %v", err)
+			} else {
+				m.refreshTasks()
+				m.triggerGCalPush(newTask)
+			}
+		} else {
+			m.Tasks = append(m.Tasks, newTask)
+		}
+
+		m.SelectedTaskUUID = newTask.UUID
+		m.AutoScrollToSelectedTask()
+
+		m.CurrentMode = ModeNormal
+		m.TaskMovePrefix = ""
+		m.TaskMoveIsClone = false
+		m.StatusMsg = fmt.Sprintf("Cloned '%s' to %s.", newTask.Title, newTask.TimeWindow.Start.Format("15:04"))
 		return
 	}
 
@@ -69,6 +118,7 @@ func (m *Model) confirmTaskMove() {
 			m.RecurringEditFromForm = false
 			m.CurrentMode = ModeNormal
 			m.TaskMovePrefix = ""
+			m.TaskMoveIsClone = false
 			m.StatusMsg = "Choose recurring update option."
 			return
 		}
@@ -83,6 +133,7 @@ func (m *Model) confirmTaskMove() {
 
 	m.CurrentMode = ModeNormal
 	m.TaskMovePrefix = ""
+	m.TaskMoveIsClone = false
 	m.StatusMsg = fmt.Sprintf("Task '%s' moved to %s.", originalTask.Title, originalTask.TimeWindow.Start.Format("15:04"))
 }
 
@@ -126,5 +177,6 @@ func (m *Model) cancelTaskMove() {
 
 	m.CurrentMode = ModeNormal
 	m.TaskMovePrefix = ""
+	m.TaskMoveIsClone = false
 	m.StatusMsg = "Task move canceled."
 }

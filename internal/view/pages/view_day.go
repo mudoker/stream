@@ -73,11 +73,13 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	// ── Resolve overlapping tasks and overlay cards ──────────────────
 	clones := make(map[string]bool)
-	for _, task := range m.Tasks {
-		if strings.HasSuffix(task.UUID, "_moving") {
-			clones[strings.TrimSuffix(task.UUID, "_moving")] = true
-		} else if strings.HasSuffix(task.UUID, "_adjusting") {
-			clones[strings.TrimSuffix(task.UUID, "_adjusting")] = true
+	if !m.TaskMoveIsClone {
+		for _, task := range m.Tasks {
+			if strings.HasSuffix(task.UUID, "_moving") {
+				clones[strings.TrimSuffix(task.UUID, "_moving")] = true
+			} else if strings.HasSuffix(task.UUID, "_adjusting") {
+				clones[strings.TrimSuffix(task.UUID, "_adjusting")] = true
+			}
 		}
 	}
 

@@ -175,6 +175,8 @@ func RenderHelpModal(m *viewmodel.Model, t theme.Theme) string {
 	body = append(body, formatKeyVal("i", "Open task creation form"))
 	body = append(body, formatKeyVal("e", "Edit selected task"))
 	body = append(body, formatKeyVal("a", "Quick anchor / de-anchor task"))
+	body = append(body, formatKeyVal("y", "Move task start time"))
+	body = append(body, formatKeyVal("Y", "Clone task to new start time"))
 	body = append(body, formatKeyVal("x", "Complete selected task"))
 	body = append(body, formatKeyVal("d", "Delete selected task"))
 	body = append(body, formatKeyVal("z", "Start / resume Zen session"))

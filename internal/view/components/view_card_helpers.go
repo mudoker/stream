@@ -6,6 +6,7 @@ import (
 
 	"stream/internal/model"
 	"stream/internal/view/theme"
+	"stream/internal/viewmodel"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -34,13 +35,17 @@ func cardBorderChars(task model.Task, hasRest bool) (string, string, string, str
 	return "╭", "╮", bottomLeftChar, bottomRightChar, "─", "│"
 }
 
-func cardTitleStr(task model.Task, isCompleted bool) string {
+func cardTitleStr(m *viewmodel.Model, task model.Task, isCompleted bool) string {
 	titleStr := theme.SentenceCase(task.Title)
 	if isCompleted {
 		titleStr = "✔ " + titleStr
 	}
 	if strings.HasSuffix(task.UUID, "_moving") {
-		titleStr = "[Moving] " + titleStr
+		if m != nil && m.TaskMoveIsClone {
+			titleStr = "[Cloning] " + titleStr
+		} else {
+			titleStr = "[Moving] " + titleStr
+		}
 	} else if strings.HasSuffix(task.UUID, "_adjusting") {
 		titleStr = "[Adjusting] " + titleStr
 	}

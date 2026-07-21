@@ -102,7 +102,7 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 	}
 
 	// Truncate title using safe visual width truncation
-	titleStr := truncateStr(cardTitleStr(task, isCompleted), contentW-1)
+	titleStr := truncateStr(cardTitleStr(m, task, isCompleted), contentW-1)
 
 	// Construct and scale metadata row to fit contentW-1
 	metaStr := cardMetaStr(t, task, contentW, priorityBadge, timeStr)
@@ -238,11 +238,13 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 	var currRc *viewmodel.ScheduledColumn
 	if !strings.HasSuffix(task.UUID, "_moving") && !strings.HasSuffix(task.UUID, "_adjusting") {
 		clones := make(map[string]bool)
-		for _, tVal := range m.Tasks {
-			if strings.HasSuffix(tVal.UUID, "_moving") {
-				clones[strings.TrimSuffix(tVal.UUID, "_moving")] = true
-			} else if strings.HasSuffix(tVal.UUID, "_adjusting") {
-				clones[strings.TrimSuffix(tVal.UUID, "_adjusting")] = true
+		if !m.TaskMoveIsClone {
+			for _, tVal := range m.Tasks {
+				if strings.HasSuffix(tVal.UUID, "_moving") {
+					clones[strings.TrimSuffix(tVal.UUID, "_moving")] = true
+				} else if strings.HasSuffix(tVal.UUID, "_adjusting") {
+					clones[strings.TrimSuffix(tVal.UUID, "_adjusting")] = true
+				}
 			}
 		}
 

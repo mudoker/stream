@@ -12,6 +12,7 @@ func (m *Model) startEditMode(task model.Task) {
 	m.IsEditing = true
 	m.Form.IsEditing = true
 	m.EditingTaskUUID = task.UUID
+	m.Form.IsAllDayIdx = 0
 
 	m.Form.TitleInput.SetValue(task.Title)
 	m.Form.DescInput.SetValue(task.Description)
@@ -91,9 +92,16 @@ func (m *Model) startEditMode(task model.Task) {
 		m.Form.CommuteInput.SetValue(fmt.Sprintf("%d", task.CommuteBuffer))
 	} else if task.SchedulingType == model.Event {
 		m.Form.TaskTypeIdx = 3
-		m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
-		durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
-		m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
+		if task.IsAllDay {
+			m.Form.IsAllDayIdx = 1
+			m.Form.StartTimeInput.SetValue("00:00")
+			m.Form.DurationInput.SetValue("1440")
+		} else {
+			m.Form.IsAllDayIdx = 0
+			m.Form.StartTimeInput.SetValue(task.TimeWindow.Start.Format("15:04"))
+			durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+			m.Form.DurationInput.SetValue(fmt.Sprintf("%d", durMins))
+		}
 		m.Form.LocationInput.SetValue(task.Location)
 		m.Form.CommuteInput.SetValue(fmt.Sprintf("%d", task.CommuteBuffer))
 	}

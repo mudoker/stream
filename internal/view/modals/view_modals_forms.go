@@ -63,6 +63,12 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 				ancOptStr = "Yes"
 			}
 			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Is Anchored", ancOptStr, f.ActiveField == 16, t))
+		case 17:
+			allDayOptStr := "No"
+			if f.IsAllDayIdx == 1 {
+				allDayOptStr = "Yes"
+			}
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "All Day", allDayOptStr, f.ActiveField == 17, t))
 		case 5:
 			if f.TaskTypeIdx == 1 {
 				fields = append(fields, components.RenderFormField(nextFieldNum(), "Due Date", f.DueDateInput.View(), f.ActiveField == 5, t))

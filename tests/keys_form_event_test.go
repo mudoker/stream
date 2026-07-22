@@ -239,3 +239,63 @@ func TestHabitFormCreationWithLocationAndBuffer(t *testing.T) {
 		t.Errorf("expected HasCommuteBuffer() to return true")
 	}
 }
+
+func TestAllDayEventTaskFormCreation(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+	m.Form = viewmodel.NewTaskForm()
+
+	// Fill the form fields for an All Day Event
+	m.Form.TitleInput.SetValue("Hackathon Day")
+	m.Form.DescInput.SetValue("24h building cool stuff")
+	m.Form.PriorityIdx = 0 // P0
+	m.Form.TaskTypeIdx = 3 // Event task type
+	m.Form.IsAllDayIdx = 1 // All Day = Yes
+	m.Form.LocationInput.SetValue("Office")
+
+	// Verify that start time (5) and duration (6) are NOT visible for all-day events
+	visible := m.Form.VisibleFields()
+	for _, fld := range visible {
+		if fld == 5 {
+			t.Errorf("field 5 (Start Time) should not be visible for all-day events")
+		}
+		if fld == 6 {
+			t.Errorf("field 6 (Duration) should not be visible for all-day events")
+		}
+	}
+
+	// Submit the form
+	m.SubmitForm()
+
+	// Retrieve the created task from database
+	tasks := database.GetTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task in database, got %d", len(tasks))
+	}
+
+	task := tasks[0]
+	if task.Title != "Hackathon Day" {
+		t.Errorf("expected Title 'Hackathon Day', got '%s'", task.Title)
+	}
+	if task.SchedulingType != model.Event {
+		t.Errorf("expected SchedulingType 'EVENT', got '%s'", task.SchedulingType)
+	}
+	if !task.IsAllDay {
+		t.Errorf("expected IsAllDay to be true")
+	}
+	if task.TimeWindow.Start.Hour() != 0 || task.TimeWindow.Start.Minute() != 0 {
+		t.Errorf("expected Start time at 00:00, got %s", task.TimeWindow.Start.Format("15:04"))
+	}
+	if task.TimeWindow.End.Hour() != 23 || task.TimeWindow.End.Minute() != 59 {
+		t.Errorf("expected End time at 23:59, got %s", task.TimeWindow.End.Format("15:04"))
+	}
+}

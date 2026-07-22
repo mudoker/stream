@@ -17,10 +17,11 @@ type TaskForm struct {
 	SPIdx                 int // index in []int{1, 2, 3, 5, 8, 13}
 	TaskTypeIdx           int // 0: Task, 1: Reminder, 2: Habit, 3: Event
 	IsAnchoredIdx         int // 0: No, 1: Yes
+	IsAllDayIdx           int // 0: No, 1: Yes
 	StartHour             int
 	StartMin              int
 	DurationMins          int
-	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days, 14: Start Date, 15: End Date, 16: Is Anchored
+	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days, 14: Start Date, 15: End Date, 16: Is Anchored, 17: Is All Day
 	TitleInput            textinput.Model
 	DescInput             textinput.Model
 	StartTimeInput        textinput.Model
@@ -110,6 +111,7 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 		SPIdx:                 2,
 		TaskTypeIdx:           0,
 		IsAnchoredIdx:         1,
+		IsAllDayIdx:           0,
 		StartHour:             baseDate.Hour(),
 		StartMin:              baseDate.Minute(),
 		DurationMins:          60,
@@ -165,8 +167,12 @@ func (f TaskForm) VisibleFields() []int {
 			fields = append(fields, 8)
 		}
 	} else if f.TaskTypeIdx == 3 {
-		// Event: Start Date (14), Start Time (5), Duration (6), Location (7)
-		fields = append(fields, 14, 5, 6, 7)
+		// Event: Start Date (14), Is All Day (17), Start Time (5), Duration (6), Location (7)
+		if f.IsAllDayIdx == 1 {
+			fields = append(fields, 14, 17, 7)
+		} else {
+			fields = append(fields, 14, 17, 5, 6, 7)
+		}
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
 			fields = append(fields, 8)
 		}

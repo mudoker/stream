@@ -70,6 +70,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 16:
 			m.Form.IsAnchoredIdx = (m.Form.IsAnchoredIdx - 1 + 2) % 2
 			return m, nil
+		case 17:
+			m.Form.IsAllDayIdx = (m.Form.IsAllDayIdx - 1 + 2) % 2
+			return m, nil
 		}
 	case "right":
 		switch m.Form.ActiveField {
@@ -96,6 +99,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 16:
 			m.Form.IsAnchoredIdx = (m.Form.IsAnchoredIdx + 1) % 2
 			return m, nil
+		case 17:
+			m.Form.IsAllDayIdx = (m.Form.IsAllDayIdx + 1) % 2
+			return m, nil
 		}
 	case " ":
 		switch m.Form.ActiveField {
@@ -117,6 +123,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case 16:
 			m.Form.IsAnchoredIdx = (m.Form.IsAnchoredIdx + 1) % 2
+			return m, nil
+		case 17:
+			m.Form.IsAllDayIdx = (m.Form.IsAllDayIdx + 1) % 2
 			return m, nil
 		}
 	case "enter":
@@ -358,6 +367,7 @@ func (m *Model) SubmitForm() {
 	} else if taskType == 3 {
 		newTask.SchedulingType = model.Event
 		newTask.StoryPoints = 0
+		newTask.IsAllDay = m.Form.IsAllDayIdx == 1
 
 		startDateStr := strings.TrimSpace(m.Form.StartDateInput.Value())
 		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
@@ -367,19 +377,28 @@ func (m *Model) SubmitForm() {
 			startDay = baseDay
 		}
 
-		hour, min := ParseFlexibleTime(timeStr, 9, 0)
-		startTime = time.Date(startDay.Year(), startDay.Month(), startDay.Day(), hour, min, 0, 0, now.Location())
+		if newTask.IsAllDay {
+			startTime = time.Date(startDay.Year(), startDay.Month(), startDay.Day(), 0, 0, 0, 0, now.Location())
+			endTime := time.Date(startDay.Year(), startDay.Month(), startDay.Day(), 23, 59, 59, 0, now.Location())
+			newTask.TimeWindow = model.TimeWindow{
+				Start: startTime,
+				End:   endTime,
+			}
+		} else {
+			hour, min := ParseFlexibleTime(timeStr, 9, 0)
+			startTime = time.Date(startDay.Year(), startDay.Month(), startDay.Day(), hour, min, 0, 0, now.Location())
 
-		durStr := m.Form.DurationInput.Value()
-		if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
-			duration = d
-		}
+			durStr := m.Form.DurationInput.Value()
+			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+				duration = d
+			}
 
-		endTime := startTime.Add(time.Duration(duration) * time.Minute)
+			endTime := startTime.Add(time.Duration(duration) * time.Minute)
 
-		newTask.TimeWindow = model.TimeWindow{
-			Start: startTime,
-			End:   endTime,
+			newTask.TimeWindow = model.TimeWindow{
+				Start: startTime,
+				End:   endTime,
+			}
 		}
 		newTask.Location = m.Form.LocationInput.Value()
 		commuteMins := 0
@@ -512,9 +531,13 @@ func (m *Model) FinalizeSubmitTask(newTask model.Task) {
 		if d, err := time.Parse("2006-01-02", startDateStr); err == nil {
 			dueDay = d
 		}
-		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
-		hour, min := ParseFlexibleTime(timeStr, 9, 0)
-		startTime = time.Date(dueDay.Year(), dueDay.Month(), dueDay.Day(), hour, min, 0, 0, now.Location())
+		if newTask.IsAllDay {
+			startTime = time.Date(dueDay.Year(), dueDay.Month(), dueDay.Day(), 0, 0, 0, 0, now.Location())
+		} else {
+			timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
+			hour, min := ParseFlexibleTime(timeStr, 9, 0)
+			startTime = time.Date(dueDay.Year(), dueDay.Month(), dueDay.Day(), hour, min, 0, 0, now.Location())
+		}
 	}
 
 	if isEdit {
@@ -607,9 +630,14 @@ func (m *Model) FinalizeSubmitTask(newTask model.Task) {
 						instance.LifecycleState = model.StateReady
 					} else {
 						instance.SchedulingType = newTask.SchedulingType
-						instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), startTime.Hour(), startTime.Minute(), startTime.Second(), 0, startTime.Location())
-						occDuration := newTask.TimeWindow.End.Sub(newTask.TimeWindow.Start)
-						instance.TimeWindow.End = instance.TimeWindow.Start.Add(occDuration)
+						if newTask.IsAllDay {
+							instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), 0, 0, 0, 0, startTime.Location())
+							instance.TimeWindow.End = time.Date(current.Year(), current.Month(), current.Day(), 23, 59, 59, 0, startTime.Location())
+						} else {
+							instance.TimeWindow.Start = time.Date(current.Year(), current.Month(), current.Day(), startTime.Hour(), startTime.Minute(), startTime.Second(), 0, startTime.Location())
+							occDuration := newTask.TimeWindow.End.Sub(newTask.TimeWindow.Start)
+							instance.TimeWindow.End = instance.TimeWindow.Start.Add(occDuration)
+						}
 						instance.LifecycleState = model.StateScheduled
 					}
 

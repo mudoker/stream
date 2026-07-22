@@ -88,6 +88,7 @@ type Task struct {
 	CompletedDates   []string         `json:"completed_dates,omitempty"`
 	RecurringParentUUID   string           `json:"recurring_parent_uuid,omitempty"`
 	EstimatedDurationMins int              `json:"estimated_duration_mins,omitempty"` // explicit duration for floating tasks
+	IsAllDay         bool             `json:"is_all_day"`
 }
 
 // SortingWeight computes the priority execution weight: (Priority Value * 1000) + Story Points

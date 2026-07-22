@@ -54,7 +54,9 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 		task.TimeWindow.Start.Format("15:04"),
 		task.TimeWindow.End.Format("15:04"),
 	)
-	if isActive {
+	if task.IsAllDay {
+		timeStr = "⏱ All Day"
+	} else if isActive {
 		remaining := task.TimeWindow.End.Sub(now)
 		if remaining < 0 {
 			remaining = 0

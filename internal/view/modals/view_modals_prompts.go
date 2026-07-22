@@ -40,7 +40,12 @@ func RenderPromptModal(m *viewmodel.Model, t theme.Theme) string {
 
 	// Scheduled time or due time
 	if m.PromptTask.SchedulingType == model.Anchored || m.PromptTask.SchedulingType == model.Event {
-		timeInfo := fmt.Sprintf("%s - %s", m.PromptTask.TimeWindow.Start.Format("15:04"), m.PromptTask.TimeWindow.End.Format("15:04"))
+		var timeInfo string
+		if m.PromptTask.IsAllDay {
+			timeInfo = "All Day"
+		} else {
+			timeInfo = fmt.Sprintf("%s - %s", m.PromptTask.TimeWindow.Start.Format("15:04"), m.PromptTask.TimeWindow.End.Format("15:04"))
+		}
 		lines = append(lines, fmt.Sprintf("  Scheduled: %s", lipgloss.NewStyle().Foreground(t.Accent).Render(timeInfo)))
 		if m.PromptTask.SchedulingType == model.Event {
 			if m.PromptTask.Location != "" {

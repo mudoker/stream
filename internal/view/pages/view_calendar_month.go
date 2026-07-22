@@ -191,7 +191,12 @@ func RenderMonthView(m *viewmodel.Model, t theme.Theme, height int) string {
 
 			bullet := pStyle.Render("●")
 			titleText := theme.SentenceCase(task.Title)
-			timeRangeText := fmt.Sprintf(" %s - %s", task.TimeWindow.Start.Format("15:04"), task.TimeWindow.End.Format("15:04"))
+			var timeRangeText string
+			if task.IsAllDay {
+				timeRangeText = " All Day"
+			} else {
+				timeRangeText = fmt.Sprintf(" %s - %s", task.TimeWindow.Start.Format("15:04"), task.TimeWindow.End.Format("15:04"))
+			}
 
 			timeStyle := lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
 			titleStyle := lipgloss.NewStyle().Foreground(t.Fg)

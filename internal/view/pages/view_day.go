@@ -83,12 +83,20 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		}
 	}
 
+	var allDayEvents []model.Task
+	for _, task := range m.Tasks {
+		if task.SchedulingType == model.Event && task.IsAllDay && viewmodel.SameDay(task.TimeWindow.Start, m.SelectedDay) {
+			allDayEvents = append(allDayEvents, task)
+		}
+	}
+	hasAllDayEvent := len(allDayEvents) > 0
+
 	var anchoredTasks []model.Task
 	for _, task := range m.Tasks {
 		if clones[task.UUID] {
 			continue
 		}
-		if model.IsTaskAnchored(task) && viewmodel.SameDay(task.TimeWindow.Start, m.SelectedDay) {
+		if model.IsTaskAnchored(task) && !task.IsAllDay && viewmodel.SameDay(task.TimeWindow.Start, m.SelectedDay) {
 			anchoredTasks = append(anchoredTasks, task)
 		}
 	}
@@ -224,16 +232,28 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				gutterRows[r] = lipgloss.NewStyle().Foreground(t.Muted).Render(label)
 			}
 		} else {
-			gutterRows[r] = "       "
+			if hasAllDayEvent {
+				gutterRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#20212b")).Render("░░░░░░░")
+			} else {
+				gutterRows[r] = "       "
+			}
 		}
 
 		// 2. Left Spacer Column (leftSpacerW chars)
 		if r == nowRow {
 			leftSpacerRows[r] = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render(strings.Repeat("─", leftSpacerW))
 		} else if isHourRow {
-			leftSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", leftSpacerW))
+			if hasAllDayEvent {
+				leftSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#3b3e52")).Render(strings.Repeat("▒", leftSpacerW))
+			} else {
+				leftSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", leftSpacerW))
+			}
 		} else {
-			leftSpacerRows[r] = strings.Repeat(" ", leftSpacerW)
+			if hasAllDayEvent {
+				leftSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#20212b")).Render(strings.Repeat("░", leftSpacerW))
+			} else {
+				leftSpacerRows[r] = strings.Repeat(" ", leftSpacerW)
+			}
 		}
 
 		// 3. Task Columns
@@ -246,9 +266,17 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			if r == nowRow {
 				taskRows[c][r] = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render(strings.Repeat("─", w))
 			} else if isHourRow {
-				taskRows[c][r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", w))
+				if hasAllDayEvent {
+					taskRows[c][r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#3b3e52")).Render(strings.Repeat("▒", w))
+				} else {
+					taskRows[c][r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", w))
+				}
 			} else {
-				taskRows[c][r] = strings.Repeat(" ", w)
+				if hasAllDayEvent {
+					taskRows[c][r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#20212b")).Render(strings.Repeat("░", w))
+				} else {
+					taskRows[c][r] = strings.Repeat(" ", w)
+				}
 			}
 		}
 
@@ -256,9 +284,17 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		if r == nowRow {
 			rightSpacerRows[r] = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render(strings.Repeat("─", actualRightSpacerW))
 		} else if isHourRow {
-			rightSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", actualRightSpacerW))
+			if hasAllDayEvent {
+				rightSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#3b3e52")).Render(strings.Repeat("▒", actualRightSpacerW))
+			} else {
+				rightSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", actualRightSpacerW))
+			}
 		} else {
-			rightSpacerRows[r] = strings.Repeat(" ", actualRightSpacerW)
+			if hasAllDayEvent {
+				rightSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#20212b")).Render(strings.Repeat("░", actualRightSpacerW))
+			} else {
+				rightSpacerRows[r] = strings.Repeat(" ", actualRightSpacerW)
+			}
 		}
 	}
 
@@ -468,6 +504,36 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	// ── Seamless Viewport Looping Slicing ────────────────────────────
 	visibleH := appContentHeight - 3
+	var allDayBanners []string
+	if hasAllDayEvent {
+		visibleH -= 2 // 1 for banner, 1 for separator/spacing
+		
+		var titles []string
+		for _, e := range allDayEvents {
+			titles = append(titles, e.Title)
+		}
+		bannerText := " 󰸗 ALL DAY: " + strings.Join(titles, ", ") + " "
+		
+		bannerStyle := lipgloss.NewStyle().
+			Foreground(t.CanvasBg).
+			Background(t.Accent).
+			Bold(true).
+			Padding(0, 2)
+			
+		totalW := l.TimelineW
+		bannerW := lipgloss.Width(bannerText)
+		leftPad := (totalW - bannerW) / 2
+		if leftPad < 0 {
+			leftPad = 0
+		}
+		rightPad := totalW - bannerW - leftPad
+		if rightPad < 0 {
+			rightPad = 0
+		}
+		
+		bannerLine := strings.Repeat(" ", leftPad) + bannerStyle.Render(bannerText) + strings.Repeat(" ", rightPad)
+		allDayBanners = append(allDayBanners, bannerLine, "")
+	}
 	if visibleH < 8 {
 		visibleH = 8
 	}
@@ -519,6 +585,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 
 	var visible []string
 	visible = append(visible, headerLine, sep, "")
+	if len(allDayBanners) > 0 {
+		visible = append(visible, allDayBanners...)
+	}
 
 	for i := 0; i < visibleH; i++ {
 		r := startR + i

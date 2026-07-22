@@ -32,8 +32,12 @@ func renderAgendaPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 
 			title := theme.SentenceCase(task.Title)
 			var timeStr string
-			if task.SchedulingType == model.Anchored {
-				timeStr = task.TimeWindow.Start.Format("15:04")
+			if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
+				if task.IsAllDay {
+					timeStr = "ALL DAY"
+				} else {
+					timeStr = task.TimeWindow.Start.Format("15:04")
+				}
 			} else if task.SchedulingType == model.Reminder {
 				if task.TimeWindow.Start.Second() == 1 {
 					timeStr = "REM"

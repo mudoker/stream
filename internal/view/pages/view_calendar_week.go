@@ -168,7 +168,12 @@ func getWeekViewLines(m *viewmodel.Model, t theme.Theme, colWidth int) ([][]stri
 			cardsContent = append(cardsContent, "", lipgloss.NewStyle().Foreground(t.Muted).Render("  (No work)"))
 		} else {
 			for idx, rc := range resolved {
-				timeText := fmt.Sprintf("%s-%s", rc.Task.TimeWindow.Start.Format("15:04"), rc.Task.TimeWindow.End.Format("15:04"))
+				var timeText string
+				if rc.Task.IsAllDay {
+					timeText = "All Day"
+				} else {
+					timeText = fmt.Sprintf("%s-%s", rc.Task.TimeWindow.Start.Format("15:04"), rc.Task.TimeWindow.End.Format("15:04"))
+				}
 				blockColor := t.PriorityColor(rc.Task.Priority)
 				if rc.Task.UUID == m.SelectedTaskUUID {
 					blockColor = t.FocusPurple

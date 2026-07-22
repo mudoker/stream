@@ -126,8 +126,12 @@ func RenderDetailPanel(m *viewmodel.Model, t theme.Theme, height int) string {
 	sb.WriteString(fmt.Sprintf("Schedule      %s\n\n", task.SchedulingType))
 
 	if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
-		sb.WriteString(fmt.Sprintf("Start Time    %s\n", task.TimeWindow.Start.Format("2006-01-02 15:04")))
-		sb.WriteString(fmt.Sprintf("End Time      %s\n\n", task.TimeWindow.End.Format("15:04")))
+		if task.IsAllDay {
+			sb.WriteString(fmt.Sprintf("Start Date    %s (All Day)\n\n", task.TimeWindow.Start.Format("2006-01-02")))
+		} else {
+			sb.WriteString(fmt.Sprintf("Start Time    %s\n", task.TimeWindow.Start.Format("2006-01-02 15:04")))
+			sb.WriteString(fmt.Sprintf("End Time      %s\n\n", task.TimeWindow.End.Format("15:04")))
+		}
 		if task.SchedulingType == model.Event {
 			if task.Location != "" {
 				sb.WriteString(fmt.Sprintf("Location      %s\n", task.Location))
@@ -184,9 +188,14 @@ func RenderDetailModal(m *viewmodel.Model, t theme.Theme) string {
 
 	if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
 		sb.WriteString("\n")
-		sb.WriteString(fmt.Sprintf("  %s  →  %s\n",
-			task.TimeWindow.Start.Format("Mon Jan _2  15:04"),
-			task.TimeWindow.End.Format("15:04")))
+		if task.IsAllDay {
+			sb.WriteString(fmt.Sprintf("  %s (All Day)\n",
+				task.TimeWindow.Start.Format("Mon Jan _2")))
+		} else {
+			sb.WriteString(fmt.Sprintf("  %s  →  %s\n",
+				task.TimeWindow.Start.Format("Mon Jan _2  15:04"),
+				task.TimeWindow.End.Format("15:04")))
+		}
 		if task.SchedulingType == model.Event {
 			if task.Location != "" {
 				sb.WriteString(fmt.Sprintf("  Location: %s\n", task.Location))

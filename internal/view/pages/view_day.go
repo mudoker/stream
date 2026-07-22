@@ -493,8 +493,8 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			}
 		}
 
-		// Sync back to m.TimelineHour so manual scroll starts from this adjusted position
-		m.TimelineHour = (startR + visibleH/2) / visualRowsPerHour
+		// Sync back to m.TimelineHour so manual scroll starts from the selected task's start hour
+		m.TimelineHour = selectedStartRow / visualRowsPerHour
 		if m.TimelineHour < 0 {
 			m.TimelineHour = 0
 		}

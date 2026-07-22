@@ -159,13 +159,13 @@ func (m *Model) AutoScrollToSelectedTask() {
 			target := taskEnd - (visibleH - visibleH/2)
 			m.TimelineHour = (target + visualRowsPerHour - 1) / visualRowsPerHour
 		} else {
-			m.TimelineHour = (taskStart + visibleH/2) / visualRowsPerHour
+			m.TimelineHour = selectedTask.TimeWindow.Start.Hour()
 		}
 	} else {
 		if taskStart < viewportStart {
-			m.TimelineHour = (taskStart + visibleH/2) / visualRowsPerHour
+			m.TimelineHour = selectedTask.TimeWindow.Start.Hour()
 		} else if taskEnd > viewportEnd {
-			m.TimelineHour = (taskStart + visibleH/2) / visualRowsPerHour
+			m.TimelineHour = selectedTask.TimeWindow.Start.Hour()
 		}
 	}
 

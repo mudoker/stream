@@ -232,28 +232,16 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 				gutterRows[r] = lipgloss.NewStyle().Foreground(t.Muted).Render(label)
 			}
 		} else {
-			if hasAllDayEvent {
-				gutterRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#20212b")).Render("░░░░░░░")
-			} else {
-				gutterRows[r] = "       "
-			}
+			gutterRows[r] = "       "
 		}
 
 		// 2. Left Spacer Column (leftSpacerW chars)
 		if r == nowRow {
 			leftSpacerRows[r] = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render(strings.Repeat("─", leftSpacerW))
 		} else if isHourRow {
-			if hasAllDayEvent {
-				leftSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#3b3e52")).Render(strings.Repeat("▒", leftSpacerW))
-			} else {
-				leftSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", leftSpacerW))
-			}
+			leftSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", leftSpacerW))
 		} else {
-			if hasAllDayEvent {
-				leftSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#20212b")).Render(strings.Repeat("░", leftSpacerW))
-			} else {
-				leftSpacerRows[r] = strings.Repeat(" ", leftSpacerW)
-			}
+			leftSpacerRows[r] = strings.Repeat(" ", leftSpacerW)
 		}
 
 		// 3. Task Columns
@@ -266,17 +254,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			if r == nowRow {
 				taskRows[c][r] = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render(strings.Repeat("─", w))
 			} else if isHourRow {
-				if hasAllDayEvent {
-					taskRows[c][r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#3b3e52")).Render(strings.Repeat("▒", w))
-				} else {
-					taskRows[c][r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", w))
-				}
+				taskRows[c][r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", w))
 			} else {
-				if hasAllDayEvent {
-					taskRows[c][r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#20212b")).Render(strings.Repeat("░", w))
-				} else {
-					taskRows[c][r] = strings.Repeat(" ", w)
-				}
+				taskRows[c][r] = strings.Repeat(" ", w)
 			}
 		}
 
@@ -284,17 +264,9 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 		if r == nowRow {
 			rightSpacerRows[r] = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render(strings.Repeat("─", actualRightSpacerW))
 		} else if isHourRow {
-			if hasAllDayEvent {
-				rightSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#3b3e52")).Render(strings.Repeat("▒", actualRightSpacerW))
-			} else {
-				rightSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", actualRightSpacerW))
-			}
+			rightSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", actualRightSpacerW))
 		} else {
-			if hasAllDayEvent {
-				rightSpacerRows[r] = lipgloss.NewStyle().Foreground(lipgloss.Color("#20212b")).Render(strings.Repeat("░", actualRightSpacerW))
-			} else {
-				rightSpacerRows[r] = strings.Repeat(" ", actualRightSpacerW)
-			}
+			rightSpacerRows[r] = strings.Repeat(" ", actualRightSpacerW)
 		}
 	}
 

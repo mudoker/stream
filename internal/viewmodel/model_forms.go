@@ -78,6 +78,7 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 
 	tags := textinput.New()
 	tags.Placeholder = "engineering, refactor, admin"
+	tags.SetValue("Misc.")
 
 	dd := textinput.New()
 	dd.Placeholder = baseDate.Format("2006-01-02")

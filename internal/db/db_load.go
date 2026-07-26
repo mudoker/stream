@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"stream/internal/model"
@@ -119,6 +120,18 @@ func (db *JSONDB) load() error {
 			{Name: "learning", Frequency: 2},
 			{Name: "health", Frequency: 1},
 			{Name: "admin", Frequency: 1},
+			{Name: "Misc.", Frequency: 1},
+		}
+	} else {
+		found := false
+		for _, tag := range db.userSettings.Tags {
+			if strings.EqualFold(tag.Name, "Misc.") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			db.userSettings.Tags = append(db.userSettings.Tags, model.TagInfo{Name: "Misc.", Frequency: 1})
 		}
 	}
 

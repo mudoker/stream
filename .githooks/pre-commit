@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Define the version file path relative to repository root
+VERSION_FILE="version.txt"
+
+# If the file does not exist, initialize it
+if [ ! -f "$VERSION_FILE" ]; then
+    echo "0.0.0" > "$VERSION_FILE"
+fi
+
+# Read the current version
+VERSION=$(cat "$VERSION_FILE" | tr -d '[:space:]')
+
+# Split by dot
+IFS='.' read -r major minor patch <<< "$VERSION"
+
+# Default to 0 if empty
+major=${major:-0}
+minor=${minor:-0}
+patch=${patch:-0}
+
+# Increment patch
+patch=$((patch + 1))
+
+# Carry over logic
+if [ "$patch" -eq 10 ]; then
+    patch=0
+    minor=$((minor + 1))
+    if [ "$minor" -eq 10 ]; then
+        minor=0
+        major=$((major + 1))
+    fi
+fi
+
+# Format new version
+NEW_VERSION="${major}.${minor}.${patch}"
+
+# Save to file
+echo "$NEW_VERSION" > "$VERSION_FILE"
+
+# Stage the file so it's included in the current commit
+git add "$VERSION_FILE"
+
+echo "Version incremented to $NEW_VERSION"

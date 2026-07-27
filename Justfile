@@ -15,3 +15,8 @@ run:
 # Make the local binary executable
 apply: build
     chmod +x stream
+
+# Setup git hooks path and make hook executable
+setup-hooks:
+    git config core.hooksPath .githooks
+    chmod +x .githooks/pre-commit

@@ -284,6 +284,25 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			m.ConfirmFocusArea,
 			t,
 		)
+	case "shrink_remaining_confirm":
+		origDur := m.ConfirmTask.TimeWindow.End.Sub(m.ConfirmTask.TimeWindow.Start)
+		newDur := m.PendingEditTask.TimeWindow.End.Sub(m.PendingEditTask.TimeWindow.Start)
+		remainingMins := int((origDur - newDur).Minutes())
+
+		return components.RenderBaseConfirmModal(
+			"Task Shrunk",
+			[]string{
+				"You have shrunk the duration of task:",
+				"  " + theme.SentenceCase(m.ConfirmTask.Title),
+				"Would you like to log the remaining time",
+				fmt.Sprintf("  (%d minutes) to the Todo Shelf or discard it?", remainingMins),
+			},
+			[]string{"Yes, Log to Shelf", "No, Discard"},
+			m.ConfirmSelectedIndex,
+			-1,
+			m.ConfirmFocusArea,
+			t,
+		)
 	default: // delete
 		return components.RenderBaseConfirmModal(
 			"Confirm Delete",

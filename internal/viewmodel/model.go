@@ -110,6 +110,8 @@ type Model struct {
 	ConfirmSelectedIndex int
 	ConfirmFocusArea     int
 	RecurringEditFromForm bool
+	LogRemainingOnConfirm bool
+	ShrinkRemainingMins   int
 	WarningOpen bool
 	WarningMsg  string
 

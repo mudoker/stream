@@ -1,6 +1,9 @@
 package viewmodel
 
 import (
+	"fmt"
+	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -334,6 +337,69 @@ func (m *Model) AutocompleteTag(sug string) {
 		m.Form.TagsInput.SetValue(val[:lastCommaIdx+1] + " " + strings.TrimSpace(val[lastCommaIdx+1:]) + sug)
 	}
 	m.Form.TagsInput.SetCursor(len(m.Form.TagsInput.Value()))
+}
+
+func (m *Model) UpdateProcessMetrics() {
+	now := time.Now()
+	// RAM calculation
+	var ramMB float64
+	data, err := os.ReadFile("/proc/self/stat")
+	if err == nil {
+		fields := strings.Fields(string(data))
+		if len(fields) >= 24 {
+			rssPages, parseErr := strconv.ParseInt(fields[23], 10, 64)
+			if parseErr == nil {
+				pageSize := int64(os.Getpagesize())
+				if pageSize <= 0 {
+					pageSize = 4096
+				}
+				ramMB = float64(rssPages*pageSize) / (1024.0 * 1024.0)
+			}
+		}
+	}
+	if ramMB <= 0 {
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+		ramMB = float64(mem.Sys) / (1024.0 * 1024.0)
+	}
+	m.ProcessRAMMB = ramMB
+
+	// CPU calculation
+	var cpuPct float64
+	ticks, err := getProcessCPUTicks()
+	if err == nil {
+		if !m.LastCPUSample.IsZero() {
+			deltaTicks := ticks - m.LastCPUTicks
+			elapsed := now.Sub(m.LastCPUSample).Seconds()
+			if elapsed > 0 {
+				cpuPct = (float64(deltaTicks) / 100.0) / elapsed * 100.0
+				cpuPct = cpuPct / float64(runtime.NumCPU())
+			}
+		}
+		m.LastCPUTicks = ticks
+		m.LastCPUSample = now
+	}
+	if cpuPct < 0 {
+		cpuPct = 0
+	}
+	if cpuPct > 100 {
+		cpuPct = 100
+	}
+	m.ProcessCPU = cpuPct
+}
+
+func getProcessCPUTicks() (int64, error) {
+	data, err := os.ReadFile("/proc/self/stat")
+	if err != nil {
+		return 0, err
+	}
+	fields := strings.Fields(string(data))
+	if len(fields) < 15 {
+		return 0, fmt.Errorf("invalid stat format")
+	}
+	utime, _ := strconv.ParseInt(fields[13], 10, 64)
+	stime, _ := strconv.ParseInt(fields[14], 10, 64)
+	return utime + stime, nil
 }
 
 

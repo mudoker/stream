@@ -112,6 +112,10 @@ type Model struct {
 	RecurringEditFromForm bool
 	LogRemainingOnConfirm bool
 	ShrinkRemainingMins   int
+	LastCPUTicks          int64
+	LastCPUSample         time.Time
+	ProcessCPU            float64
+	ProcessRAMMB          float64
 	WarningOpen bool
 	WarningMsg  string
 

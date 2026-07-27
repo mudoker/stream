@@ -82,6 +82,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case TickMsg:
+		m.UpdateProcessMetrics()
 		if m.ZenTimer != nil {
 			oldIdx := m.ZenTimer.CurrentSessionIdx
 			finished := m.ZenTimer.Tick()

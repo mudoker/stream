@@ -1,8 +1,10 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
+	"strings"
 	gosync "sync"
 
 	"stream/internal/db"
@@ -31,6 +33,9 @@ func (sp *SafeProgram) Send(msg tea.Msg) {
 		sp.prog.Send(msg)
 	}
 }
+
+//go:embed version.txt
+var version string
 
 func main() {
 	// 1. Initialize local JSON DB
@@ -62,6 +67,7 @@ func main() {
 
 	// 4. Initialize and run TUI
 	vm := viewmodel.NewModel(database, syncEngine)
+	vm.Version = "v" + strings.TrimSpace(version)
 	ui := view.NewView(&vm)
 	program := tea.NewProgram(ui, tea.WithAltScreen())
 	safeProg.Set(program)

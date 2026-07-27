@@ -116,6 +116,7 @@ type Model struct {
 	LastCPUSample         time.Time
 	ProcessCPU            float64
 	ProcessRAMMB          float64
+	Version               string
 	WarningOpen bool
 	WarningMsg  string
 

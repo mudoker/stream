@@ -354,9 +354,27 @@ func renderSidebarFooter(m *viewmodel.Model, t theme.Theme, innerW int, appConte
 	}
 	focusRow := focusLabel + strings.Repeat(" ", focusPad) + focusVal
 
-	// CPU & RAM Bars
-	cpuPct := 20 + int(time.Now().Unix()%35)
-	memPct := 45 + int(time.Now().Unix()%20)
+	// CPU & RAM Bars (process specific)
+	cpuPct := int(m.ProcessCPU)
+	if cpuPct < 0 {
+		cpuPct = 0
+	}
+	if cpuPct > 100 {
+		cpuPct = 100
+	}
+
+	ramMB := m.ProcessRAMMB
+	if ramMB <= 0 {
+		ramMB = 15.0
+	}
+	ramPct := int((ramMB / 100.0) * 100.0)
+	if ramPct < 0 {
+		ramPct = 0
+	}
+	if ramPct > 100 {
+		ramPct = 100
+	}
+
 	barW := innerW - 15
 	if barW < 4 {
 		barW = 4
@@ -384,7 +402,7 @@ func renderSidebarFooter(m *viewmodel.Model, t theme.Theme, innerW int, appConte
 	cpuRow := cpuLeftText + strings.Repeat(" ", cpuSpaceCount) + cpuRightText + " "
 
 	// RAM Bar
-	solidCount := memPct * barW / 100
+	solidCount := ramPct * barW / 100
 	if solidCount < 0 {
 		solidCount = 0
 	}
@@ -395,7 +413,7 @@ func renderSidebarFooter(m *viewmodel.Model, t theme.Theme, innerW int, appConte
 	barStr := strings.Repeat("█", solidCount) + strings.Repeat("░", emptyCount)
 
 	leftText := fmt.Sprintf("  RAM  [%s]", barStr)
-	rightText := fmt.Sprintf("%d%%", memPct)
+	rightText := fmt.Sprintf("%dMB", int(ramMB))
 	leftW := lipgloss.Width(leftText)
 	rightW := lipgloss.Width(rightText)
 	spaceCount := innerW - leftW - rightW - 1

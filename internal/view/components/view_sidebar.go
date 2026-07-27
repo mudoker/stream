@@ -297,20 +297,93 @@ func renderSidebarFooter(m *viewmodel.Model, t theme.Theme, innerW int, appConte
 	sep := lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", innerW))
 	muted := lipgloss.NewStyle().Foreground(t.Muted)
 
-	footOccupied := 5
-	if m.ZenTimer != nil && m.ZenTimer.Running {
-		footOccupied++
-	}
-	remaining := appContentHeight - (occupied + footOccupied + 9)
-	if remaining > 0 {
-		rows = append(rows, strings.Repeat("\n", remaining))
+	// Summary of the day
+	today := time.Now()
+	todayCompletedCount := 0
+	todayTotalCount := 0
+	todayCompletedSP := 0
+	todayTotalSP := 0
+	todayFocusSeconds := 0
+
+	for _, task := range m.Tasks {
+		isToday := false
+		if task.SchedulingType == model.Anchored {
+			isToday = viewmodel.SameDay(task.TimeWindow.Start, today)
+		} else {
+			isToday = viewmodel.SameDay(task.CreatedAt, today)
+		}
+
+		if isToday {
+			todayTotalCount++
+			todayTotalSP += task.StoryPoints
+			todayFocusSeconds += task.ExecutionMetrics.ElapsedFocusSeconds
+			if task.LifecycleState == model.StateCompleted {
+				todayCompletedCount++
+				todayCompletedSP += task.StoryPoints
+			}
+		}
 	}
 
+	focusMins := todayFocusSeconds / 60
+	summaryTitle := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  TODAY SUMMARY")
+
+	tasksLabel := "  Tasks Completed"
+	tasksVal := fmt.Sprintf("%d/%d", todayCompletedCount, todayTotalCount)
+	tasksPad := innerW - lipgloss.Width(tasksLabel) - lipgloss.Width(tasksVal) - 1
+	if tasksPad < 0 {
+		tasksPad = 0
+	}
+	tasksRow := tasksLabel + strings.Repeat(" ", tasksPad) + tasksVal
+
+	spLabel := "  Story Points"
+	spVal := fmt.Sprintf("%d/%d SP", todayCompletedSP, todayTotalSP)
+	spPad := innerW - lipgloss.Width(spLabel) - lipgloss.Width(spVal) - 1
+	if spPad < 0 {
+		spPad = 0
+	}
+	spRow := spLabel + strings.Repeat(" ", spPad) + spVal
+
+	focusLabel := "  Focus Time"
+	focusVal := fmt.Sprintf("%dh %dm", focusMins/60, focusMins%60)
+	if focusMins < 60 {
+		focusVal = fmt.Sprintf("%dm", focusMins)
+	}
+	focusPad := innerW - lipgloss.Width(focusLabel) - lipgloss.Width(focusVal) - 1
+	if focusPad < 0 {
+		focusPad = 0
+	}
+	focusRow := focusLabel + strings.Repeat(" ", focusPad) + focusVal
+
+	// CPU & RAM Bars
+	cpuPct := 20 + int(time.Now().Unix()%35)
 	memPct := 45 + int(time.Now().Unix()%20)
 	barW := innerW - 15
 	if barW < 4 {
 		barW = 4
 	}
+
+	// CPU Bar
+	cpuSolid := cpuPct * barW / 100
+	if cpuSolid < 0 {
+		cpuSolid = 0
+	}
+	if cpuSolid > barW {
+		cpuSolid = barW
+	}
+	cpuEmpty := barW - cpuSolid
+	cpuBarStr := strings.Repeat("█", cpuSolid) + strings.Repeat("░", cpuEmpty)
+
+	cpuLeftText := fmt.Sprintf("  CPU  [%s]", cpuBarStr)
+	cpuRightText := fmt.Sprintf("%d%%", cpuPct)
+	cpuLeftW := lipgloss.Width(cpuLeftText)
+	cpuRightW := lipgloss.Width(cpuRightText)
+	cpuSpaceCount := innerW - cpuLeftW - cpuRightW - 1
+	if cpuSpaceCount < 0 {
+		cpuSpaceCount = 0
+	}
+	cpuRow := cpuLeftText + strings.Repeat(" ", cpuSpaceCount) + cpuRightText + " "
+
+	// RAM Bar
 	solidCount := memPct * barW / 100
 	if solidCount < 0 {
 		solidCount = 0
@@ -330,6 +403,26 @@ func renderSidebarFooter(m *viewmodel.Model, t theme.Theme, innerW int, appConte
 		spaceCount = 0
 	}
 	memRow := leftText + strings.Repeat(" ", spaceCount) + rightText + " "
+
+	// Dynamic spacer calculation
+	footOccupied := 11
+	if m.ZenTimer != nil && m.ZenTimer.Running {
+		footOccupied++
+	}
+	remaining := appContentHeight - (occupied + footOccupied + 9)
+	if remaining > 0 {
+		rows = append(rows, strings.Repeat("\n", remaining))
+	}
+
+	// Append Today Summary
+	rows = append(rows, summaryTitle)
+	rows = append(rows, muted.Render(tasksRow))
+	rows = append(rows, muted.Render(spRow))
+	rows = append(rows, muted.Render(focusRow))
+	rows = append(rows, "")
+
+	// Append CPU & RAM Bars
+	rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render(cpuRow))
 	rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render(memRow))
 
 	rows = append(rows, sep)

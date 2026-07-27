@@ -16,6 +16,8 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 	defer func() {
 		if !m.ConfirmOpen {
 			m.ConfirmFocusArea = 0
+			m.LogRemainingOnConfirm = false
+			m.ShrinkRemainingMins = 0
 		}
 	}()
 
@@ -144,12 +146,32 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			case "edit_recurring":
 				if m.ConfirmSelectedIndex == 0 {
 					m.DB.UpdateTask(m.PendingEditTask)
+					if m.LogRemainingOnConfirm {
+						remainingTask := model.Task{
+							UUID:                  uuid.New().String(),
+							WorkspaceUUID:         m.PendingEditTask.WorkspaceUUID,
+							Title:                 m.PendingEditTask.Title,
+							Description:           m.PendingEditTask.Description,
+							Priority:              m.PendingEditTask.Priority,
+							StoryPoints:           m.PendingEditTask.StoryPoints,
+							SchedulingType:        model.Floating,
+							LifecycleState:        model.StateReady,
+							EstimatedDurationMins: m.ShrinkRemainingMins,
+							Tags:                  m.PendingEditTask.Tags,
+							Notes:                 m.PendingEditTask.Notes,
+							CreatedAt:             time.Now(),
+							UpdatedAt:             time.Now(),
+						}
+						m.DB.AddTask(remainingTask)
+						m.StatusMsg = fmt.Sprintf("Occurrence of '%s' updated; remaining %dm logged to Todo Shelf.", m.PendingEditTask.Title, m.ShrinkRemainingMins)
+					} else {
+						m.StatusMsg = fmt.Sprintf("Occurrence of '%s' updated.", m.PendingEditTask.Title)
+					}
 					m.refreshTasks()
 					m.triggerGCalPush(m.PendingEditTask)
 					m.ConfirmOpen = false
 					m.ConfirmActionType = ""
 					m.RecurringEditFromForm = false
-					m.StatusMsg = fmt.Sprintf("Occurrence of '%s' updated.", m.PendingEditTask.Title)
 				} else {
 					originalStart := m.ConfirmTask.TimeWindow.Start
 					durationShift := m.PendingEditTask.TimeWindow.End.Sub(m.PendingEditTask.TimeWindow.Start)
@@ -182,7 +204,27 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 								}
 							}
 						}
-						m.StatusMsg = "This and all future occurrences updated."
+						if m.LogRemainingOnConfirm {
+							remainingTask := model.Task{
+								UUID:                  uuid.New().String(),
+								WorkspaceUUID:         m.PendingEditTask.WorkspaceUUID,
+								Title:                 m.PendingEditTask.Title,
+								Description:           m.PendingEditTask.Description,
+								Priority:              m.PendingEditTask.Priority,
+								StoryPoints:           m.PendingEditTask.StoryPoints,
+								SchedulingType:        model.Floating,
+								LifecycleState:        model.StateReady,
+								EstimatedDurationMins: m.ShrinkRemainingMins,
+								Tags:                  m.PendingEditTask.Tags,
+								Notes:                 m.PendingEditTask.Notes,
+								CreatedAt:             time.Now(),
+								UpdatedAt:             time.Now(),
+							}
+							m.DB.AddTask(remainingTask)
+							m.StatusMsg = fmt.Sprintf("This and all future occurrences updated; remaining %dm logged to Todo Shelf.", m.ShrinkRemainingMins)
+						} else {
+							m.StatusMsg = "This and all future occurrences updated."
+						}
 					} else {
 						// Form edit: delete all future occurrences and regenerate them using the new pattern
 						daysStr := strings.ToLower(m.Form.RecurringDaysInput.Value())
@@ -282,6 +324,52 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					m.ConfirmActionType = ""
 					m.StartZenModeWithTrim(m.ConfirmTask)
 				}
+			case "shrink_remaining_confirm":
+				if m.ConfirmSelectedIndex == 0 {
+					m.LogRemainingOnConfirm = true
+				} else {
+					m.LogRemainingOnConfirm = false
+				}
+
+				origDur := m.ConfirmTask.TimeWindow.End.Sub(m.ConfirmTask.TimeWindow.Start)
+				newDur := m.PendingEditTask.TimeWindow.End.Sub(m.PendingEditTask.TimeWindow.Start)
+				m.ShrinkRemainingMins = int((origDur - newDur).Minutes())
+
+				if m.PendingEditTask.RecurringParentUUID != "" {
+					m.ConfirmActionType = "edit_recurring"
+					m.ConfirmSelectedIndex = 0
+					m.RecurringEditFromForm = false
+					m.StatusMsg = "Choose recurring update option."
+				} else {
+					m.DB.UpdateTask(m.PendingEditTask)
+					if m.LogRemainingOnConfirm {
+						remainingTask := model.Task{
+							UUID:                  uuid.New().String(),
+							WorkspaceUUID:         m.PendingEditTask.WorkspaceUUID,
+							Title:                 m.PendingEditTask.Title,
+							Description:           m.PendingEditTask.Description,
+							Priority:              m.PendingEditTask.Priority,
+							StoryPoints:           m.PendingEditTask.StoryPoints,
+							SchedulingType:        model.Floating,
+							LifecycleState:        model.StateReady,
+							EstimatedDurationMins: m.ShrinkRemainingMins,
+							Tags:                  m.PendingEditTask.Tags,
+							Notes:                 m.PendingEditTask.Notes,
+							CreatedAt:             time.Now(),
+							UpdatedAt:             time.Now(),
+						}
+						m.DB.AddTask(remainingTask)
+					}
+					m.refreshTasks()
+					m.triggerGCalPush(m.PendingEditTask)
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					if m.LogRemainingOnConfirm {
+						m.StatusMsg = fmt.Sprintf("Task '%s' shrunk; remaining %dm logged to Todo Shelf.", m.PendingEditTask.Title, m.ShrinkRemainingMins)
+					} else {
+						m.StatusMsg = fmt.Sprintf("Task '%s' shrunk; remaining duration discarded.", m.PendingEditTask.Title)
+					}
+				}
 			default: // delete
 				if m.ConfirmSelectedIndex == 0 {
 					common.DeleteTaskOccurrence(m, m.ConfirmTask)
@@ -320,6 +408,24 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""
 				m.StatusMsg = "Edit canceled."
+			} else if m.ConfirmActionType == "shrink_remaining_confirm" {
+				if m.DB != nil {
+					m.refreshTasks()
+				} else {
+					for i, t := range m.Tasks {
+						if t.UUID == m.ConfirmTask.UUID {
+							m.Tasks[i] = m.ConfirmTask
+							break
+						}
+					}
+				}
+				if !m.ConfirmTask.TimeWindow.Start.IsZero() {
+					m.SelectedDay = m.ConfirmTask.TimeWindow.Start.Local()
+				}
+				m.AutoScrollToSelectedTask()
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.StatusMsg = "Shrink canceled."
 			} else {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""

@@ -158,6 +158,26 @@ func (m *Model) confirmTaskDurationAdjust() {
 	m.SelectedTaskUUID = originalUUID
 
 	if originalFound && m.DB != nil {
+		origDur := m.TaskMoveOriginalTimeWindow.End.Sub(m.TaskMoveOriginalTimeWindow.Start)
+		newDur := finalTimeWindow.End.Sub(finalTimeWindow.Start)
+		isShrunk := !m.TaskDurationAdjustTop && newDur < origDur
+
+		if isShrunk {
+			m.ConfirmTask = originalTask
+			m.ConfirmTask.TimeWindow = m.TaskMoveOriginalTimeWindow
+
+			m.PendingEditTask = originalTask
+			m.PendingEditTask.TimeWindow = finalTimeWindow
+
+			m.ConfirmOpen = true
+			m.ConfirmActionType = "shrink_remaining_confirm"
+			m.ConfirmSelectedIndex = 0
+			m.CurrentMode = ModeNormal
+			m.TaskMovePrefix = ""
+			m.StatusMsg = "Choose whether to log remaining time to Todo Shelf."
+			return
+		}
+
 		if originalTask.RecurringParentUUID != "" {
 			confirmTask := originalTask
 			confirmTask.TimeWindow = m.TaskMoveOriginalTimeWindow

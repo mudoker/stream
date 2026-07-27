@@ -312,3 +312,160 @@ func TestManualSessionLogging(t *testing.T) {
 	// Press Esc to cancel
 	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEsc})
 }
+
+func TestTaskShrinkRemaining(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := NewModel(database, syncEngine)
+	day := time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local)
+	m.SelectedDay = day
+
+	// Test case 1: Log to shelf
+	task1 := model.Task{
+		UUID:           "task-shrink-1",
+		Title:          "Shrink Task 1",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(10 * time.Hour),
+			End:   day.Add(11 * time.Hour), // 60 mins
+		},
+	}
+	database.AddTask(task1)
+	m.refreshTasks()
+	m.SelectedTaskUUID = "task-shrink-1"
+
+	// Enter duration adjust mode (adjustTop = false)
+	m.EnterTaskDurationAdjustMode(false)
+	if m.CurrentMode != ModeTaskDurationAdjust {
+		t.Fatalf("expected mode %v, got %v", ModeTaskDurationAdjust, m.CurrentMode)
+	}
+
+	// Shrink duration by 15 minutes
+	m.applyTaskDurationAdjust(-1)
+
+	// Confirm duration adjust
+	m.confirmTaskDurationAdjust()
+	if !m.ConfirmOpen || m.ConfirmActionType != "shrink_remaining_confirm" {
+		t.Fatalf("expected shrink_remaining_confirm dialog, got ConfirmOpen=%t ConfirmActionType=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+
+	// Press "y" to log remaining time to shelf
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if m.ConfirmOpen {
+		t.Fatal("expected confirmation modal to be closed")
+	}
+
+	// Verify task 1 is shrunk to 45 mins
+	u1, _ := database.GetTask("task-shrink-1")
+	dur1 := u1.TimeWindow.End.Sub(u1.TimeWindow.Start)
+	if dur1 != 45*time.Minute {
+		t.Errorf("expected task-shrink-1 duration to be 45m, got %s", dur1)
+	}
+
+	// Verify a floating task was logged to shelf with 15 mins estimated duration
+	allTasks := database.GetTasks()
+	var floatingFound bool
+	for _, tk := range allTasks {
+		if tk.SchedulingType == model.Floating && tk.Title == "Shrink Task 1" && tk.EstimatedDurationMins == 15 {
+			floatingFound = true
+			break
+		}
+	}
+	if !floatingFound {
+		t.Error("expected a floating task with 15m remaining logged to Todo Shelf")
+	}
+
+	// Test case 2: Discard remaining
+	task2 := model.Task{
+		UUID:           "task-shrink-2",
+		Title:          "Shrink Task 2",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(12 * time.Hour),
+			End:   day.Add(13 * time.Hour), // 60 mins
+		},
+	}
+	database.AddTask(task2)
+	m.refreshTasks()
+	m.SelectedTaskUUID = "task-shrink-2"
+
+	m.EnterTaskDurationAdjustMode(false)
+	m.applyTaskDurationAdjust(-1)
+	m.confirmTaskDurationAdjust()
+	if !m.ConfirmOpen || m.ConfirmActionType != "shrink_remaining_confirm" {
+		t.Fatalf("expected shrink_remaining_confirm dialog, got ConfirmOpen=%t ConfirmActionType=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+
+	// Press "n" to discard remaining
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	if m.ConfirmOpen {
+		t.Fatal("expected confirmation modal to be closed")
+	}
+
+	u2, _ := database.GetTask("task-shrink-2")
+	dur2 := u2.TimeWindow.End.Sub(u2.TimeWindow.Start)
+	if dur2 != 45*time.Minute {
+		t.Errorf("expected task-shrink-2 duration to be 45m, got %s", dur2)
+	}
+
+	// Verify no new floating task for "Shrink Task 2"
+	allTasks = database.GetTasks()
+	floatingFound = false
+	for _, tk := range allTasks {
+		if tk.SchedulingType == model.Floating && tk.Title == "Shrink Task 2" {
+			floatingFound = true
+			break
+		}
+	}
+	if floatingFound {
+		t.Error("expected no floating task logged to Todo Shelf for task-shrink-2")
+	}
+
+	// Test case 3: Cancel shrink confirmation
+	task3 := model.Task{
+		UUID:           "task-shrink-3",
+		Title:          "Shrink Task 3",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(14 * time.Hour),
+			End:   day.Add(15 * time.Hour), // 60 mins
+		},
+	}
+	database.AddTask(task3)
+	m.refreshTasks()
+	m.SelectedTaskUUID = "task-shrink-3"
+
+	m.EnterTaskDurationAdjustMode(false)
+	m.applyTaskDurationAdjust(-1)
+	m.confirmTaskDurationAdjust()
+	if !m.ConfirmOpen || m.ConfirmActionType != "shrink_remaining_confirm" {
+		t.Fatalf("expected shrink_remaining_confirm dialog, got ConfirmOpen=%t ConfirmActionType=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+
+	// Press Esc to cancel
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.ConfirmOpen {
+		t.Fatal("expected confirmation modal to be closed")
+	}
+
+	// Verify duration remains 60 mins
+	u3, _ := database.GetTask("task-shrink-3")
+	dur3 := u3.TimeWindow.End.Sub(u3.TimeWindow.Start)
+	if dur3 != 60*time.Minute {
+		t.Errorf("expected task-shrink-3 duration to remain 60m, got %s", dur3)
+	}
+}

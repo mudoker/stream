@@ -154,18 +154,41 @@ func (m *Model) AutoScrollToSelectedTask() {
 	viewportStart := startR
 	viewportEnd := startR + visibleH
 
-	if taskEnd-taskStart >= visibleH {
-		if m.CurrentMode == ModeTaskDurationAdjust {
-			target := taskEnd - (visibleH - visibleH/2)
-			m.TimelineHour = (target + visualRowsPerHour - 1) / visualRowsPerHour
+	if m.CurrentMode == ModeTaskDurationAdjust {
+		var activeBoundary int
+		if m.TaskDurationAdjustTop {
+			activeBoundary = rect.Top
 		} else {
-			m.TimelineHour = selectedTask.TimeWindow.Start.Hour()
+			activeBoundary = rect.Bottom
+		}
+
+		padding := 2
+		if activeBoundary < viewportStart+padding {
+			newViewportStart := activeBoundary - padding
+			if newViewportStart < 0 {
+				newViewportStart = 0
+			}
+			m.TimelineHour = (newViewportStart + visibleH/2) / visualRowsPerHour
+		} else if activeBoundary > viewportEnd-padding {
+			newViewportEnd := activeBoundary + padding
+			newViewportStart := newViewportEnd - visibleH
+			if newViewportStart > visualTotalRows-visibleH {
+				newViewportStart = visualTotalRows - visibleH
+			}
+			if newViewportStart < 0 {
+				newViewportStart = 0
+			}
+			m.TimelineHour = (newViewportStart + visibleH/2 + visualRowsPerHour - 1) / visualRowsPerHour
 		}
 	} else {
-		if taskStart < viewportStart {
+		if taskEnd-taskStart >= visibleH {
 			m.TimelineHour = selectedTask.TimeWindow.Start.Hour()
-		} else if taskEnd > viewportEnd {
-			m.TimelineHour = selectedTask.TimeWindow.Start.Hour()
+		} else {
+			if taskStart < viewportStart {
+				m.TimelineHour = selectedTask.TimeWindow.Start.Hour()
+			} else if taskEnd > viewportEnd {
+				m.TimelineHour = selectedTask.TimeWindow.Start.Hour()
+			}
 		}
 	}
 

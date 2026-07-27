@@ -469,3 +469,55 @@ func TestTaskShrinkRemaining(t *testing.T) {
 		t.Errorf("expected task-shrink-3 duration to remain 60m, got %s", dur3)
 	}
 }
+
+func TestTaskDurationAdjustScrolling(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := NewModel(database, syncEngine)
+	m.Height = 32
+	day := time.Date(2026, 6, 6, 0, 0, 0, 0, time.Local)
+	m.SelectedDay = day
+
+	task := model.Task{
+		UUID:           "task-scroll",
+		Title:          "Scroll Task",
+		WorkspaceUUID:  m.ActiveWorkspaceUUID,
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: day.Add(10 * time.Hour),
+			End:   day.Add(11 * time.Hour), // 60 mins
+		},
+	}
+	database.AddTask(task)
+	m.refreshTasks()
+	m.SelectedTaskUUID = "task-scroll"
+
+	// 1. Enter duration adjust mode
+	m.EnterTaskDurationAdjustMode(false) // Adjust bottom boundary
+	m.TimelineHour = 10 // Center around 10:00 AM
+
+	// Trigger AutoScroll - should keep TimelineHour = 10 since task is in view
+	m.AutoScrollToSelectedTask()
+	if m.TimelineHour != 10 {
+		t.Errorf("expected TimelineHour to remain 10, got %d", m.TimelineHour)
+	}
+
+	// 2. Extend bottom boundary extensively to 8 hours duration (moving taskEnd down)
+	m.applyTaskDurationAdjust(28) // +7 hours (total 8 hours)
+
+	// Since active boundary taskEnd is now at 18:00 (6:00 PM), it is outside the viewport when centered at 10:00 AM.
+	// AutoScroll should scroll down (TimelineHour should increase)
+	m.AutoScrollToSelectedTask()
+	if m.TimelineHour <= 10 {
+		t.Errorf("expected TimelineHour to increase to keep extended bottom in view, got %d", m.TimelineHour)
+	}
+}

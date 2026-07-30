@@ -50,7 +50,9 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 
 	var details []string
 	details = append(details, string(task.Priority))
-	if task.SchedulingType != model.Reminder {
+	if task.SchedulingType == model.Floating && task.EstimatedDurationMins > 0 {
+		details = append(details, fmt.Sprintf("%dm remaining", task.EstimatedDurationMins))
+	} else if task.SchedulingType != model.Reminder {
 		details = append(details, fmt.Sprintf("%d SP", task.StoryPoints))
 	}
 	if task.SchedulingType == model.Reminder {

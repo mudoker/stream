@@ -289,13 +289,20 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 		newDur := m.PendingEditTask.TimeWindow.End.Sub(m.PendingEditTask.TimeWindow.Start)
 		remainingMins := int((origDur - newDur).Minutes())
 
+		boldAccent := lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
+		boldSuccess := lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true)
+		boldMuted := lipgloss.NewStyle().Foreground(t.Muted)
+
 		return components.RenderBaseConfirmModal(
-			"Task Shrunk",
+			"✂️   TASK SHRUNK",
 			[]string{
 				"You have shrunk the duration of task:",
-				"  " + theme.SentenceCase(m.ConfirmTask.Title),
+				"  " + boldAccent.Render(theme.SentenceCase(m.ConfirmTask.Title)),
+				"",
 				"Would you like to log the remaining time",
-				fmt.Sprintf("  (%d minutes) to the Todo Shelf or discard it?", remainingMins),
+				fmt.Sprintf("  (%s) to the Todo Shelf or discard it?", boldSuccess.Render(fmt.Sprintf("%d minutes", remainingMins))),
+				"",
+				boldMuted.Render("  Logs to Shelf as a floating backlog item."),
 			},
 			[]string{"Yes, Log to Shelf", "No, Discard"},
 			m.ConfirmSelectedIndex,
@@ -324,7 +331,11 @@ func RenderAnchorPromptModal(m *viewmodel.Model, t theme.Theme) string {
 	var bodyLines []string
 
 	bodyLines = append(bodyLines, fmt.Sprintf("  Task:  %s", lipgloss.NewStyle().Bold(true).Render(theme.SentenceCase(m.AnchorPromptTask.Title))))
-	bodyLines = append(bodyLines, fmt.Sprintf("  Est:   %d SP (%d mins)", m.AnchorPromptTask.StoryPoints, m.AnchorPromptTask.StoryPoints*45))
+	if m.AnchorPromptTask.SchedulingType == model.Floating && m.AnchorPromptTask.EstimatedDurationMins > 0 {
+		bodyLines = append(bodyLines, fmt.Sprintf("  Est:   %d mins (remaining)", m.AnchorPromptTask.EstimatedDurationMins))
+	} else {
+		bodyLines = append(bodyLines, fmt.Sprintf("  Est:   %d SP (%d mins)", m.AnchorPromptTask.StoryPoints, m.AnchorPromptTask.StoryPoints*45))
+	}
 	bodyLines = append(bodyLines, "")
 
 	renderField := func(label string, view string, isActive bool) string {

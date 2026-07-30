@@ -147,10 +147,14 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				if m.ConfirmSelectedIndex == 0 {
 					m.DB.UpdateTask(m.PendingEditTask)
 					if m.LogRemainingOnConfirm {
+						remainingTitle := m.PendingEditTask.Title
+						if !strings.HasSuffix(remainingTitle, " (remaining)") {
+							remainingTitle += " (remaining)"
+						}
 						remainingTask := model.Task{
 							UUID:                  uuid.New().String(),
 							WorkspaceUUID:         m.PendingEditTask.WorkspaceUUID,
-							Title:                 m.PendingEditTask.Title,
+							Title:                 remainingTitle,
 							Description:           m.PendingEditTask.Description,
 							Priority:              m.PendingEditTask.Priority,
 							StoryPoints:           m.PendingEditTask.StoryPoints,
@@ -205,10 +209,14 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 							}
 						}
 						if m.LogRemainingOnConfirm {
+							remainingTitle := m.PendingEditTask.Title
+							if !strings.HasSuffix(remainingTitle, " (remaining)") {
+								remainingTitle += " (remaining)"
+							}
 							remainingTask := model.Task{
 								UUID:                  uuid.New().String(),
 								WorkspaceUUID:         m.PendingEditTask.WorkspaceUUID,
-								Title:                 m.PendingEditTask.Title,
+								Title:                 remainingTitle,
 								Description:           m.PendingEditTask.Description,
 								Priority:              m.PendingEditTask.Priority,
 								StoryPoints:           m.PendingEditTask.StoryPoints,
@@ -343,10 +351,14 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				} else {
 					m.DB.UpdateTask(m.PendingEditTask)
 					if m.LogRemainingOnConfirm {
+						remainingTitle := m.PendingEditTask.Title
+						if !strings.HasSuffix(remainingTitle, " (remaining)") {
+							remainingTitle += " (remaining)"
+						}
 						remainingTask := model.Task{
 							UUID:                  uuid.New().String(),
 							WorkspaceUUID:         m.PendingEditTask.WorkspaceUUID,
-							Title:                 m.PendingEditTask.Title,
+							Title:                 remainingTitle,
 							Description:           m.PendingEditTask.Description,
 							Priority:              m.PendingEditTask.Priority,
 							StoryPoints:           m.PendingEditTask.StoryPoints,

@@ -75,7 +75,10 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 				m.AnchorDurationInput = textinput.New()
 				defaultDur := task.EstimatedDurationMins
 				if defaultDur <= 0 {
-					defaultDur = 60
+					defaultDur = task.StoryPoints * 45
+					if defaultDur <= 0 {
+						defaultDur = 60
+					}
 				}
 				m.AnchorDurationInput.SetValue(strconv.Itoa(defaultDur))
 

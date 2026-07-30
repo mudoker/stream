@@ -376,7 +376,7 @@ func TestTaskShrinkRemaining(t *testing.T) {
 	allTasks := database.GetTasks()
 	var floatingFound bool
 	for _, tk := range allTasks {
-		if tk.SchedulingType == model.Floating && tk.Title == "Shrink Task 1" && tk.EstimatedDurationMins == 15 {
+		if tk.SchedulingType == model.Floating && tk.Title == "Shrink Task 1 (remaining)" && tk.EstimatedDurationMins == 15 {
 			floatingFound = true
 			break
 		}

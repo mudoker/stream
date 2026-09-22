@@ -172,3 +172,74 @@ func TestDBInvalidTasksCleanup(t *testing.T) {
 		t.Errorf("expected completed invalid type task to be retained")
 	}
 }
+
+func TestAutoSyncEndToEndIntegration(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+
+	ws := model.Workspace{UUID: "ws-1", Name: "Default"}
+	_ = database.AddWorkspace(ws)
+
+	var logMessages []string
+	syncEngine, err := sync.NewSyncEngine(database, func(msg string) {
+		logMessages = append(logMessages, msg)
+	}, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+
+	// Verify default sync settings: Two-Way mode
+	settings := database.GetUserSettings().NormalizedGCalSync()
+	if settings.GCalSyncMode != model.GCalSyncTwoWay {
+		t.Errorf("expected default sync mode to be GCalSyncTwoWay, got %s", settings.GCalSyncMode)
+	}
+
+	// 1. Add anchored task via ViewModel -> should trigger push sync
+	task := model.Task{
+		UUID:           "task-anchored-auto",
+		WorkspaceUUID:  "ws-1",
+		Title:          "Morning Standup",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 6, 11, 9, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 6, 11, 9, 30, 0, 0, time.UTC),
+		},
+	}
+	m.AddTask(task)
+
+	ledger := database.GetLedger()
+	if len(ledger) != 1 || ledger[0].Op != "CREATE" {
+		t.Errorf("expected 1 CREATE entry in ledger for added anchored task, got %d", len(ledger))
+	}
+
+	// 2. Update task via ViewModel -> should record UPDATE in ledger
+	task.Title = "Morning Standup & Sync"
+	m.UpdateTask(task)
+
+	ledger = database.GetLedger()
+	if len(ledger) != 2 || ledger[1].Op != "UPDATE" {
+		t.Errorf("expected UPDATE entry in ledger, got %v", ledger)
+	}
+
+	// 3. Delete task via ViewModel -> should record DELETE in ledger
+	m.DeleteTask("task-anchored-auto")
+
+	ledger = database.GetLedger()
+	if len(ledger) != 3 || ledger[2].Op != "DELETE" {
+		t.Errorf("expected DELETE entry in ledger, got %v", ledger)
+	}
+}
+
+
+
+
+
+
+

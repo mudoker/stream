@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"stream/internal/db"
 	"stream/internal/model"
 
 	"google.golang.org/api/calendar/v3"
+	"google.golang.org/api/googleapi"
 )
 
 func (s *SyncEngine) ensureService() (*calendar.Service, error) {
@@ -105,6 +107,8 @@ func (s *SyncEngine) sync(includePull bool) {
 			s.logCallback("Sync Engine: Remote pull complete.")
 		}
 	}
+
+	s.resetRateLimitBackoff()
 }
 
 func (s *SyncEngine) replayEntry(srv *calendar.Service, entry db.LedgerEntry) error {
@@ -130,9 +134,19 @@ func (s *SyncEngine) replayEntry(srv *calendar.Service, entry db.LedgerEntry) er
 }
 
 func (s *SyncEngine) handleSkippableLedgerEntry(entry db.LedgerEntry, err error) bool {
-	if err != nil && err.Error() == "non-anchored task" {
+	if err == nil {
+		return false
+	}
+	if err.Error() == "non-anchored task" {
 		s.logCallback(fmt.Sprintf("Sync: skipping non-anchored ledger entry for %s.", entry.TaskUUID))
 		return true
+	}
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) {
+		if apiErr.Code == 400 || apiErr.Code == 404 || apiErr.Code == 410 {
+			s.logCallback(fmt.Sprintf("Sync: skipping non-syncable entry for %s: %s", entry.TaskUUID, apiErr.Message))
+			return true
+		}
 	}
 	return false
 }
@@ -162,27 +176,43 @@ func (s *SyncEngine) handleStaleLedgerEntry(srv *calendar.Service, entry db.Ledg
 	}
 }
 
+func normalizeTitleTimeKey(title string, start, end time.Time) string {
+	normTitle := strings.TrimSpace(strings.ToLower(title))
+	return fmt.Sprintf("%s|%s|%s", normTitle, start.UTC().Format(time.RFC3339), end.UTC().Format(time.RFC3339))
+}
+
 func (s *SyncEngine) taskToEvent(task model.Task) *calendar.Event {
 	event := &calendar.Event{
 		Summary:     task.Title,
 		Description: task.Description,
+		Location:    task.Location,
 		ExtendedProperties: &calendar.EventExtendedProperties{
 			Private: map[string]string{
 				"uuid":            task.UUID,
+				"source":          "stream",
 				"priority":        string(task.Priority),
 				"story_points":    strconv.Itoa(task.StoryPoints),
 				"lifecycle_state": string(task.LifecycleState),
 				"scheduling_type": string(task.SchedulingType),
 			},
 		},
-		Start: &calendar.EventDateTime{
-			DateTime: task.TimeWindow.Start.Format(time.RFC3339),
-			TimeZone: "UTC",
-		},
-		End: &calendar.EventDateTime{
-			DateTime: task.TimeWindow.End.Format(time.RFC3339),
-			TimeZone: "UTC",
-		},
 	}
+
+	if task.IsAllDay {
+		event.Start = &calendar.EventDateTime{
+			Date: task.TimeWindow.Start.Format("2006-01-02"),
+		}
+		event.End = &calendar.EventDateTime{
+			Date: task.TimeWindow.End.Format("2006-01-02"),
+		}
+	} else {
+		event.Start = &calendar.EventDateTime{
+			DateTime: task.TimeWindow.Start.Format(time.RFC3339),
+		}
+		event.End = &calendar.EventDateTime{
+			DateTime: task.TimeWindow.End.Format(time.RFC3339),
+		}
+	}
+
 	return event
 }

@@ -43,7 +43,12 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 		if entry.Op == "DELETE" {
 			if entry.Task.GCalMetadata.EventID != "" {
 				s.logCallback(fmt.Sprintf("Sync: Deleting GCal event '%s'...", entry.Task.Title))
-				_ = s.deleteRemoteEvent(srv, entry.Task)
+				if err := s.deleteRemoteEvent(srv, entry.Task); err != nil {
+					if isRateLimitError(err) {
+						return err
+					}
+				}
+				s.throttle()
 			}
 		}
 		_ = s.localDB.RemoveLedgerEntry(entry.ID)
@@ -51,60 +56,126 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 
 	// 2. Fetch GCal events to avoid duplicates
 	timeMin := time.Now().AddDate(0, 0, -30).Format(time.RFC3339)
-	events, err := srv.Events.List("primary").TimeMin(timeMin).ShowDeleted(true).Do()
-	if err != nil {
-		return err
-	}
-
 	gcalByEventID := make(map[string]*calendar.Event)
 	gcalByTitleTime := make(map[string]*calendar.Event)
-	for _, item := range events.Items {
-		if item.Status == "cancelled" {
-			continue
+	gcalByUUID := make(map[string][]*calendar.Event)
+
+	pageToken := ""
+	for {
+		call := srv.Events.List("primary").TimeMin(timeMin).ShowDeleted(true).SingleEvents(true)
+		if pageToken != "" {
+			call = call.PageToken(pageToken)
 		}
-		gcalByEventID[item.Id] = item
-		var start, end time.Time
-		if item.Start != nil {
-			start, _ = time.Parse(time.RFC3339, item.Start.DateTime)
+		events, err := call.Do()
+		if err != nil {
+			return err
 		}
-		if item.End != nil {
-			end, _ = time.Parse(time.RFC3339, item.End.DateTime)
+
+		for _, item := range events.Items {
+			if item.Status == "cancelled" {
+				continue
+			}
+			gcalByEventID[item.Id] = item
+			if item.ExtendedProperties != nil && item.ExtendedProperties.Private != nil {
+				if u, ok := item.ExtendedProperties.Private["uuid"]; ok && u != "" {
+					gcalByUUID[u] = append(gcalByUUID[u], item)
+				}
+			}
+			var start, end time.Time
+			if item.Start != nil {
+				start, _ = time.Parse(time.RFC3339, item.Start.DateTime)
+			}
+			if item.End != nil {
+				end, _ = time.Parse(time.RFC3339, item.End.DateTime)
+			}
+			if !start.IsZero() && !end.IsZero() {
+				key := normalizeTitleTimeKey(item.Summary, start, end)
+				gcalByTitleTime[key] = item
+			}
 		}
-		if !start.IsZero() && !end.IsZero() {
-			key := fmt.Sprintf("%s|%s|%s", strings.ToLower(item.Summary), start.UTC().Format(time.RFC3339), end.UTC().Format(time.RFC3339))
-			gcalByTitleTime[key] = item
+
+		pageToken = events.NextPageToken
+		if pageToken == "" {
+			break
 		}
+		s.throttle()
 	}
 
 	// 3. Scan local database for ANCHORED tasks and push
+	windowStart := time.Now().AddDate(0, 0, -30)
 	localTasks := s.localDB.GetTasks()
 	for _, t := range localTasks {
 		if !model.IsGCalSyncable(t) {
 			continue
+		}
+		if !t.TimeWindow.End.IsZero() && t.TimeWindow.End.Before(windowStart) {
+			continue
+		}
+
+		// Check if GCal has multiple ghost events with this task's UUID -> clean them up!
+		if evts, hasDups := gcalByUUID[t.UUID]; hasDups && len(evts) > 1 {
+			bestIdx := 0
+			for i, e := range evts {
+				if t.GCalMetadata.EventID != "" && e.Id == t.GCalMetadata.EventID {
+					bestIdx = i
+					break
+				}
+			}
+			// Delete the duplicate ghost events from GCal
+			for i, e := range evts {
+				if i != bestIdx {
+					_ = s.deleteRemoteEvent(srv, model.Task{GCalMetadata: model.GCalMetadata{EventID: e.Id}})
+					delete(gcalByEventID, e.Id)
+				}
+			}
+			gcalByUUID[t.UUID] = []*calendar.Event{evts[bestIdx]}
 		}
 
 		var matchedEvent *calendar.Event
 		if t.GCalMetadata.EventID != "" {
 			matchedEvent = gcalByEventID[t.GCalMetadata.EventID]
 		}
+		if matchedEvent == nil && t.UUID != "" {
+			if evts, ok := gcalByUUID[t.UUID]; ok && len(evts) > 0 {
+				matchedEvent = evts[0]
+			}
+		}
 		if matchedEvent == nil {
 			// Try title+time matching
-			key := fmt.Sprintf("%s|%s|%s", strings.ToLower(t.Title), t.TimeWindow.Start.UTC().Format(time.RFC3339), t.TimeWindow.End.UTC().Format(time.RFC3339))
+			key := normalizeTitleTimeKey(t.Title, t.TimeWindow.Start, t.TimeWindow.End)
 			matchedEvent = gcalByTitleTime[key]
 		}
 
 		if matchedEvent != nil {
-			// Exists on GCal: Update it (local is source of truth)
 			t.GCalMetadata.EventID = matchedEvent.Id
+			if matchedEvent.EventType != "" && matchedEvent.EventType != "default" && matchedEvent.EventType != "focusTime" {
+				// Special Google events (flight reservations, hotel, outOfOffice) are read-only
+				_ = s.localDB.UpdateTaskNoLedger(t)
+				continue
+			}
+
+			// If event is already identical, skip sending redundant API requests
+			if t.GCalMetadata.ETag == matchedEvent.Etag && t.Title == matchedEvent.Summary && t.Description == matchedEvent.Description {
+				continue
+			}
+
+			// Exists on GCal: Update it (local is source of truth)
 			if err := s.updateRemoteEvent(srv, t); err != nil {
+				if isRateLimitError(err) {
+					return err
+				}
 				s.logCallback(fmt.Sprintf("Sync: Failed to update GCal event '%s': %s", t.Title, formatSyncError(err)))
 			}
 		} else {
 			// Does not exist on GCal: Create it
 			if err := s.createRemoteEvent(srv, t); err != nil {
+				if isRateLimitError(err) {
+					return err
+				}
 				s.logCallback(fmt.Sprintf("Sync: Failed to create GCal event '%s': %s", t.Title, formatSyncError(err)))
 			}
 		}
+		s.throttle()
 	}
 
 	return nil
@@ -136,11 +207,17 @@ func (s *SyncEngine) updateRemoteEvent(srv *calendar.Service, task model.Task) e
 	}
 
 	event := s.taskToEvent(task)
-	res, err := srv.Events.Update("primary", task.GCalMetadata.EventID, event).Do()
+	res, err := srv.Events.Patch("primary", task.GCalMetadata.EventID, event).Do()
 	if err != nil {
 		var apiErr *googleapi.Error
-		if errors.As(err, &apiErr) && apiErr.Code == 410 {
-			return s.createRemoteEvent(srv, task)
+		if errors.As(err, &apiErr) {
+			if apiErr.Code == 404 || apiErr.Code == 410 {
+				return s.createRemoteEvent(srv, task)
+			}
+			if apiErr.Code == 400 && strings.Contains(apiErr.Message, "Event type cannot be changed") {
+				// Special Google events (flights, reservations, etc.) are read-only from Gmail
+				return nil
+			}
 		}
 		return err
 	}
@@ -157,7 +234,7 @@ func (s *SyncEngine) deleteRemoteEvent(srv *calendar.Service, task model.Task) e
 	err := srv.Events.Delete("primary", task.GCalMetadata.EventID).Do()
 	if err != nil {
 		var apiErr *googleapi.Error
-		if errors.As(err, &apiErr) && apiErr.Code == 410 {
+		if errors.As(err, &apiErr) && (apiErr.Code == 404 || apiErr.Code == 410) {
 			return nil
 		}
 		return err

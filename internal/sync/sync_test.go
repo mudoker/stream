@@ -326,14 +326,15 @@ func TestSyncEngine_ManualPush_Success(t *testing.T) {
 	// 1. local-task-1: Has EventID, exists on remote -> Should trigger UPDATE
 	// 2. local-task-2: No EventID -> Should trigger INSERT
 	// 3. local-task-3: Floating -> Should not sync at all
+	now := time.Now()
 	t1 := model.Task{
 		UUID:           "local-task-1",
 		WorkspaceUUID:  "ws-1",
 		Title:          "Task 1 Pushed",
 		SchedulingType: model.Anchored,
 		TimeWindow: model.TimeWindow{
-			Start: time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC),
-			End:   time.Date(2026, 6, 11, 11, 0, 0, 0, time.UTC),
+			Start: now.Add(1 * time.Hour),
+			End:   now.Add(2 * time.Hour),
 		},
 		GCalMetadata: model.GCalMetadata{
 			EventID: "event-id-1",
@@ -347,8 +348,8 @@ func TestSyncEngine_ManualPush_Success(t *testing.T) {
 		Title:          "Task 2 Pushed",
 		SchedulingType: model.Anchored,
 		TimeWindow: model.TimeWindow{
-			Start: time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC),
-			End:   time.Date(2026, 6, 11, 13, 0, 0, 0, time.UTC),
+			Start: now.Add(3 * time.Hour),
+			End:   now.Add(4 * time.Hour),
 		},
 	}
 	_ = localDB.AddTaskNoLedger(t2)
@@ -377,18 +378,18 @@ func TestSyncEngine_ManualPush_Success(t *testing.T) {
 		logged = append(logged, s)
 	}, nil)
 
-	var putCalled, postCalled, deleteCalled bool
+	var patchCalled, postCalled, deleteCalled bool
 	transport := &mockTransport{
 		roundTrip: func(req *http.Request) (*http.Response, error) {
 			if req.Method == "GET" && strings.Contains(req.URL.Path, "/calendars/primary/events") {
-				respBody := `{
+				respBody := fmt.Sprintf(`{
 					"items": [
 						{
 							"id": "event-id-1",
 							"summary": "Old Task 1 Summary",
 							"status": "confirmed",
-							"start": {"dateTime": "2026-06-11T10:00:00Z"},
-							"end": {"dateTime": "2026-06-11T11:00:00Z"}
+							"start": {"dateTime": "%s"},
+							"end": {"dateTime": "%s"}
 						},
 						{
 							"id": "event-id-deleted",
@@ -396,7 +397,7 @@ func TestSyncEngine_ManualPush_Success(t *testing.T) {
 							"status": "confirmed"
 						}
 					]
-				}`
+				}`, now.Add(1*time.Hour).Format(time.RFC3339), now.Add(2*time.Hour).Format(time.RFC3339))
 				return &http.Response{
 					StatusCode: 200,
 					Body:       io.NopCloser(bytes.NewBufferString(respBody)),
@@ -413,8 +414,8 @@ func TestSyncEngine_ManualPush_Success(t *testing.T) {
 				}, nil
 			}
 
-			if req.Method == "PUT" && strings.Contains(req.URL.Path, "/events/event-id-1") {
-				putCalled = true
+			if (req.Method == "PATCH" || req.Method == "PUT") && strings.Contains(req.URL.Path, "/events/event-id-1") {
+				patchCalled = true
 				respBody := `{"id": "event-id-1", "etag": "new-etag", "sequence": 2}`
 				return &http.Response{
 					StatusCode: 200,
@@ -447,8 +448,8 @@ func TestSyncEngine_ManualPush_Success(t *testing.T) {
 	if !deleteCalled {
 		t.Errorf("expected DELETE request for event-id-deleted")
 	}
-	if !putCalled {
-		t.Errorf("expected PUT request for event-id-1")
+	if !patchCalled {
+		t.Errorf("expected PATCH/PUT request for event-id-1")
 	}
 	if !postCalled {
 		t.Errorf("expected POST request to create event for local-task-2")
@@ -709,3 +710,271 @@ func TestFormatSyncError(t *testing.T) {
 		})
 	}
 }
+
+func TestSyncEngine_AutoSyncDaemon(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	configDir := filepath.Join(tmpDir, ".config", "stream")
+	_ = os.MkdirAll(configDir, 0755)
+	_ = os.WriteFile(filepath.Join(configDir, "client_secrets.json"), []byte(`{"installed":{"client_id":"123"}}`), 0644)
+	_ = os.WriteFile(filepath.Join(configDir, "credentials.json"), []byte(`{"access_token":"tok"}`), 0600)
+
+	localDB, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create db: %v", err)
+	}
+
+	ws := model.Workspace{UUID: "ws-1", Name: "Default"}
+	_ = localDB.AddWorkspace(ws)
+
+	// Set sync mode to two-way with very short interval (1s)
+	settings := localDB.GetUserSettings()
+	settings.GCalSyncMode = model.GCalSyncTwoWay
+	settings.GCalSyncIntervalSeconds = 1
+	_ = localDB.UpdateUserSettings(settings)
+
+	// Local task to push
+	task1 := model.Task{
+		UUID:           "local-task-auto",
+		WorkspaceUUID:  "ws-1",
+		Title:          "Auto Task Local",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 6, 11, 11, 0, 0, 0, time.UTC),
+		},
+	}
+	_ = localDB.AddTask(task1)
+
+	var logged []string
+	engine, err := NewSyncEngine(localDB, func(s string) {
+		logged = append(logged, s)
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewSyncEngine failed: %v", err)
+	}
+
+	var postCalled bool
+	transport := &mockTransport{
+		roundTrip: func(req *http.Request) (*http.Response, error) {
+			if req.Method == "GET" && strings.Contains(req.URL.Path, "/events") {
+				respBody := `{
+					"items": [
+						{
+							"id": "remote-evt-auto-2",
+							"summary": "Remote Event Auto",
+							"status": "confirmed",
+							"start": {"dateTime": "2026-06-11T14:00:00Z"},
+							"end": {"dateTime": "2026-06-11T15:00:00Z"},
+							"extendedProperties": {
+								"private": {
+									"uuid": "remote-auto-uuid",
+									"priority": "P1",
+									"story_points": "2",
+									"lifecycle_state": "SCHEDULED",
+									"scheduling_type": "ANCHORED"
+								}
+							}
+						}
+					]
+				}`
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(respBody)),
+					Header:     make(http.Header),
+				}, nil
+			}
+			if req.Method == "GET" && strings.Contains(req.URL.Path, "/calendars/primary") {
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
+					Header:     make(http.Header),
+				}, nil
+			}
+			if req.Method == "POST" && strings.Contains(req.URL.Path, "/events") {
+				postCalled = true
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"id":"evt-auto-1"}`)),
+					Header:     make(http.Header),
+				}, nil
+			}
+			return nil, fmt.Errorf("unexpected: %s", req.URL.Path)
+		},
+	}
+
+	client := &http.Client{Transport: transport}
+	srv, _ := calendar.NewService(context.Background(), option.WithHTTPClient(client))
+	engine.srv = srv
+	engine.isOnline = true
+
+	engine.StartDaemon()
+	defer engine.Stop()
+
+	// Wait for daemon to execute sync cycle
+	time.Sleep(150 * time.Millisecond)
+
+	// Check post was called for local task
+	if !postCalled {
+		t.Errorf("expected local task to be pushed automatically by daemon")
+	}
+
+	// Check remote task was pulled into local DB
+	pulledTask, ok := localDB.GetTask("remote-auto-uuid")
+	if !ok {
+		t.Errorf("expected remote task to be pulled automatically by daemon")
+	} else if pulledTask.Title != "Remote Event Auto" {
+		t.Errorf("expected pulled task title 'Remote Event Auto', got %q", pulledTask.Title)
+	}
+}
+func TestSyncEngine_StaleDataConflictResolution(t *testing.T) {
+	localDB, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to init db: %v", err)
+	}
+
+	engine, err := NewSyncEngine(localDB, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to init sync engine: %v", err)
+	}
+
+	// 1. Task exists locally and was updated locally more recently than remote
+	localTask := model.Task{
+		UUID:           "task-conflict-1",
+		Title:          "Local Fresh Title",
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 6, 11, 11, 0, 0, 0, time.UTC),
+		},
+		GCalMetadata: model.GCalMetadata{
+			EventID: "event-conflict-1",
+		},
+	}
+	_ = localDB.AddTask(localTask)
+
+	// Remote item has an older updated timestamp and older title
+	remoteListJSON := `{
+		"kind": "calendar#events",
+		"items": [
+			{
+				"id": "event-conflict-1",
+				"status": "confirmed",
+				"summary": "Stale Remote Title",
+				"updated": "2026-06-11T08:00:00.000Z",
+				"start": {"dateTime": "2026-06-11T10:00:00Z"},
+				"end": {"dateTime": "2026-06-11T11:00:00Z"},
+				"extendedProperties": {
+					"private": {
+						"uuid": "task-conflict-1",
+						"source": "stream",
+						"scheduling_type": "ANCHORED"
+					}
+				}
+			}
+		]
+	}`
+
+	transport := &mockTransport{
+		roundTrip: func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "/events") && req.Method == "GET" {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(remoteListJSON)),
+					Header:     make(http.Header),
+				}, nil
+			}
+			return nil, fmt.Errorf("unexpected: %s", req.URL.Path)
+		},
+	}
+
+	client := &http.Client{Transport: transport}
+	srv, _ := calendar.NewService(context.Background(), option.WithHTTPClient(client))
+
+	err = engine.pullRemoteUpdates(srv)
+	if err != nil {
+		t.Fatalf("pullRemoteUpdates failed: %v", err)
+	}
+
+	// Verify local task title was NOT overwritten with stale remote title
+	taskAfterPull, _ := localDB.GetTask("task-conflict-1")
+	if taskAfterPull.Title != "Local Fresh Title" {
+		t.Errorf("expected local title to be preserved ('Local Fresh Title'), got %q", taskAfterPull.Title)
+	}
+
+	// 2. Pending delete prevention: Task was deleted locally, remote list still has it
+	_ = localDB.DeleteTask("task-conflict-1") // records DELETE in ledger
+
+	deleteRemoteCalled := false
+	transportDelete := &mockTransport{
+		roundTrip: func(req *http.Request) (*http.Response, error) {
+			if strings.Contains(req.URL.Path, "/events") && req.Method == "GET" {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(remoteListJSON)),
+					Header:     make(http.Header),
+				}, nil
+			}
+			if strings.Contains(req.URL.Path, "/events/event-conflict-1") && req.Method == "DELETE" {
+				deleteRemoteCalled = true
+				return &http.Response{
+					StatusCode: http.StatusNoContent,
+					Body:       io.NopCloser(bytes.NewReader([]byte{})),
+					Header:     make(http.Header),
+				}, nil
+			}
+			return nil, fmt.Errorf("unexpected: %s %s", req.Method, req.URL.Path)
+		},
+	}
+	clientDelete := &http.Client{Transport: transportDelete}
+	srvDelete, _ := calendar.NewService(context.Background(), option.WithHTTPClient(clientDelete))
+
+	err = engine.pullRemoteUpdates(srvDelete)
+	if err != nil {
+		t.Fatalf("pullRemoteUpdates on pending delete failed: %v", err)
+	}
+
+	// Task should not be resurrected in local DB
+	if _, exists := localDB.GetTask("task-conflict-1"); exists {
+		t.Errorf("expected locally deleted task NOT to be resurrected by remote pull")
+	}
+	if !deleteRemoteCalled {
+		t.Errorf("expected deleteRemoteEvent to be triggered for pending deleted task")
+	}
+}
+
+func TestSyncEngine_RateLimitProgression(t *testing.T) {
+	localDB, _ := db.NewJSONDB()
+	engine, _ := NewSyncEngine(localDB, nil, nil)
+
+	if engine.isRateLimited() {
+		t.Errorf("expected not rate limited initially")
+	}
+
+	// First rate limit: backoff should be 5s
+	err429 := &googleapi.Error{Code: 429}
+	engine.handleRateLimit(err429)
+
+	if !engine.isRateLimited() {
+		t.Errorf("expected rate limited after handleRateLimit")
+	}
+	if engine.consecutiveRateLimits != 1 {
+		t.Errorf("expected consecutiveRateLimits to be 1, got %d", engine.consecutiveRateLimits)
+	}
+
+	// Second rate limit: backoff increases exponentially
+	engine.handleRateLimit(err429)
+	if engine.consecutiveRateLimits != 2 {
+		t.Errorf("expected consecutiveRateLimits to be 2, got %d", engine.consecutiveRateLimits)
+	}
+
+	// Reset backoff on success
+	engine.resetRateLimitBackoff()
+	if engine.consecutiveRateLimits != 0 {
+		t.Errorf("expected consecutiveRateLimits to reset to 0, got %d", engine.consecutiveRateLimits)
+	}
+}
+
+
+

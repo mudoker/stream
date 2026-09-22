@@ -22,18 +22,20 @@ type syncRequest struct {
 }
 
 type SyncEngine struct {
-	mu                   sync.RWMutex
-	localDB              *db.JSONDB
-	oauthConfig          *oauth2.Config
-	token                *oauth2.Token
-	srv                  *calendar.Service
-	isOnline             bool
-	syncChan             chan syncRequest
-	settingsChan         chan struct{}
-	stopChan             chan struct{}
-	logCallback          func(string)
-	authCompleteCallback func()
-	rateLimitedUntil     time.Time
+	mu                    sync.RWMutex
+	syncMutex             sync.Mutex
+	localDB               *db.JSONDB
+	oauthConfig           *oauth2.Config
+	token                 *oauth2.Token
+	srv                   *calendar.Service
+	isOnline              bool
+	syncChan              chan syncRequest
+	settingsChan          chan struct{}
+	stopChan              chan struct{}
+	logCallback           func(string)
+	authCompleteCallback  func()
+	rateLimitedUntil      time.Time
+	consecutiveRateLimits int
 }
 
 func NewSyncEngine(localDB *db.JSONDB, logCallback func(string), authCompleteCallback func()) (*SyncEngine, error) {
@@ -100,8 +102,59 @@ func (s *SyncEngine) enqueueSync(req syncRequest) {
 
 func (s *SyncEngine) StartDaemon() {
 	go func() {
-		<-s.stopChan
+		interval := s.getSyncInterval()
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		// Initial sync on startup
+		mode := s.getSyncMode()
+		if mode != model.GCalSyncNone {
+			s.enqueueSync(syncRequest{includePull: mode == model.GCalSyncTwoWay})
+		}
+
+		for {
+			select {
+			case <-s.stopChan:
+				return
+
+			case <-s.settingsChan:
+				newInterval := s.getSyncInterval()
+				if newInterval != interval {
+					interval = newInterval
+					ticker.Reset(interval)
+				}
+				mode := s.getSyncMode()
+				if mode != model.GCalSyncNone {
+					s.enqueueSync(syncRequest{includePull: mode == model.GCalSyncTwoWay})
+				}
+
+			case req := <-s.syncChan:
+				if !s.isRateLimited() {
+					s.runSync(req.includePull)
+				}
+
+			case <-ticker.C:
+				if !s.isRateLimited() {
+					mode := s.getSyncMode()
+					if mode == model.GCalSyncTwoWay {
+						s.runSync(true)
+					} else if mode == model.GCalSyncPush {
+						s.runSync(false)
+					}
+				}
+			}
+		}
 	}()
+}
+
+func (s *SyncEngine) runSync(includePull bool) {
+	s.syncMutex.Lock()
+	defer s.syncMutex.Unlock()
+
+	if s.isRateLimited() {
+		return
+	}
+	s.sync(includePull)
 }
 
 func (s *SyncEngine) Stop() {
@@ -121,6 +174,9 @@ func (s *SyncEngine) setOnline(online bool) {
 }
 
 func isRateLimitError(err error) bool {
+	if err == nil {
+		return false
+	}
 	var apiErr *googleapi.Error
 	if errors.As(err, &apiErr) {
 		if apiErr.Code == 429 {
@@ -128,18 +184,32 @@ func isRateLimitError(err error) bool {
 		}
 		if apiErr.Code == 403 {
 			for _, e := range apiErr.Errors {
-				if e.Reason == "rateLimitExceeded" || e.Reason == "userRateLimitExceeded" {
+				if e.Reason == "rateLimitExceeded" || e.Reason == "userRateLimitExceeded" || e.Reason == "quotaExceeded" || e.Reason == "dailyLimitExceeded" {
 					return true
 				}
 			}
-			return strings.Contains(strings.ToLower(apiErr.Message), "rate limit")
+			errMsg := strings.ToLower(apiErr.Message)
+			return strings.Contains(errMsg, "rate limit") || strings.Contains(errMsg, "quota")
+		}
+		if apiErr.Code == 500 || apiErr.Code == 503 {
+			return true
 		}
 	}
-	return false
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "rate limit") || strings.Contains(errMsg, "quota exceeded")
 }
 
 func (s *SyncEngine) handleRateLimit(err error) {
-	backoff := 60 * time.Second
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.consecutiveRateLimits++
+	backoffSecs := 5 * (1 << (s.consecutiveRateLimits - 1))
+	if backoffSecs > 120 {
+		backoffSecs = 120
+	}
+	backoff := time.Duration(backoffSecs) * time.Second
+
 	var apiErr *googleapi.Error
 	if errors.As(err, &apiErr) {
 		if retryAfter := apiErr.Header.Get("Retry-After"); retryAfter != "" {
@@ -152,8 +222,20 @@ func (s *SyncEngine) handleRateLimit(err error) {
 	s.logCallback(fmt.Sprintf("GCal rate limit hit. Retrying in %ds. Changes stay queued.", int(backoff.Seconds())))
 }
 
+func (s *SyncEngine) resetRateLimitBackoff() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.consecutiveRateLimits = 0
+}
+
 func (s *SyncEngine) isRateLimited() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return time.Now().Before(s.rateLimitedUntil)
+}
+
+func (s *SyncEngine) throttle() {
+	time.Sleep(30 * time.Millisecond)
 }
 
 func formatSyncError(err error) string {
@@ -194,6 +276,9 @@ func formatSyncError(err error) string {
 	}
 	if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline exceeded") {
 		return "connection timeout"
+	}
+	if strings.Contains(errStr, "invalid_grant") {
+		return "OAuth token expired or revoked. Please run ':auth' to re-authenticate."
 	}
 	if strings.Contains(errStr, "oauth2: cannot fetch token") {
 		return "OAuth token refresh failed (check connection/credentials)"

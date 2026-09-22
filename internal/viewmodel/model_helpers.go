@@ -59,7 +59,7 @@ func (m *Model) refreshTasks() {
 			t.LifecycleState != model.StateOverdue {
 
 			t.LifecycleState = model.StateOverdue
-			m.DB.UpdateTask(t)
+			m.DB.UpdateTaskNoLedger(t)
 			m.Tasks[i] = t
 			updatedAny = true
 		}
@@ -269,6 +269,7 @@ func (m *Model) AddTask(task model.Task) {
 	} else {
 		m.Tasks = append(m.Tasks, task)
 	}
+	m.triggerGCalPush(task)
 }
 
 func (m *Model) UpdateTask(task model.Task) {
@@ -277,18 +278,27 @@ func (m *Model) UpdateTask(task model.Task) {
 	} else {
 		m.updateTaskInMemory(task)
 	}
+	m.triggerGCalPushIfAnchored(task)
 }
 
 func (m *Model) DeleteTask(uuid string) {
+	var task model.Task
+	var found bool
 	if m.DB != nil {
+		task, found = m.DB.GetTask(uuid)
 		m.DB.DeleteTask(uuid)
 	} else {
 		for i, t := range m.Tasks {
 			if t.UUID == uuid {
+				task = t
+				found = true
 				m.Tasks = append(m.Tasks[:i], m.Tasks[i+1:]...)
 				break
 			}
 		}
+	}
+	if found {
+		m.triggerGCalPushIfAnchored(task)
 	}
 }
 

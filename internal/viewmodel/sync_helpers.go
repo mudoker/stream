@@ -4,12 +4,16 @@ import (
 	"stream/internal/model"
 )
 
-// triggerGCalPush queues a one-way push for anchored calendar changes.
+// triggerGCalPush queues an automatic push for anchored calendar changes.
 func (m *Model) triggerGCalPush(task model.Task) {
-	// No-op: all sync is manual
+	if m.Sync != nil && model.IsGCalSyncable(task) {
+		m.Sync.TriggerPushSync()
+	}
 }
 
 // triggerGCalPushIfAnchored queues push when the task is or was anchored for GCal.
 func (m *Model) triggerGCalPushIfAnchored(task model.Task) {
-	// No-op: all sync is manual
+	if m.Sync != nil && (model.IsGCalSyncable(task) || task.GCalMetadata.EventID != "") {
+		m.Sync.TriggerPushSync()
+	}
 }

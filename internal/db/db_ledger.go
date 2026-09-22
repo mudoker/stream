@@ -73,16 +73,22 @@ func calendarRelevantChange(prev, next model.Task) bool {
 	}
 	return prev.Title != next.Title ||
 		prev.Description != next.Description ||
+		prev.Location != next.Location ||
+		prev.Priority != next.Priority ||
+		prev.StoryPoints != next.StoryPoints ||
+		prev.LifecycleState != next.LifecycleState ||
 		!prev.TimeWindow.Start.Equal(next.TimeWindow.Start) ||
 		!prev.TimeWindow.End.Equal(next.TimeWindow.End)
 }
 
 func (db *JSONDB) recordTaskChangeLocked(prev, next model.Task) error {
-	wasAnchored := model.IsGCalSyncable(prev)
+	wasAnchored := model.IsGCalSyncable(prev) || prev.GCalMetadata.EventID != ""
 	isAnchored := model.IsGCalSyncable(next)
 
 	switch {
-	case isAnchored && calendarRelevantChange(prev, next):
+	case !wasAnchored && isAnchored:
+		return db.appendLedgerLocked("CREATE", next.UUID, next)
+	case wasAnchored && isAnchored && calendarRelevantChange(prev, next):
 		return db.appendLedgerLocked("UPDATE", next.UUID, next)
 	case wasAnchored && !isAnchored:
 		return db.appendLedgerLocked("DELETE", prev.UUID, prev)

@@ -67,28 +67,36 @@ type Workspace struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type TaskSource string
+
+const (
+	SourceStream TaskSource = "stream"
+	SourceGCal   TaskSource = "gcal"
+)
+
 type Task struct {
-	UUID             string           `json:"uuid"`
-	WorkspaceUUID    string           `json:"workspace_uuid,omitempty"`
-	Title            string           `json:"title"`
-	Description      string           `json:"description"`
-	Priority         Priority         `json:"priority"`
-	StoryPoints      int              `json:"story_points"`
-	SchedulingType   SchedulingType   `json:"scheduling_type"`
-	TimeWindow       TimeWindow       `json:"time_window"`
-	LifecycleState   LifecycleState   `json:"lifecycle_state"`
-	ExecutionMetrics ExecutionMetrics `json:"execution_metrics"`
-	GCalMetadata     GCalMetadata     `json:"gcal_metadata"`
-	Location         string           `json:"location,omitempty"`
-	CommuteBuffer    int              `json:"commute_buffer,omitempty"` // in minutes
-	CreatedAt        time.Time        `json:"created_at"`
-	UpdatedAt        time.Time        `json:"updated_at"`
-	Tags             []string         `json:"tags,omitempty"`
-	Notes            string           `json:"notes,omitempty"`
-	CompletedDates   []string         `json:"completed_dates,omitempty"`
+	UUID                  string           `json:"uuid"`
+	WorkspaceUUID         string           `json:"workspace_uuid,omitempty"`
+	Title                 string           `json:"title"`
+	Description           string           `json:"description"`
+	Priority              Priority         `json:"priority"`
+	StoryPoints           int              `json:"story_points"`
+	SchedulingType        SchedulingType   `json:"scheduling_type"`
+	TimeWindow            TimeWindow       `json:"time_window"`
+	LifecycleState        LifecycleState   `json:"lifecycle_state"`
+	ExecutionMetrics      ExecutionMetrics `json:"execution_metrics"`
+	GCalMetadata          GCalMetadata     `json:"gcal_metadata"`
+	Source                TaskSource       `json:"source,omitempty"`
+	Location              string           `json:"location,omitempty"`
+	CommuteBuffer         int              `json:"commute_buffer,omitempty"` // in minutes
+	CreatedAt             time.Time        `json:"created_at"`
+	UpdatedAt             time.Time        `json:"updated_at"`
+	Tags                  []string         `json:"tags,omitempty"`
+	Notes                 string           `json:"notes,omitempty"`
+	CompletedDates        []string         `json:"completed_dates,omitempty"`
 	RecurringParentUUID   string           `json:"recurring_parent_uuid,omitempty"`
 	EstimatedDurationMins int              `json:"estimated_duration_mins,omitempty"` // explicit duration for floating tasks
-	IsAllDay         bool             `json:"is_all_day"`
+	IsAllDay              bool             `json:"is_all_day"`
 }
 
 // SortingWeight computes the priority execution weight: (Priority Value * 1000) + Story Points
@@ -147,7 +155,7 @@ func IsGCalSyncable(task Task) bool {
 
 func (s UserSettings) NormalizedGCalSync() UserSettings {
 	if s.GCalSyncMode == "" {
-		s.GCalSyncMode = GCalSyncPush
+		s.GCalSyncMode = GCalSyncTwoWay
 	}
 	if s.GCalSyncIntervalSeconds <= 0 {
 		if s.GCalSyncIntervalMinutes > 0 {

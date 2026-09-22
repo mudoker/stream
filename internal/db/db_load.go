@@ -94,7 +94,7 @@ func (db *JSONDB) load() error {
 		Username:                "Doan Huu Quoc",
 		PasswordHash:            "",
 		LockTimeoutMinutes:      5,
-		GCalSyncMode:            model.GCalSyncPush,
+		GCalSyncMode:            model.GCalSyncTwoWay,
 		GCalSyncIntervalSeconds: 5,
 	}
 	if _, err := os.Stat(db.settingsPath); err == nil {

@@ -134,8 +134,23 @@ func (db *JSONDB) DeleteTask(taskUUID string) error {
 		return err
 	}
 
-	if model.IsGCalSyncable(task) {
+	if model.IsGCalSyncable(task) || task.GCalMetadata.EventID != "" {
 		return db.appendLedgerLocked("DELETE", taskUUID, task)
 	}
 	return nil
 }
+
+// DeleteTaskNoLedger removes a task without recording a sync ledger entry.
+func (db *JSONDB) DeleteTaskNoLedger(taskUUID string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, exists := db.tasks[taskUUID]
+	if !exists {
+		return ErrTaskNotFound
+	}
+
+	delete(db.tasks, taskUUID)
+	return db.saveTasks()
+}
+

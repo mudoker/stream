@@ -380,12 +380,12 @@ func TestDBLedgerTransitions(t *testing.T) {
 		t.Fatalf("expected DELETE ledger entry for de-anchoring, got %v", ledger)
 	}
 
-	// 3. Change Floating task to Anchored (anchoring) -> should append UPDATE
+	// 3. Change Floating task to Anchored (anchoring) -> should append CREATE
 	t1.SchedulingType = model.Anchored
 	_ = db.UpdateTask(t1)
 	ledger = db.GetLedger()
-	if len(ledger) != 3 || ledger[2].Op != "UPDATE" {
-		t.Fatalf("expected UPDATE ledger entry for anchoring, got %v", ledger)
+	if len(ledger) != 3 || ledger[2].Op != "CREATE" {
+		t.Fatalf("expected CREATE ledger entry for anchoring, got %v", ledger)
 	}
 
 	// 4. Update title of Anchored task -> should append UPDATE

@@ -6,8 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"stream/internal/model"
 	"stream/internal/view/theme"
 	"stream/internal/viewmodel"
+	"stream/internal/viewmodel/tasks"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -112,19 +114,77 @@ func renderCapacityPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 		lines = append(lines, rowContent)
 	}
 
-	remainingLines := innerH - 2 - len(lines)
+	remainingLines := innerH - len(lines) - 2
 	if remainingLines > 2 {
 		lines = append(lines, "", lipgloss.NewStyle().Foreground(t.Muted).Render(strings.Repeat("─", innerW)))
 		totalWeeklySP := 0
 		totalWeeklyCompSP := 0
-		for _, wd := range weekdays {
-			totalWeeklySP += weeklyPoints[wd]
+		totalWeeklyTasks := 0
+		peakDayIdx := 0
+		peakDaySP := 0
+		for idx, wd := range weekdays {
+			pts := weeklyPoints[wd]
+			totalWeeklySP += pts
 			totalWeeklyCompSP += weeklyCompletedPoints[wd]
+			totalWeeklyTasks += weeklyCount[wd]
+			if pts > peakDaySP {
+				peakDaySP = pts
+				peakDayIdx = idx
+			}
 		}
+
 		lines = append(lines,
 			lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("WEEKLY CAPACITY SNAPSHOT:"),
 			fmt.Sprintf(" • Total Velocity:    %d / %d SP completed", totalWeeklyCompSP, totalWeeklySP),
 		)
+
+		if innerH-len(lines) > 2 {
+			pct := 0.0
+			if totalWeeklySP > 0 {
+				pct = float64(totalWeeklyCompSP) / float64(totalWeeklySP) * 100
+			}
+			lines = append(lines,
+				fmt.Sprintf(" • Completion Rate:   %.0f%% (%d total tasks)", pct, totalWeeklyTasks),
+			)
+		}
+
+		if innerH-len(lines) > 2 && peakDaySP > 0 {
+			lines = append(lines,
+				fmt.Sprintf(" • Peak Load Day:     %s (%d SP scheduled)", weekdayNames[peakDayIdx], peakDaySP),
+			)
+		}
+
+		if innerH-len(lines) > 2 {
+			activeSprint, hasSprint := m.GetActiveSprint()
+			if hasSprint {
+				defined, inProg, rev, tst, comp := tasks.GetSprintSwimlaneTasks(m.Tasks, activeSprint.UUID)
+				sprintTotalSP := 0
+				for _, tList := range [][]model.Task{defined, inProg, rev, tst, comp} {
+					for _, tsk := range tList {
+						sprintTotalSP += tsk.StoryPoints
+					}
+				}
+				sprintPct := 0.0
+				if sprintTotalSP > 0 {
+					sprintPct = float64(totalWeeklySP) / float64(sprintTotalSP) * 100
+				}
+				lines = append(lines,
+					fmt.Sprintf(" • Sprint Allocation: %.0f%% of active sprint", sprintPct),
+				)
+			}
+		}
+
+		if innerH-len(lines) > 1 {
+			paceStr := "✓ OPTIMAL"
+			if totalWeeklySP > 40 {
+				paceStr = "⚡ HIGH LOAD"
+			} else if totalWeeklySP == 0 {
+				paceStr = "○ LIGHT LOAD"
+			}
+			lines = append(lines,
+				fmt.Sprintf(" • Workload Pace:     %s", paceStr),
+			)
+		}
 	}
 
 	borderCol := t.Muted

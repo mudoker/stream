@@ -129,6 +129,32 @@ func renderUpcomingPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 			row := fmt.Sprintf("  %s %s %2d tasks", pNames[idx], barStyled, cnt)
 			lines = append(lines, row)
 		}
+
+		if innerH-len(lines) >= 3 {
+			activeCount := 0
+			reviewCount := 0
+			testCount := 0
+			scheduledCount := 0
+			for _, task := range m.Tasks {
+				if m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || task.WorkspaceUUID == m.ActiveWorkspaceUUID {
+					switch task.LifecycleState {
+					case model.StateActive:
+						activeCount++
+					case model.StateReview:
+						reviewCount++
+					case model.StateTesting:
+						testCount++
+					case model.StateScheduled:
+						scheduledCount++
+					}
+				}
+			}
+			lines = append(lines,
+				"",
+				lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  • Pipeline: %d Active | %d In Review | %d Testing | %d Scheduled",
+					activeCount, reviewCount, testCount, scheduledCount)),
+			)
+		}
 	}
 
 	borderCol := t.Muted

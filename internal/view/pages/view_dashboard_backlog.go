@@ -22,13 +22,25 @@ func renderBacklogHealthPanel(m *viewmodel.Model, t theme.Theme, w, h int) strin
 	readyCount := 0
 	overdueCount := 0
 	blockedCount := 0
+	totalBacklogSP := 0
+	inSprintCount := 0
+	unassignedCount := 0
 	wsCounts := make(map[string]int)
 	wsCompCounts := make(map[string]int)
+
+	pCounts := make(map[model.Priority]int)
 
 	for _, task := range m.Tasks {
 		if m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || task.WorkspaceUUID == m.ActiveWorkspaceUUID {
 			if task.SchedulingType == model.Floating && task.LifecycleState != model.StateCompleted {
 				totalBacklog++
+				totalBacklogSP += task.StoryPoints
+				pCounts[task.Priority]++
+				if task.SprintUUID != "" {
+					inSprintCount++
+				} else {
+					unassignedCount++
+				}
 				if task.LifecycleState == model.StateReady {
 					readyCount++
 				}
@@ -50,9 +62,15 @@ func renderBacklogHealthPanel(m *viewmodel.Model, t theme.Theme, w, h int) strin
 		}
 	}
 
+	avgSP := 0.0
+	if totalBacklog > 0 {
+		avgSP = float64(totalBacklogSP) / float64(totalBacklog)
+	}
+
 	lines = append(lines,
-		fmt.Sprintf(" • Total Backlog Size:   %d Floating Tasks", totalBacklog),
-		fmt.Sprintf(" • Ready to Pull:        %d Tasks", readyCount),
+		fmt.Sprintf(" • Total Backlog Size:   %d Floating Tasks (%d SP)", totalBacklog, totalBacklogSP),
+		fmt.Sprintf(" • Sprint Allocation:    %d Sprint / %d Unassigned", inSprintCount, unassignedCount),
+		fmt.Sprintf(" • Ready to Pull:        %d Tasks (Avg %.1f SP/task)", readyCount, avgSP),
 		fmt.Sprintf(" • Overdue / Blocked:    %d Overdue, %d Blocked", overdueCount, blockedCount),
 	)
 
@@ -82,6 +100,14 @@ func renderBacklogHealthPanel(m *viewmodel.Model, t theme.Theme, w, h int) strin
 
 			row := fmt.Sprintf("  %s %-12s %s  %d/%d (%2.0f%%)", ws.Icon, ws.Name, barStyled, comp, tot, pct)
 			lines = append(lines, row)
+		}
+
+		if innerH-len(lines) >= 3 {
+			lines = append(lines,
+				"",
+				lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  • Priority Mix: P0:%d | P1:%d | P2:%d | P3:%d",
+					pCounts[model.P0], pCounts[model.P1], pCounts[model.P2], pCounts[model.P3])),
+			)
 		}
 	}
 

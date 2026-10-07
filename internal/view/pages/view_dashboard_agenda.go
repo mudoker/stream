@@ -3,6 +3,7 @@ package pages
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"stream/internal/model"
 	"stream/internal/view/theme"
@@ -17,6 +18,8 @@ func renderAgendaPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 
 	var lines []string
 	agendaTasks := m.GetAgendaTasks()
+	today := time.Now()
+	todayStr := today.Format("2006-01-02")
 
 	isDetailed := innerH >= 12
 	isExpanded := innerH >= 7 && !isDetailed
@@ -24,7 +27,14 @@ func renderAgendaPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 	if len(agendaTasks) == 0 {
 		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render("No tasks scheduled for today."))
 	} else {
-		for _, task := range agendaTasks {
+		maxTasks := innerH - 8
+		if maxTasks < 2 {
+			maxTasks = 2
+		}
+		for idx, task := range agendaTasks {
+			if idx >= maxTasks {
+				break
+			}
 			chk := "[ ]"
 			if task.LifecycleState == model.StateCompleted {
 				chk = "[✓]"
@@ -125,15 +135,32 @@ func renderAgendaPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 		}
 	}
 
-	remainingLines := innerH - 2 - len(lines)
-	if remainingLines > 3 {
+	// ── Daily Habits Breakdown ──────────────────────────────────────
+	var totalHabits, doneHabits int
+	for _, tsk := range m.Tasks {
+		if tsk.SchedulingType == model.Habit {
+			totalHabits++
+			for _, d := range tsk.CompletedDates {
+				if d == todayStr {
+					doneHabits++
+					break
+				}
+			}
+		}
+	}
+
+	// ── Operations & Metrics Section ────────────────────────────────
+	remainingLines := innerH - len(lines) - 2
+	if remainingLines > 2 {
 		lines = append(lines, "", lipgloss.NewStyle().Foreground(t.Muted).Render(strings.Repeat("─", innerW)))
 		compCount := 0
 		totCount := len(agendaTasks)
 		totSP := 0
 		compSP := 0
+		elapsedFocusSecs := 0
 		for _, task := range agendaTasks {
 			totSP += task.StoryPoints
+			elapsedFocusSecs += task.ExecutionMetrics.ElapsedFocusSeconds
 			if task.LifecycleState == model.StateCompleted {
 				compCount++
 				compSP += task.StoryPoints
@@ -151,10 +178,36 @@ func renderAgendaPanel(m *viewmodel.Model, t theme.Theme, w, h int) string {
 			fmt.Sprintf(" • Story Points:      %d / %d completed", compSP, totSP),
 		)
 
-		if innerH-len(lines)-2 > 1 {
+		if innerH-len(lines) > 2 {
 			lines = append(lines,
 				fmt.Sprintf(" • Health Status:     %s", getAgendaHealthStatus(t, agendaTasks)),
 				fmt.Sprintf(" • Target Capacity:   %d SP daily load", m.GetRecommendedCapacity()),
+			)
+		}
+
+		if innerH-len(lines) > 2 && totalHabits > 0 {
+			habitPct := float64(doneHabits) / float64(totalHabits) * 100
+			lines = append(lines,
+				fmt.Sprintf(" • Daily Habits:      %d / %d completed (%.0f%%)", doneHabits, totalHabits, habitPct),
+			)
+		}
+
+		if innerH-len(lines) > 2 {
+			activeSprint, hasSprint := m.GetActiveSprint()
+			if hasSprint {
+				daysLeft := int(time.Until(activeSprint.EndDate).Hours() / 24)
+				if daysLeft < 0 {
+					daysLeft = 0
+				}
+				lines = append(lines,
+					fmt.Sprintf(" • Active Sprint:     %s (%d days left)", activeSprint.Name, daysLeft),
+				)
+			}
+		}
+
+		if innerH-len(lines) > 1 && elapsedFocusSecs > 0 {
+			lines = append(lines,
+				fmt.Sprintf(" • Focus Logged:      %dm today", elapsedFocusSecs/60),
 			)
 		}
 	}
@@ -187,3 +240,4 @@ func getAgendaHealthStatus(t theme.Theme, tasks []model.Task) string {
 	}
 	return lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render("✓ OPTIMAL")
 }
+

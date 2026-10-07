@@ -81,6 +81,10 @@ func GetDayTasks(allTasks []model.Task, day time.Time, isCloneMove ...bool) []mo
 }
 
 func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Task {
+	if selectedDay.IsZero() {
+		selectedDay = time.Now()
+	}
+
 	var reminders []model.Task
 	var habits []model.Task
 	var backlog []model.Task
@@ -90,7 +94,7 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 	recurringInstances := make(map[string]model.Task)
 
 	for _, t := range allTasks {
-		// Anchored habits (has start time) should not show on the todo shelf anymore
+		// Anchored habits (has start time and end time) should not show on the todo shelf anymore
 		if t.SchedulingType == model.Habit && !t.TimeWindow.Start.IsZero() && !t.TimeWindow.End.IsZero() {
 			continue
 		}
@@ -119,7 +123,21 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 			if t.SchedulingType == model.Reminder {
 				continue
 			}
-			completed = append(completed, t)
+			// Only show completed tasks completed or initiated on this selected day
+			isCompletedToday := sameDay(t.UpdatedAt, selectedDay) || sameDay(t.GetInitiateDate(), selectedDay)
+			if t.SchedulingType == model.Habit {
+				isCompletedToday = false
+				dateStr := selectedDay.Format("2006-01-02")
+				for _, d := range t.CompletedDates {
+					if d == dateStr {
+						isCompletedToday = true
+						break
+					}
+				}
+			}
+			if isCompletedToday {
+				completed = append(completed, t)
+			}
 			continue
 		}
 
@@ -134,14 +152,32 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 			} else {
 				habits = append(habits, t)
 			}
-		} else if t.SchedulingType == model.Floating {
-			if t.RecurringParentUUID != "" {
-				recurringCounts[t.RecurringParentUUID]++
-				if _, exists := recurringInstances[t.RecurringParentUUID]; !exists {
-					recurringInstances[t.RecurringParentUUID] = t
-				}
+		} else if t.SchedulingType == model.Floating || t.AddedToToday {
+			// Day view shelf: only show tasks linked to that day
+			// 1. Explicitly added to today
+			// 2. InitiateDate matches selectedDay
+			// 3. Fallback: CreatedAt matches selectedDay if InitiateDate is zero
+			// 4. Fallback for tests/legacy without dates: both InitiateDate and CreatedAt are zero
+			var isForDay bool
+			if t.AddedToToday && sameDay(time.Now(), selectedDay) {
+				isForDay = true
+			} else if !t.InitiateDate.IsZero() {
+				isForDay = sameDay(t.InitiateDate, selectedDay)
+			} else if !t.CreatedAt.IsZero() {
+				isForDay = sameDay(t.CreatedAt, selectedDay)
 			} else {
-				backlog = append(backlog, t)
+				isForDay = true
+			}
+
+			if isForDay {
+				if t.RecurringParentUUID != "" {
+					recurringCounts[t.RecurringParentUUID]++
+					if _, exists := recurringInstances[t.RecurringParentUUID]; !exists {
+						recurringInstances[t.RecurringParentUUID] = t
+					}
+				} else {
+					backlog = append(backlog, t)
+				}
 			}
 		}
 	}
@@ -168,8 +204,74 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 	return append(res, completed...)
 }
 
+func GetGlobalBacklogShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Task {
+	// Global backlog contains ALL floating tasks not assigned to a sprint across all dates.
+	// Habits, events, and reminders are not tasks and appear directly on the day timeline.
+	var backlog []model.Task
+	var completed []model.Task
+
+	for _, t := range allTasks {
+		if t.SchedulingType != model.Floating {
+			continue
+		}
+		if t.SprintUUID != "" {
+			continue
+		}
+		if model.IsTaskAnchored(t) {
+			continue
+		}
+
+		isDone := t.LifecycleState == model.StateCompleted
+		if isDone {
+			completed = append(completed, t)
+		} else {
+			backlog = append(backlog, t)
+		}
+	}
+
+	ImportSort(backlog)
+	ImportSort(completed)
+
+	return append(backlog, completed...)
+}
+
+func GetSprintSwimlaneTasks(allTasks []model.Task, sprintUUID string) (defined, inProgress, review, testing, completed []model.Task) {
+	for _, t := range allTasks {
+		// Habits, events, and reminders are not tasks and cannot belong to a sprint
+		if t.SchedulingType != model.Floating && !t.AddedToToday {
+			continue
+		}
+		if t.SprintUUID != sprintUUID {
+			continue
+		}
+		switch t.LifecycleState {
+		case model.StateCompleted:
+			completed = append(completed, t)
+		case model.StateTesting:
+			testing = append(testing, t)
+		case model.StateReview:
+			review = append(review, t)
+		case model.StateActive, model.StateScheduled, model.StatePaused:
+			inProgress = append(inProgress, t)
+		default: // StateBacklog, StateReady, StateOverdue, etc.
+			defined = append(defined, t)
+		}
+	}
+	ImportSort(defined)
+	ImportSort(inProgress)
+	ImportSort(review)
+	ImportSort(testing)
+	ImportSort(completed)
+	return defined, inProgress, review, testing, completed
+}
+
+func SameDay(a, b time.Time) bool {
+	return sameDay(a, b)
+}
+
 func sameDay(a, b time.Time) bool {
 	aLocal := a.Local()
 	bLocal := b.Local()
 	return aLocal.Year() == bLocal.Year() && aLocal.Month() == bLocal.Month() && aLocal.Day() == bLocal.Day()
 }
+

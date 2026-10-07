@@ -56,9 +56,86 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		m.Form = NewTaskFormWithDate(m.SelectedDay)
 		m.Form.TitleInput.Focus()
 		return true, nil
+	case "I":
+		if m.CurrentView == SprintView {
+			m.CurrentMode = ModeSprintForm
+			defaultName := fmt.Sprintf("Sprint %d", len(m.Sprints)+1)
+			m.SprintForm = NewSprintForm(defaultName)
+			m.SprintForm.NameInput.Focus()
+			return true, nil
+		}
+		return false, nil
+	case "E":
+		if m.CurrentView == SprintView {
+			activeSprint, ok := m.GetActiveSprint()
+			if ok {
+				m.CurrentMode = ModeSprintForm
+				m.SprintForm = NewSprintFormFromSprint(activeSprint)
+				m.SprintForm.NameInput.Focus()
+				return true, nil
+			}
+		}
+		return false, nil
+	case "D":
+		if m.CurrentView == SprintView {
+			activeSprint, ok := m.GetActiveSprint()
+			if ok {
+				m.DB.DeleteSprint(activeSprint.UUID)
+				m.refreshSprints()
+				m.refreshTasks()
+				m.StatusMsg = fmt.Sprintf("Sprint '%s' deleted.", activeSprint.Name)
+				return true, nil
+			}
+		}
+		return false, nil
+	case "g":
+		if m.CurrentView == SprintView {
+			activeSprint, ok := m.GetActiveSprint()
+			if ok {
+				m.CurrentMode = ModeSprintForm
+				m.SprintForm = NewSprintFormFromSprint(activeSprint)
+				m.SprintForm.ActiveField = 3
+				m.SprintForm.RecurringCountInput.SetValue("4")
+				m.SprintForm.RecurringCountInput.Focus()
+				return true, nil
+			}
+		}
+		return false, nil
 	case "a":
 		task, exists := m.GetActiveTask()
 		if exists {
+			if m.CurrentView == SprintView {
+				activeSprint, ok := m.GetActiveSprint()
+				if !ok {
+					m.StatusMsg = "No active sprint found."
+					return true, nil
+				}
+				if m.TodoShelfFocus {
+					if task.SchedulingType == model.Habit || task.SchedulingType == model.Event || task.SchedulingType == model.Reminder {
+						m.StatusMsg = "Habits and events are not tasks and cannot be anchored to a sprint."
+						return true, nil
+					}
+					// Anchor task to active sprint
+					task.SprintUUID = activeSprint.UUID
+					if task.LifecycleState == "" || task.LifecycleState == model.StateCompleted {
+						task.LifecycleState = model.StateBacklog
+					}
+					task.UpdatedAt = time.Now()
+					m.DB.UpdateTask(task)
+					m.refreshTasks()
+					m.StatusMsg = fmt.Sprintf("Task '%s' anchored to sprint '%s'.", task.Title, activeSprint.Name)
+					return true, nil
+				} else {
+					// Deanchor task from active sprint
+					task.SprintUUID = ""
+					task.UpdatedAt = time.Now()
+					m.DB.UpdateTask(task)
+					m.refreshTasks()
+					m.StatusMsg = fmt.Sprintf("Task '%s' deanchored back to global backlog.", task.Title)
+					return true, nil
+				}
+			}
+
 			if model.IsTaskAnchored(task) {
 				m.ConfirmTask = task
 				m.ConfirmOpen = true
@@ -92,6 +169,13 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		task, exists := m.GetActiveTask()
 		if exists {
 			m.startEditMode(task)
+		} else if m.CurrentView == SprintView {
+			activeSprint, ok := m.GetActiveSprint()
+			if ok {
+				m.CurrentMode = ModeSprintForm
+				m.SprintForm = NewSprintFormFromSprint(activeSprint)
+				m.SprintForm.NameInput.Focus()
+			}
 		}
 		return true, nil
 	case "enter":
@@ -141,12 +225,42 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		}
 		return true, nil
 	case "t":
+		if m.CurrentView == SprintView {
+			task, exists := m.GetActiveTask()
+			if exists {
+				task.AddedToToday = !task.AddedToToday
+				task.UpdatedAt = time.Now()
+				m.DB.UpdateTask(task)
+				m.refreshTasks()
+				if task.AddedToToday {
+					m.StatusMsg = fmt.Sprintf("Added '%s' to today's task list (will appear on Day timeline backlog).", task.Title)
+				} else {
+					m.StatusMsg = fmt.Sprintf("Removed '%s' from today's task list.", task.Title)
+				}
+				return true, nil
+			}
+		}
 		m.SelectedDay = time.Now()
 		m.selectDefaultTaskForSelectedDay()
 		m.TimelineHour = time.Now().Hour()
 		m.ScrollOffset = 0
 		m.StatusMsg = "Jumped to today."
 		return true, nil
+	case " ":
+		task, exists := m.GetActiveTask()
+		if exists {
+			task.AddedToToday = !task.AddedToToday
+			task.UpdatedAt = time.Now()
+			m.DB.UpdateTask(task)
+			m.refreshTasks()
+			if task.AddedToToday {
+				m.StatusMsg = fmt.Sprintf("Added '%s' to today's task list (will appear on Day timeline backlog).", task.Title)
+			} else {
+				m.StatusMsg = fmt.Sprintf("Removed '%s' from today's task list.", task.Title)
+			}
+			return true, nil
+		}
+		return false, nil
 	case "M":
 		jazzlounge.GetJazzLoungeEngine().SetPlaying(true)
 		m.StatusMsg = "🔊 Jazz Lounge Engine started/resumed"

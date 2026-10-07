@@ -16,9 +16,14 @@ func (m *Model) GetActiveTask() (model.Task, bool) {
 			}
 		}
 	}
-	if m.CurrentView == DayView {
+	if m.CurrentView == DayView || m.CurrentView == SprintView {
 		if m.TodoShelfFocus {
-			shelf := m.GetTodoShelfTasks()
+			var shelf []model.Task
+			if m.CurrentView == SprintView {
+				shelf = m.GetGlobalBacklogTasks()
+			} else {
+				shelf = m.GetTodoShelfTasks()
+			}
 			if len(shelf) > 0 {
 				for _, t := range shelf {
 					if t.UUID == m.SelectedTaskUUID {
@@ -27,6 +32,38 @@ func (m *Model) GetActiveTask() (model.Task, bool) {
 				}
 				m.SelectedTaskUUID = shelf[0].UUID
 				return shelf[0], true
+			}
+		} else if m.CurrentView == SprintView {
+			activeSprint, ok := m.GetActiveSprint()
+			if ok {
+				defined, inProgress, review, testing, completed := tasks.GetSprintSwimlaneTasks(m.Tasks, activeSprint.UUID)
+				lanes := [][]model.Task{defined, inProgress, review, testing, completed}
+				var curLane []model.Task
+				if m.SprintSwimlaneIdx >= 0 && m.SprintSwimlaneIdx < len(lanes) {
+					curLane = lanes[m.SprintSwimlaneIdx]
+				}
+				for _, t := range curLane {
+					if t.UUID == m.SelectedTaskUUID {
+						return t, true
+					}
+				}
+				var allSprintTasks []model.Task
+				for _, l := range lanes {
+					allSprintTasks = append(allSprintTasks, l...)
+				}
+				if len(allSprintTasks) > 0 {
+					for _, t := range allSprintTasks {
+						if t.UUID == m.SelectedTaskUUID {
+							return t, true
+						}
+					}
+					if len(curLane) > 0 {
+						m.SelectedTaskUUID = curLane[0].UUID
+						return curLane[0], true
+					}
+					m.SelectedTaskUUID = allSprintTasks[0].UUID
+					return allSprintTasks[0], true
+				}
 			}
 		} else {
 			dayTasks := m.GetDayTasks()
@@ -55,6 +92,16 @@ func (m *Model) GetActiveTask() (model.Task, bool) {
 		}
 	}
 	return model.Task{}, false
+}
+
+func (m *Model) GetGlobalBacklogTasks() []model.Task {
+	var wsTasks []model.Task
+	for _, t := range m.Tasks {
+		if m.ActiveWorkspaceUUID == "ALL_WORKSPACES" || t.WorkspaceUUID == m.ActiveWorkspaceUUID {
+			wsTasks = append(wsTasks, t)
+		}
+	}
+	return tasks.GetGlobalBacklogShelfTasks(wsTasks, m.SelectedDay)
 }
 
 func (m *Model) GetTodoShelfTasks() []model.Task {

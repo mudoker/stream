@@ -33,6 +33,8 @@ func (m *Model) HandleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.handleWeekNav(key)
 	case DayView:
 		m.handleDayNav(key)
+	case SprintView:
+		m.handleSprintNav(key)
 	case DashboardView, AnalyticsView:
 		m.handleDashboardOrAnalyticsNav(key)
 	}

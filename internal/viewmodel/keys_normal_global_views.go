@@ -17,16 +17,21 @@ func (m *Model) handleGlobalViewsAndNavigation(key string) (bool, tea.Cmd) {
 		m.ShelfScrollOffset = 0
 		return true, nil
 	case "3":
-		m.CurrentView = WeekView
+		m.CurrentView = SprintView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		return true, nil
 	case "4":
-		m.CurrentView = DayView
+		m.CurrentView = WeekView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		return true, nil
 	case "5":
+		m.CurrentView = DayView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
+		return true, nil
+	case "6":
 		m.CurrentView = AnalyticsView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
@@ -36,18 +41,23 @@ func (m *Model) handleGlobalViewsAndNavigation(key string) (bool, tea.Cmd) {
 		m.cycleFocus()
 		return true, nil
 	case "ctrl+d":
-		if m.CurrentView == DayView {
+		if m.CurrentView == DayView || m.CurrentView == SprintView {
 			if m.TodoShelfFocus {
 				m.ShelfScrollOffset += 2
 				shelfTasks := m.GetTodoShelfTasks()
+				if m.CurrentView == SprintView {
+					shelfTasks = m.GetGlobalBacklogTasks()
+				}
 				if m.ShelfScrollOffset > len(shelfTasks)-3 {
 					m.ShelfScrollOffset = len(shelfTasks) - 3
 				}
 				if m.ShelfScrollOffset < 0 {
 					m.ShelfScrollOffset = 0
 				}
-			} else {
+			} else if m.CurrentView == DayView {
 				m.TimelineHour = (m.TimelineHour + 2) % 24
+			} else {
+				m.ScrollOffset += 2
 			}
 		} else if m.CurrentView == MonthView {
 			// Scroll forward by colsFit months
@@ -64,14 +74,19 @@ func (m *Model) handleGlobalViewsAndNavigation(key string) (bool, tea.Cmd) {
 		}
 		return true, nil
 	case "ctrl+u":
-		if m.CurrentView == DayView {
+		if m.CurrentView == DayView || m.CurrentView == SprintView {
 			if m.TodoShelfFocus {
 				m.ShelfScrollOffset -= 2
 				if m.ShelfScrollOffset < 0 {
 					m.ShelfScrollOffset = 0
 				}
-			} else {
+			} else if m.CurrentView == DayView {
 				m.TimelineHour = (m.TimelineHour - 2 + 24) % 24
+			} else {
+				m.ScrollOffset -= 2
+				if m.ScrollOffset < 0 {
+					m.ScrollOffset = 0
+				}
 			}
 		} else if m.CurrentView == MonthView {
 			// Scroll backward by colsFit months (indefinitely back)

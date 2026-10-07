@@ -1,9 +1,11 @@
 package viewmodel
 
 import (
+	"fmt"
 	"time"
 
 	"stream/internal/model"
+	"stream/internal/viewmodel/tasks"
 )
 
 func (m *Model) handleDashboardOrAnalyticsNav(key string) {
@@ -331,3 +333,180 @@ func (m *Model) handleDayNav(key string) {
 		m.AutoScrollToSelectedTask()
 	}
 }
+
+func (m *Model) handleSprintNav(key string) {
+	activeSprint, ok := m.GetActiveSprint()
+	if !ok {
+		return
+	}
+
+	defined, inProgress, review, testing, completed := tasks.GetSprintSwimlaneTasks(m.Tasks, activeSprint.UUID)
+	lanes := [][]model.Task{defined, inProgress, review, testing, completed}
+
+	switch key {
+	case "h", "left":
+		if !m.TodoShelfFocus {
+			m.SprintSwimlaneIdx--
+			if m.SprintSwimlaneIdx < 0 {
+				m.SprintSwimlaneIdx = 0
+			}
+			curLane := lanes[m.SprintSwimlaneIdx]
+			if len(curLane) > 0 {
+				m.SelectedTaskUUID = curLane[0].UUID
+			}
+		}
+	case "l", "right":
+		if !m.TodoShelfFocus {
+			m.SprintSwimlaneIdx++
+			if m.SprintSwimlaneIdx > 4 {
+				m.SprintSwimlaneIdx = 4
+			}
+			curLane := lanes[m.SprintSwimlaneIdx]
+			if len(curLane) > 0 {
+				m.SelectedTaskUUID = curLane[0].UUID
+			}
+		}
+	case "j", "down":
+		if m.TodoShelfFocus {
+			m.MoveTaskSelection(1)
+		} else {
+			curLane := lanes[m.SprintSwimlaneIdx]
+			if len(curLane) > 0 {
+				curIdx := -1
+				for i, t := range curLane {
+					if t.UUID == m.SelectedTaskUUID {
+						curIdx = i
+						break
+					}
+				}
+				if curIdx == -1 {
+					m.SelectedTaskUUID = curLane[0].UUID
+				} else {
+					nextIdx := (curIdx + 1) % len(curLane)
+					m.SelectedTaskUUID = curLane[nextIdx].UUID
+				}
+			}
+		}
+	case "k", "up":
+		if m.TodoShelfFocus {
+			m.MoveTaskSelection(-1)
+		} else {
+			curLane := lanes[m.SprintSwimlaneIdx]
+			if len(curLane) > 0 {
+				curIdx := -1
+				for i, t := range curLane {
+					if t.UUID == m.SelectedTaskUUID {
+						curIdx = i
+						break
+					}
+				}
+				if curIdx == -1 {
+					m.SelectedTaskUUID = curLane[len(curLane)-1].UUID
+				} else {
+					prevIdx := (curIdx - 1 + len(curLane)) % len(curLane)
+					m.SelectedTaskUUID = curLane[prevIdx].UUID
+				}
+			}
+		}
+	case "H":
+		if !m.TodoShelfFocus {
+			task, exists := m.GetActiveTask()
+			if exists && task.SprintUUID == activeSprint.UUID {
+				curIdx := m.SprintSwimlaneIdx
+				if curIdx > 0 {
+					newIdx := curIdx - 1
+					m.SprintSwimlaneIdx = newIdx
+					switch newIdx {
+					case 0:
+						task.LifecycleState = model.StateBacklog
+					case 1:
+						task.LifecycleState = model.StateActive
+					case 2:
+						task.LifecycleState = model.StateReview
+					case 3:
+						task.LifecycleState = model.StateTesting
+					}
+					task.UpdatedAt = time.Now()
+					m.DB.UpdateTask(task)
+					m.refreshTasks()
+					m.SelectedTaskUUID = task.UUID
+					m.StatusMsg = fmt.Sprintf("Moved task '%s' to %s.", task.Title, sprintLaneName(newIdx))
+				}
+			}
+		}
+	case "L":
+		if !m.TodoShelfFocus {
+			task, exists := m.GetActiveTask()
+			if exists && task.SprintUUID == activeSprint.UUID {
+				curIdx := m.SprintSwimlaneIdx
+				if curIdx < 4 {
+					newIdx := curIdx + 1
+					m.SprintSwimlaneIdx = newIdx
+					switch newIdx {
+					case 1:
+						task.LifecycleState = model.StateActive
+					case 2:
+						task.LifecycleState = model.StateReview
+					case 3:
+						task.LifecycleState = model.StateTesting
+					case 4:
+						task.LifecycleState = model.StateCompleted
+					}
+					task.UpdatedAt = time.Now()
+					m.DB.UpdateTask(task)
+					m.refreshTasks()
+					m.SelectedTaskUUID = task.UUID
+					m.StatusMsg = fmt.Sprintf("Moved task '%s' to %s.", task.Title, sprintLaneName(newIdx))
+				}
+			}
+		}
+	case "s", "]":
+		if len(m.Sprints) > 1 {
+			idx := -1
+			for i, s := range m.Sprints {
+				if s.UUID == m.ActiveSprintUUID {
+					idx = i
+					break
+				}
+			}
+			if idx != -1 {
+				nextIdx := (idx + 1) % len(m.Sprints)
+				m.ActiveSprintUUID = m.Sprints[nextIdx].UUID
+				m.StatusMsg = fmt.Sprintf("Switched to sprint '%s'.", m.Sprints[nextIdx].Name)
+			}
+		}
+	case "S", "[":
+		if len(m.Sprints) > 1 {
+			idx := -1
+			for i, s := range m.Sprints {
+				if s.UUID == m.ActiveSprintUUID {
+					idx = i
+					break
+				}
+			}
+			if idx != -1 {
+				prevIdx := (idx - 1 + len(m.Sprints)) % len(m.Sprints)
+				m.ActiveSprintUUID = m.Sprints[prevIdx].UUID
+				m.StatusMsg = fmt.Sprintf("Switched to sprint '%s'.", m.Sprints[prevIdx].Name)
+			}
+		}
+	}
+}
+
+func sprintLaneName(idx int) string {
+	switch idx {
+	case 0:
+		return "Defined"
+	case 1:
+		return "In Progress"
+	case 2:
+		return "Review"
+	case 3:
+		return "Testing"
+	case 4:
+		return "Completed"
+	default:
+		return "Defined"
+	}
+}
+

@@ -30,9 +30,11 @@ type JSONDB struct {
 	dataPath       string
 	ledgerPath     string
 	workspacesPath string
+	sprintsPath    string
 	settingsPath   string
 	tasks          map[string]model.Task
 	workspaces     map[string]model.Workspace
+	sprints        map[string]model.Sprint
 	ledger         []LedgerEntry
 	userSettings   model.UserSettings
 }
@@ -52,9 +54,11 @@ func NewJSONDB() (*JSONDB, error) {
 		dataPath:       filepath.Join(configDir, "data.json"),
 		ledgerPath:     filepath.Join(configDir, "ledger.json"),
 		workspacesPath: filepath.Join(configDir, "workspaces.json"),
+		sprintsPath:    filepath.Join(configDir, "sprints.json"),
 		settingsPath:   filepath.Join(configDir, "settings.json"),
 		tasks:          make(map[string]model.Task),
 		workspaces:     make(map[string]model.Workspace),
+		sprints:        make(map[string]model.Sprint),
 		ledger:         []LedgerEntry{},
 	}
 
@@ -63,6 +67,9 @@ func NewJSONDB() (*JSONDB, error) {
 	}
 
 	if err := db.saveWorkspaces(); err != nil {
+		return nil, err
+	}
+	if err := db.saveSprints(); err != nil {
 		return nil, err
 	}
 	if err := db.saveTasks(); err != nil {

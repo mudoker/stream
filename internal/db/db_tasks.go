@@ -53,8 +53,13 @@ func (db *JSONDB) AddTask(t model.Task) error {
 		t.UUID = uuid.New().String()
 	}
 	now := time.Now()
-	t.CreatedAt = now
+	if t.CreatedAt.IsZero() {
+		t.CreatedAt = now
+	}
 	t.UpdatedAt = now
+	if t.InitiateDate.IsZero() {
+		t.InitiateDate = t.GetInitiateDate()
+	}
 
 	db.tasks[t.UUID] = t
 	if err := db.saveTasks(); err != nil {
@@ -76,8 +81,13 @@ func (db *JSONDB) AddTaskNoLedger(t model.Task) error {
 		t.UUID = uuid.New().String()
 	}
 	now := time.Now()
-	t.CreatedAt = now
+	if t.CreatedAt.IsZero() {
+		t.CreatedAt = now
+	}
 	t.UpdatedAt = now
+	if t.InitiateDate.IsZero() {
+		t.InitiateDate = t.GetInitiateDate()
+	}
 
 	db.tasks[t.UUID] = t
 	return db.saveTasks()

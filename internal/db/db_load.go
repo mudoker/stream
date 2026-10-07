@@ -51,6 +51,41 @@ func (db *JSONDB) load() error {
 		break
 	}
 
+	// Load Sprints
+	if _, err := os.Stat(db.sprintsPath); err == nil {
+		data, err := os.ReadFile(db.sprintsPath)
+		if err != nil {
+			return fmt.Errorf("could not read sprints file: %w", err)
+		}
+		var list []model.Sprint
+		if err := json.Unmarshal(data, &list); err != nil {
+			return fmt.Errorf("could not unmarshal sprints: %w", err)
+		}
+		for _, s := range list {
+			if s.WorkspaceUUID == "" {
+				s.WorkspaceUUID = defaultWSUUID
+			}
+			db.sprints[s.UUID] = s
+		}
+	}
+
+	// Initialize default sprint if none exist
+	if len(db.sprints) == 0 {
+		now := time.Now()
+		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		end := start.AddDate(0, 0, 14)
+		defaultSprint := model.Sprint{
+			UUID:          uuid.New().String(),
+			WorkspaceUUID: defaultWSUUID,
+			Name:          "Sprint 1",
+			StartDate:     start,
+			EndDate:       end,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}
+		db.sprints[defaultSprint.UUID] = defaultSprint
+	}
+
 	// Load Tasks
 	if _, err := os.Stat(db.dataPath); err == nil {
 		data, err := os.ReadFile(db.dataPath)
@@ -73,6 +108,9 @@ func (db *JSONDB) load() error {
 				t.SchedulingType != model.Habit &&
 				t.SchedulingType != model.Event) {
 				continue
+			}
+			if t.InitiateDate.IsZero() {
+				t.InitiateDate = t.GetInitiateDate()
 			}
 			db.tasks[t.UUID] = t
 		}

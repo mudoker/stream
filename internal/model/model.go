@@ -32,11 +32,23 @@ const (
 	StateScheduled LifecycleState = "SCHEDULED"
 	StateReady     LifecycleState = "READY"
 	StateActive    LifecycleState = "ACTIVE"
+	StateReview    LifecycleState = "REVIEW"
+	StateTesting   LifecycleState = "TESTING"
 	StatePaused    LifecycleState = "PAUSED"
 	StateCompleted LifecycleState = "COMPLETED"
 	StateArchived  LifecycleState = "ARCHIVED"
 	StateOverdue   LifecycleState = "OVERDUE"
 )
+
+type Sprint struct {
+	UUID          string    `json:"uuid"`
+	WorkspaceUUID string    `json:"workspace_uuid,omitempty"`
+	Name          string    `json:"name"`
+	StartDate     time.Time `json:"start_date"`
+	EndDate       time.Time `json:"end_date"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
 
 type TimeWindow struct {
 	Start time.Time `json:"start"`
@@ -77,6 +89,9 @@ const (
 type Task struct {
 	UUID                  string           `json:"uuid"`
 	WorkspaceUUID         string           `json:"workspace_uuid,omitempty"`
+	SprintUUID            string           `json:"sprint_uuid,omitempty"`
+	AddedToToday          bool             `json:"added_to_today,omitempty"`
+	InitiateDate          time.Time        `json:"initiate_date,omitempty"`
 	Title                 string           `json:"title"`
 	Description           string           `json:"description"`
 	Priority              Priority         `json:"priority"`
@@ -97,6 +112,19 @@ type Task struct {
 	RecurringParentUUID   string           `json:"recurring_parent_uuid,omitempty"`
 	EstimatedDurationMins int              `json:"estimated_duration_mins,omitempty"` // explicit duration for floating tasks
 	IsAllDay              bool             `json:"is_all_day"`
+}
+
+func (t Task) GetInitiateDate() time.Time {
+	if !t.InitiateDate.IsZero() {
+		return t.InitiateDate
+	}
+	if !t.TimeWindow.Start.IsZero() {
+		return t.TimeWindow.Start
+	}
+	if !t.CreatedAt.IsZero() {
+		return t.CreatedAt
+	}
+	return time.Now()
 }
 
 // SortingWeight computes the priority execution weight: (Priority Value * 1000) + Story Points

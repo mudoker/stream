@@ -20,9 +20,14 @@ func (m *Model) GetCommandList() []CommandEntry {
 		CommandEntry{"exit", "Quit Stream"},
 		CommandEntry{"dashboard", "Switch to Dashboard view (1)"},
 		CommandEntry{"month", "Switch to Month view (2)"},
-		CommandEntry{"week", "Switch to Week view (3)"},
-		CommandEntry{"day", "Switch to Day view (4)"},
-		CommandEntry{"analytics", "Switch to Analytics view (5)"},
+		CommandEntry{"sprint", "Switch to Sprint view (3)"},
+		CommandEntry{"week", "Switch to Week view (4)"},
+		CommandEntry{"day", "Switch to Day view (5)"},
+		CommandEntry{"analytics", "Switch to Analytics view (6)"},
+		CommandEntry{"sprint-create", "Create a new sprint"},
+		CommandEntry{"sprint-edit", "Edit active sprint settings"},
+		CommandEntry{"sprint-delete", "Delete active sprint"},
+		CommandEntry{"sprint-generate", "Generate recurring sprints"},
 		CommandEntry{"profile", "Edit profile & security settings"},
 		CommandEntry{"help", "Toggle command reference help overlay"},
 		CommandEntry{"create <title>", "Create anchored task starting 9:00 AM"},
@@ -112,6 +117,7 @@ func (m *Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				val = strings.TrimRight(val[:idx], " ") + " "
 			}
 			m.CommandInput.SetValue(val)
+			m.CommandInput.SetCursor(len(val))
 		}
 		return m, nil
 	case "shift+tab":
@@ -125,6 +131,7 @@ func (m *Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				val = strings.TrimRight(val[:idx], " ") + " "
 			}
 			m.CommandInput.SetValue(val)
+			m.CommandInput.SetCursor(len(val))
 		}
 		return m, nil
 	case "enter":

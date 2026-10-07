@@ -107,3 +107,46 @@ func TestPromptModalInteractiveSelection(t *testing.T) {
 		t.Errorf("expected task start time to be snoozed to %s, got %s", expectedStart, updatedTasks[0].TimeWindow.Start)
 	}
 }
+
+func TestCommandPaletteAutocompleteCursorPosition(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, _ := db.NewJSONDB()
+	modelVal := viewmodel.NewModel(database, nil)
+	m := &modelVal
+
+	// Open command palette with ':'
+	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
+	m = res.(*viewmodel.Model)
+
+	if m.CurrentMode != viewmodel.ModeCommand {
+		t.Fatalf("expected ModeCommand, got %v", m.CurrentMode)
+	}
+
+	// Type "sprint"
+	for _, r := range "sprint" {
+		res, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = res.(*viewmodel.Model)
+	}
+
+	// Press Tab to autocomplete to the first matching command
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = res.(*viewmodel.Model)
+
+	// Verify command value is autocompleted and cursor is at rightmost position (len(val))
+	val := m.CommandInput.Value()
+	if val == "" {
+		t.Fatalf("expected autocompleted command, got empty")
+	}
+	if m.CommandInput.Position() != len(val) {
+		t.Errorf("expected cursor position at index %d (rightmost), got %d (value was '%s')", len(val), m.CommandInput.Position(), val)
+	}
+
+	// Press Shift+Tab to cycle and verify cursor remains at rightmost (len(val))
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
+	m = res.(*viewmodel.Model)
+	valAfter := m.CommandInput.Value()
+	if m.CommandInput.Position() != len(valAfter) {
+		t.Errorf("expected cursor position at index %d after shift+tab, got %d", len(valAfter), m.CommandInput.Position())
+	}
+}
+

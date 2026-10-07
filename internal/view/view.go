@@ -111,21 +111,26 @@ func (v *View) Render() string {
 		}
 		todoStyle := lipgloss.NewStyle().
 			Width(l.TodoW).
-			Height(appContentHeight - 2).
-			MaxHeight(appContentHeight - 2).
-			Padding(1, 1).
+			Height(appContentHeight).
+			MaxHeight(appContentHeight).
+			Padding(0, 1).
 			BorderLeft(true).
 			BorderStyle(lipgloss.Border{Left: "│"}).
 			BorderForeground(todoBorderCol)
 
-		if m.CurrentView == viewmodel.DayView {
-			// Three-column layout: sidebar | timeline | todo shelf
-			timelineContent := pages.RenderDayTimeline(m, v.Theme, appContentHeight)
+		if m.CurrentView == viewmodel.DayView || m.CurrentView == viewmodel.SprintView {
+			// Three-column layout: sidebar | timeline/sprint | todo shelf
+			var mainContent string
+			if m.CurrentView == viewmodel.DayView {
+				mainContent = pages.RenderDayTimeline(m, v.Theme, appContentHeight)
+			} else {
+				mainContent = pages.RenderSprintView(m, v.Theme, appContentHeight)
+			}
 			todoContent := components.RenderTodoShelf(m, v.Theme, appContentHeight)
 
 			canvas = lipgloss.JoinHorizontal(lipgloss.Top,
 				sidebarStyle.Render(components.RenderArcSidebar(m, v.Theme, appContentHeight-2)),
-				timelineStyle.Render(timelineContent),
+				timelineStyle.Render(mainContent),
 				todoStyle.Render(todoContent),
 			)
 		} else {
@@ -207,7 +212,7 @@ func (v *View) Render() string {
 	}
 
 	// Centered floating modal over the full canvas
-	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.LogSessionPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen || m.JazzLoungeOpen || m.UpdatePromptOpen || m.CurrentMode == viewmodel.ModeTagsCRUD {
+	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeSprintForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.LogSessionPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen || m.JazzLoungeOpen || m.UpdatePromptOpen || m.CurrentMode == viewmodel.ModeTagsCRUD {
 		var modalStr string
 		switch {
 		case m.WarningOpen:
@@ -226,6 +231,8 @@ func (v *View) Render() string {
 			modalStr = modals.RenderUpdatePromptModal(m, v.Theme)
 		case m.CurrentMode == viewmodel.ModeForm:
 			modalStr = modals.RenderFormModal(m, v.Theme)
+		case m.CurrentMode == viewmodel.ModeSprintForm:
+			modalStr = modals.RenderSprintFormModal(m, v.Theme)
 		case m.CurrentMode == viewmodel.ModeWorkspaceForm:
 			modalStr = modals.RenderWorkspaceFormModal(m, v.Theme)
 		case m.CurrentMode == viewmodel.ModeWorkspacePicker:

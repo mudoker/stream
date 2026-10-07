@@ -63,6 +63,9 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 			details = append(details, fmt.Sprintf("due %s (%s)", task.TimeWindow.Start.Format("15:04"), remDays))
 		}
 	}
+	if task.AddedToToday {
+		details = append(details, "⚡ Today")
+	}
 	if len(task.Tags) > 0 {
 		details = append(details, strings.Join(task.Tags, ", "))
 	}
@@ -94,11 +97,9 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 	if isSelected {
 		titleStyle = lipgloss.NewStyle().
 			Foreground(t.FocusPurple).
-			Bold(true).
-			Background(t.SelectedBg)
+			Bold(true)
 		detailStyle = lipgloss.NewStyle().
-			Foreground(t.FocusPurple).
-			Background(t.SelectedBg)
+			Foreground(t.FocusPurple)
 	} else if isDone {
 		titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Bold(true)
 		detailStyle = lipgloss.NewStyle().Foreground(t.Muted)
@@ -130,8 +131,7 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 		}
 		descStyle := lipgloss.NewStyle().
 			Foreground(t.Muted).
-			Italic(true).
-			Background(t.SelectedBg)
+			Italic(true)
 		itemRows = append(itemRows, descStyle.Render(descLine))
 	}
 

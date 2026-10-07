@@ -233,3 +233,31 @@ func RenderSyncFormModal(m *viewmodel.Model, t theme.Theme) string {
 
 	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
 }
+
+func RenderSprintFormModal(m *viewmodel.Model, t theme.Theme) string {
+	f := m.SprintForm
+	const innerW = 54
+
+	var fields []string
+	headerText := "Create Sprint"
+	if f.IsEditing {
+		headerText = "Edit Sprint"
+	}
+	title := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(headerText)
+	fields = append(fields, title)
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+
+	fields = append(fields, components.RenderFormFieldWide("1", "Sprint Name", f.NameInput.View(), 20, f.ActiveField == 0, t))
+	fields = append(fields, components.RenderFormFieldWide("2", "Start Date (YYYY-MM-DD)", f.StartDateInput.View(), 20, f.ActiveField == 1, t))
+	fields = append(fields, components.RenderFormFieldWide("3", "End Date (YYYY-MM-DD)", f.EndDateInput.View(), 20, f.ActiveField == 2, t))
+	fields = append(fields, components.RenderFormFieldWide("4", "Generate Recurring (N)", f.RecurringCountInput.View(), 20, f.ActiveField == 3, t))
+	fields = append(fields, "")
+	fields = append(fields, ModalSep(innerW))
+	fields = append(fields, "")
+
+	fields = append(fields, "  "+components.RenderFormSubmitButton("Save Sprint", f.ActiveField == 4, t))
+
+	return t.ModalStyle.Render(PrepareModalContent(strings.Join(fields, "\n"), innerW))
+}
+

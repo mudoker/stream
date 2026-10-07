@@ -22,12 +22,16 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 	isTodoFocused := m.TodoShelfFocus && !m.SidebarFocus
 	var titleStr string
 	var sepColor lipgloss.Color
+	shelfTitle := "TODO SHELF"
+	if m.CurrentView == viewmodel.SprintView {
+		shelfTitle = "GLOBAL BACKLOG"
+	}
 	if isTodoFocused {
 		titleStr = lipgloss.NewStyle().Foreground(t.Accent).Render("● ") +
-			lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("TODO SHELF")
+			lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(shelfTitle)
 		sepColor = t.Accent
 	} else {
-		titleStr = "  " + lipgloss.NewStyle().Foreground(t.Muted).Bold(true).Render("TODO SHELF")
+		titleStr = "  " + lipgloss.NewStyle().Foreground(t.Muted).Bold(true).Render(shelfTitle)
 		sepColor = lipgloss.Color("#2a2c37")
 	}
 
@@ -41,12 +45,15 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 	var rows []string
 	rows = append(rows,
 		titleStr,
-		"",
 		sep,
-		"",
 	)
 
-	shelfTasks := m.GetTodoShelfTasks()
+	var shelfTasks []model.Task
+	if m.CurrentView == viewmodel.SprintView {
+		shelfTasks = m.GetGlobalBacklogTasks()
+	} else {
+		shelfTasks = m.GetTodoShelfTasks()
+	}
 	var reminders []model.Task
 	var habits []model.Task
 	var backlog []model.Task
@@ -78,53 +85,53 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 
 	subtleSep := lipgloss.NewStyle().Foreground(t.Muted).Render(strings.Repeat("─", innerW))
 
-	// ── 1. Reminders Section ─────────────────────────────────────────
-	remindersHeader := lipgloss.NewStyle().
-		Background(t.SelectedBg).
-		Foreground(t.Accent).
-		Bold(true).
-		Padding(0, 1).
-		Render(fmt.Sprintf("⏰ REMINDERS (%d)", len(reminders)))
-	rows = append(rows, remindersHeader, subtleSep)
-	if len(reminders) == 0 {
-		rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render("  No reminders"), "")
-	} else {
-		for _, task := range reminders {
-			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
-				selectedLineStart = len(rows)
-			}
-			rows = append(rows, renderShelfTaskRow(m, t, task, innerW)...)
-			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
-				selectedLineEnd = len(rows)
+	// Reminders and Habits are for Day Timeline view (appear directly on day)
+	if m.CurrentView != viewmodel.SprintView {
+		// ── 1. Reminders Section ─────────────────────────────────────────
+		remindersHeader := lipgloss.NewStyle().
+			Foreground(t.Accent).
+			Bold(true).
+			Padding(0, 1).
+			Render(fmt.Sprintf("⏰ REMINDERS (%d)", len(reminders)))
+		rows = append(rows, remindersHeader, subtleSep)
+		if len(reminders) == 0 {
+			rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render("  No reminders"), "")
+		} else {
+			for _, task := range reminders {
+				if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
+					selectedLineStart = len(rows)
+				}
+				rows = append(rows, renderShelfTaskRow(m, t, task, innerW)...)
+				if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
+					selectedLineEnd = len(rows)
+				}
 			}
 		}
-	}
 
-	// ── 2. Habits Section ────────────────────────────────────────────
-	habitsHeader := lipgloss.NewStyle().
-		Background(t.SelectedBg).
-		Foreground(t.Accent).
-		Bold(true).
-		Padding(0, 1).
-		Render(fmt.Sprintf("🔁 HABITS (%d)", len(habits)))
-	rows = append(rows, habitsHeader, subtleSep)
-	if len(habits) == 0 {
-		rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render("  No habits"), "")
-	} else {
-		for _, task := range habits {
-			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
-				selectedLineStart = len(rows)
-			}
-			rows = append(rows, renderShelfTaskRow(m, t, task, innerW)...)
-			if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
-				selectedLineEnd = len(rows)
+		// ── 2. Habits Section ────────────────────────────────────────────
+		habitsHeader := lipgloss.NewStyle().
+			Foreground(t.Accent).
+			Bold(true).
+			Padding(0, 1).
+			Render(fmt.Sprintf("🔁 HABITS (%d)", len(habits)))
+		rows = append(rows, habitsHeader, subtleSep)
+		if len(habits) == 0 {
+			rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render("  No habits"), "")
+		} else {
+			for _, task := range habits {
+				if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
+					selectedLineStart = len(rows)
+				}
+				rows = append(rows, renderShelfTaskRow(m, t, task, innerW)...)
+				if m.TodoShelfFocus && task.UUID == m.SelectedTaskUUID {
+					selectedLineEnd = len(rows)
+				}
 			}
 		}
 	}
 
 	// ── 3. Backlog Section ───────────────────────────────────────────
 	backlogHeader := lipgloss.NewStyle().
-		Background(t.SelectedBg).
 		Foreground(t.Accent).
 		Bold(true).
 		Padding(0, 1).
@@ -146,7 +153,6 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 
 	// ── 4. Completed Section ─────────────────────────────────────────
 	completedHeader := lipgloss.NewStyle().
-		Background(t.SelectedBg).
 		Foreground(t.Accent).
 		Bold(true).
 		Padding(0, 1).

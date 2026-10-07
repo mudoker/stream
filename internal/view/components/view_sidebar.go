@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"stream/internal/model"
-	"stream/internal/viewmodel"
 	"stream/internal/view/theme"
+	"stream/internal/viewmodel"
+	"stream/internal/viewmodel/tasks"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -179,6 +180,7 @@ func renderSidebarViews(m *viewmodel.Model, t theme.Theme, innerW int, todayCoun
 	items := []navItem{
 		{"Dashboard", "", viewmodel.DashboardView},
 		{"Month Grid", "󰸗", viewmodel.MonthView},
+		{"Sprint", "󰓹", viewmodel.SprintView},
 		{"Week Lanes", "󰸶", viewmodel.WeekView},
 		{"Day Timeline", "󰸴", viewmodel.DayView},
 		{"Analytics", "󰄫", viewmodel.AnalyticsView},
@@ -189,6 +191,15 @@ func renderSidebarViews(m *viewmodel.Model, t theme.Theme, innerW int, todayCoun
 		badgeStr := ""
 		if item.view == viewmodel.DayView && todayCount > 0 {
 			badgeStr = fmt.Sprintf("[%d]", todayCount)
+		} else if item.view == viewmodel.SprintView && len(m.Sprints) > 0 {
+			activeSprint, hasSprint := m.GetActiveSprint()
+			if hasSprint {
+				defined, inProgress, review, testing, completed := tasks.GetSprintSwimlaneTasks(m.Tasks, activeSprint.UUID)
+				sprintTaskCount := len(defined) + len(inProgress) + len(review) + len(testing) + len(completed)
+				if sprintTaskCount > 0 {
+					badgeStr = fmt.Sprintf("[%d]", sprintTaskCount)
+				}
+			}
 		}
 
 		var leftText string
@@ -449,7 +460,7 @@ func renderSidebarFooter(m *viewmodel.Model, t theme.Theme, innerW int, appConte
 	rows = append(rows, sep)
 
 	syncColor := t.Muted
-	if m.Sync.IsOnline() {
+	if m.Sync != nil && m.Sync.IsOnline() {
 		syncColor = t.SuccessColor
 	}
 	gcal := lipgloss.NewStyle().Foreground(syncColor).Render("● gcal")

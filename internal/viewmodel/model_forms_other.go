@@ -2,6 +2,7 @@ package viewmodel
 
 import (
 	"strconv"
+	"time"
 
 	"stream/internal/model"
 
@@ -120,3 +121,90 @@ func (f SyncForm) ModeValue() model.GCalSyncMode {
 		return model.GCalSyncTwoWay
 	}
 }
+
+type SprintForm struct {
+	Name                string
+	StartDate           string
+	EndDate             string
+	RecurringCount      int
+	ActiveField         int // 0: Name, 1: Start Date, 2: End Date, 3: Recurring Sprints, 4: Submit
+	NameInput           textinput.Model
+	StartDateInput      textinput.Model
+	EndDateInput        textinput.Model
+	RecurringCountInput textinput.Model
+	IsEditing           bool
+	EditingSprintUUID   string
+}
+
+func NewSprintForm(defaultName string) SprintForm {
+	now := time.Now()
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	end := start.AddDate(0, 0, 14)
+
+	name := textinput.New()
+	name.Placeholder = "Sprint 1"
+	if defaultName == "" {
+		defaultName = "Sprint 1"
+	}
+	name.SetValue(defaultName)
+	name.Focus()
+
+	startDate := textinput.New()
+	startDate.Placeholder = start.Format("2006-01-02")
+	startDate.SetValue(start.Format("2006-01-02"))
+
+	endDate := textinput.New()
+	endDate.Placeholder = end.Format("2006-01-02")
+	endDate.SetValue(end.Format("2006-01-02"))
+
+	recCount := textinput.New()
+	recCount.Placeholder = "0 (no recurring) or e.g. 4"
+	recCount.SetValue("0")
+
+	return SprintForm{
+		Name:                defaultName,
+		StartDate:           start.Format("2006-01-02"),
+		EndDate:             end.Format("2006-01-02"),
+		RecurringCount:      0,
+		ActiveField:         0,
+		NameInput:           name,
+		StartDateInput:      startDate,
+		EndDateInput:        endDate,
+		RecurringCountInput: recCount,
+		IsEditing:           false,
+	}
+}
+
+func NewSprintFormFromSprint(s model.Sprint) SprintForm {
+	name := textinput.New()
+	name.Placeholder = s.Name
+	name.SetValue(s.Name)
+	name.Focus()
+
+	startDate := textinput.New()
+	startDate.Placeholder = s.StartDate.Format("2006-01-02")
+	startDate.SetValue(s.StartDate.Format("2006-01-02"))
+
+	endDate := textinput.New()
+	endDate.Placeholder = s.EndDate.Format("2006-01-02")
+	endDate.SetValue(s.EndDate.Format("2006-01-02"))
+
+	recCount := textinput.New()
+	recCount.Placeholder = "0"
+	recCount.SetValue("0")
+
+	return SprintForm{
+		Name:                s.Name,
+		StartDate:           s.StartDate.Format("2006-01-02"),
+		EndDate:             s.EndDate.Format("2006-01-02"),
+		RecurringCount:      0,
+		ActiveField:         0,
+		NameInput:           name,
+		StartDateInput:      startDate,
+		EndDateInput:        endDate,
+		RecurringCountInput: recCount,
+		IsEditing:           true,
+		EditingSprintUUID:   s.UUID,
+	}
+}
+

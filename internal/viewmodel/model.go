@@ -17,6 +17,7 @@ type ViewType int
 const (
 	DashboardView ViewType = iota
 	MonthView
+	SprintView
 	WeekView
 	DayView
 	AnalyticsView
@@ -30,6 +31,7 @@ const (
 	ModeZen             UIState = "ZEN"
 	ModeCommand         UIState = "COMMAND"
 	ModeForm            UIState = "WIZARD"
+	ModeSprintForm      UIState = "SPRINT_WIZARD"
 	ModeTaskMove        UIState = "TASK_MOVE"
 	ModeTaskDurationAdjust UIState = "DURATION_ADJUST"
 	ModeWorkspaceForm   UIState = "WORKSPACE_WIZARD"
@@ -87,6 +89,11 @@ type Model struct {
 	WorkspaceForm        WorkspaceForm
 	IsEditingWorkspace   bool
 	EditingWorkspaceUUID string
+
+	Sprints           []model.Sprint
+	ActiveSprintUUID  string
+	SprintForm        SprintForm
+	SprintSwimlaneIdx int // 0: Defined, 1: In Progress, 2: Review, 3: Testing, 4: Completed
 
 	PromptOpen        bool
 	PromptTask        model.Task
@@ -202,6 +209,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 		DayScrollOffsetHeight:       -1,
 		Form:                        NewTaskForm(),
 		WorkspaceForm:               NewWorkspaceForm(),
+		SprintForm:                  NewSprintForm(""),
 		ProfileForm:                 NewProfileForm(settings.Username, settings.LockTimeoutMinutes),
 		SyncForm:                    NewSyncForm(settings.NormalizedGCalSync()),
 		IsLocked:                    false,
@@ -217,6 +225,7 @@ func NewModel(database *db.JSONDB, syncEngine *sync.SyncEngine) Model {
 	}
 
 	m.refreshWorkspaces()
+	m.refreshSprints()
 	m.refreshTasks()
 	m.selectDefaultTaskForSelectedDay()
 	m.TimelineHour = time.Now().Hour() // Focus on current time on first open

@@ -101,6 +101,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.HandleTaskDurationAdjustKeys(msg)
 	case ModeWorkspaceForm:
 		return m.handleWorkspaceFormKeys(msg)
+	case ModeSprintForm:
+		return m.handleSprintFormKeys(msg)
 	case ModeProfileForm:
 		return m.handleProfileFormKeys(msg)
 	case ModeSyncForm:

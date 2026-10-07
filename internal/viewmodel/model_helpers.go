@@ -11,6 +11,7 @@ import (
 
 	"stream/internal/db"
 	"stream/internal/model"
+	"stream/internal/viewmodel/tasks"
 	"stream/internal/viewmodel/timer"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -69,17 +70,69 @@ func (m *Model) refreshTasks() {
 	}
 }
 
+func (m *Model) refreshSprints() {
+	if m.DB == nil {
+		return
+	}
+	m.Sprints = m.DB.GetSprints()
+	if len(m.Sprints) > 0 {
+		found := false
+		for _, s := range m.Sprints {
+			if s.UUID == m.ActiveSprintUUID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			m.ActiveSprintUUID = m.Sprints[0].UUID
+		}
+	} else {
+		m.ActiveSprintUUID = ""
+	}
+}
+
+func (m *Model) GetActiveSprint() (model.Sprint, bool) {
+	if m.ActiveSprintUUID != "" {
+		for _, s := range m.Sprints {
+			if s.UUID == m.ActiveSprintUUID {
+				return s, true
+			}
+		}
+	}
+	if len(m.Sprints) > 0 {
+		return m.Sprints[0], true
+	}
+	return model.Sprint{}, false
+}
+
 func (m *Model) cycleFocus() {
-	if m.CurrentView == DayView {
+	if m.CurrentView == DayView || m.CurrentView == SprintView {
 		if m.SidebarFocus {
 			m.SidebarFocus = false
 			m.TodoShelfFocus = false
-			dayTasks := m.GetDayTasks()
-			if len(dayTasks) > 0 {
-				m.SelectedTaskUUID = dayTasks[0].UUID
-				m.TimelineHour = dayTasks[0].TimeWindow.Start.Hour()
+			if m.CurrentView == DayView {
+				dayTasks := m.GetDayTasks()
+				if len(dayTasks) > 0 {
+					m.SelectedTaskUUID = dayTasks[0].UUID
+					m.TimelineHour = dayTasks[0].TimeWindow.Start.Hour()
+				} else {
+					m.SelectedTaskUUID = ""
+				}
 			} else {
-				m.SelectedTaskUUID = ""
+				// Sprint view
+				activeSprint, ok := m.GetActiveSprint()
+				if ok {
+					defined, inProgress, review, testing, completed := tasks.GetSprintSwimlaneTasks(m.Tasks, activeSprint.UUID)
+					lanes := [][]model.Task{defined, inProgress, review, testing, completed}
+					if m.SprintSwimlaneIdx >= 0 && m.SprintSwimlaneIdx < len(lanes) {
+						laneTasks := lanes[m.SprintSwimlaneIdx]
+						if len(laneTasks) > 0 {
+							m.SelectedTaskUUID = laneTasks[0].UUID
+						} else {
+							m.SelectedTaskUUID = ""
+						}
+					}
+				}
 			}
 		} else if m.TodoShelfFocus {
 			m.LastTodoShelfTaskUUID = m.SelectedTaskUUID
@@ -121,6 +174,7 @@ func (m *Model) moveSidebarView(delta int) {
 	viewsOrder := []ViewType{
 		DashboardView,
 		MonthView,
+		SprintView,
 		WeekView,
 		DayView,
 		AnalyticsView,

@@ -51,6 +51,49 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		m.StatusMsg = "Switched to Day view."
+	case "sprint":
+		m.CurrentView = SprintView
+		m.ScrollOffset = 0
+		m.ShelfScrollOffset = 0
+		m.StatusMsg = "Switched to Sprint view."
+	case "sprint-create":
+		m.CurrentMode = ModeSprintForm
+		defaultName := fmt.Sprintf("Sprint %d", len(m.Sprints)+1)
+		m.SprintForm = NewSprintForm(defaultName)
+		m.SprintForm.NameInput.Focus()
+		m.StatusMsg = "Create new sprint."
+	case "sprint-edit":
+		activeSprint, ok := m.GetActiveSprint()
+		if ok {
+			m.CurrentMode = ModeSprintForm
+			m.SprintForm = NewSprintFormFromSprint(activeSprint)
+			m.SprintForm.NameInput.Focus()
+			m.StatusMsg = fmt.Sprintf("Editing sprint '%s'.", activeSprint.Name)
+		} else {
+			m.StatusMsg = "No active sprint found to edit."
+		}
+	case "sprint-delete":
+		activeSprint, ok := m.GetActiveSprint()
+		if ok {
+			m.DB.DeleteSprint(activeSprint.UUID)
+			m.refreshSprints()
+			m.refreshTasks()
+			m.StatusMsg = fmt.Sprintf("Sprint '%s' deleted.", activeSprint.Name)
+		} else {
+			m.StatusMsg = "No active sprint found to delete."
+		}
+	case "sprint-generate":
+		activeSprint, ok := m.GetActiveSprint()
+		if ok {
+			m.CurrentMode = ModeSprintForm
+			m.SprintForm = NewSprintFormFromSprint(activeSprint)
+			m.SprintForm.ActiveField = 3
+			m.SprintForm.RecurringCountInput.SetValue("4")
+			m.SprintForm.RecurringCountInput.Focus()
+			m.StatusMsg = "Generate recurring sprints."
+		} else {
+			m.StatusMsg = "No active sprint found."
+		}
 	case "analytics":
 		m.CurrentView = AnalyticsView
 		m.ScrollOffset = 0

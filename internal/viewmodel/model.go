@@ -116,6 +116,7 @@ type Model struct {
 	ConfirmActionType string
 	ConfirmSelectedIndex int
 	ConfirmFocusArea     int
+	FactoryResetCountdown int
 	RecurringEditFromForm bool
 	LogRemainingOnConfirm bool
 	ShrinkRemainingMins   int

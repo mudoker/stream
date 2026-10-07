@@ -83,6 +83,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case TickMsg:
 		m.UpdateProcessMetrics()
+		if m.ConfirmOpen && m.ConfirmActionType == "factory_reset" && m.FactoryResetCountdown > 0 {
+			m.FactoryResetCountdown--
+		}
 		if m.ZenTimer != nil {
 			oldIdx := m.ZenTimer.CurrentSessionIdx
 			finished := m.ZenTimer.Tick()

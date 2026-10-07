@@ -114,6 +114,32 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 		if keyStr == "enter" {
 			switch m.ConfirmActionType {
+			case "factory_reset":
+				if m.ConfirmSelectedIndex == 0 {
+					if m.FactoryResetCountdown > 0 {
+						m.StatusMsg = fmt.Sprintf("⚠️ Please wait %d seconds before confirming factory reset.", m.FactoryResetCountdown)
+						return true, nil
+					}
+					if m.DB != nil {
+						_ = m.DB.FactoryReset()
+					}
+					m.refreshWorkspaces()
+					m.refreshSprints()
+					m.refreshTasks()
+					m.CurrentView = DashboardView
+					m.SelectedTaskUUID = ""
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.FactoryResetCountdown = 0
+					m.StatusMsg = "💥 Factory reset complete. All data has been wiped."
+					return true, nil
+				} else {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.FactoryResetCountdown = 0
+					m.StatusMsg = "Factory reset cancelled."
+					return true, nil
+				}
 			case "save_tag_confirm":
 				if m.ConfirmSelectedIndex == 0 {
 					tags := m.DB.GetTags()
@@ -438,6 +464,11 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""
 				m.StatusMsg = "Shrink canceled."
+			} else if m.ConfirmActionType == "factory_reset" {
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.FactoryResetCountdown = 0
+				m.StatusMsg = "Factory reset cancelled."
 			} else {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""

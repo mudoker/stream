@@ -171,6 +171,40 @@ func RenderReviewModal(m *viewmodel.Model, t theme.Theme) string {
 
 func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 	switch m.ConfirmActionType {
+	case "factory_reset":
+		countdownLine := ""
+		if m.FactoryResetCountdown > 0 {
+			countdownLine = lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render(
+				fmt.Sprintf("⏳ Confirmation unlocks in %d seconds...", m.FactoryResetCountdown),
+			)
+		} else {
+			countdownLine = lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render(
+				"⚠️  READY: Press Enter / 'y' to wipe all data",
+			)
+		}
+
+		optConfirm := "💥 Wipe All Data (Factory Reset)"
+		if m.FactoryResetCountdown > 0 {
+			optConfirm = fmt.Sprintf("Wipe All Data (%ds remaining)", m.FactoryResetCountdown)
+		}
+
+		return components.RenderBaseConfirmModal(
+			"⚠️  FACTORY RESET CONFIRMATION",
+			[]string{
+				"THIS WILL PERMANENTLY WIPE ALL LOCAL DATA:",
+				"  • All Tasks, Backlogs & Reminders",
+				"  • All Sprints & Kanban Swimlanes",
+				"  • All Workspaces, Tags & Habits",
+				"  • All Sync History & Settings",
+				"",
+				countdownLine,
+			},
+			[]string{optConfirm, "Cancel (Keep Data)"},
+			m.ConfirmSelectedIndex,
+			0, // Destructive index 0
+			m.ConfirmFocusArea,
+			t,
+		)
 	case "complete_reminder":
 		return components.RenderBaseConfirmModal(
 			"Complete Reminder",

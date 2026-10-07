@@ -47,6 +47,8 @@ func (m *Model) GetCommandList() []CommandEntry {
 		CommandEntry{"stop", "Stop active focus timer session"},
 		CommandEntry{"music", "Open jazz lounge music player modal"},
 		CommandEntry{"tags", "Manage system tags (CRUD)"},
+		CommandEntry{"factory-reset", "Wipe all data and reset to factory state"},
+		CommandEntry{"reset", "Wipe all data and reset to factory state"},
 	)
 
 	for _, ws := range m.Workspaces {

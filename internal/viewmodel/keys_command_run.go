@@ -317,6 +317,14 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			common.InitiateDeleteTask(m, task)
 		}
 
+	case "factory-reset", "reset":
+		m.ConfirmOpen = true
+		m.ConfirmActionType = "factory_reset"
+		m.FactoryResetCountdown = 10
+		m.ConfirmSelectedIndex = 1 // Default to cancel for safety
+		m.ConfirmFocusArea = 0
+		m.StatusMsg = "⚠️ Factory reset initiated. Please wait 10 seconds to confirm."
+
 	case "pull", "push", "sync-settings", "gcal-settings":
 		if cmdName == "pull" {
 			if m.Sync != nil {

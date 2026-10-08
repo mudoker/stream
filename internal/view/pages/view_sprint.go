@@ -398,7 +398,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		borderColor = typeColor
 	}
 
-	cursor := "  "
+	cursor := ""
 	if isSelected {
 		if m.CurrentMode == viewmodel.ModeSprintTaskMove {
 			cursor = "❖ "
@@ -445,7 +445,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	// Line 2 (optional): Description rendered right below title
 	if strings.TrimSpace(task.Description) != "" {
 		desc := strings.TrimSpace(task.Description)
-		descStr := "  " + desc
+		descStr := desc
 		if lipgloss.Width(descStr) > innerW {
 			runes := []rune(descStr)
 			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > innerW {
@@ -465,7 +465,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	if len(task.Tags) > 0 {
 		metaParts = append(metaParts, "# "+strings.Join(task.Tags, ", "))
 	}
-	metaStr := "  " + strings.Join(metaParts, " • ")
+	metaStr := strings.Join(metaParts, " • ")
 	if lipgloss.Width(metaStr) > innerW {
 		runes := []rune(metaStr)
 		for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > innerW {
@@ -478,7 +478,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 
 	// If linked to another feature and not blocked
 	if task.LinkedFeatureID != "" && task.BlockedBy == "" {
-		linkStr := fmt.Sprintf("  Link: %s", task.LinkedFeatureID)
+		linkStr := fmt.Sprintf("Link: %s", task.LinkedFeatureID)
 		if lipgloss.Width(linkStr) > innerW {
 			runes := []rune(linkStr)
 			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > innerW {

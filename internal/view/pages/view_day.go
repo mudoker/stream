@@ -222,7 +222,7 @@ func RenderDayTimeline(m *viewmodel.Model, t theme.Theme, appContentHeight int) 
 			gutterRows[r] = lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true).Render(label)
 		} else if isHourRow {
 			label = fmt.Sprintf(" %02d:00 ", hour)
-			isSelectedHour := !m.TodoShelfFocus && m.TimelineHour == hour
+			isSelectedHour := isTimelineFocused && m.TimelineHour == hour
 			if isSelectedHour {
 				gutterRows[r] = lipgloss.NewStyle().
 					Foreground(t.Accent).

@@ -45,13 +45,22 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 		sep,
 	)
 
-	subtleSep := lipgloss.NewStyle().Foreground(t.Muted).Render(strings.Repeat("─", innerW))
+	var subtleSep string
+	if isTodoFocused {
+		subtleSep = lipgloss.NewStyle().Foreground(lipgloss.Color("#45475a")).Render(strings.Repeat("─", innerW))
+	} else {
+		subtleSep = lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37")).Render(strings.Repeat("─", innerW))
+	}
 
 	// Render each section defined in the headless shelf model
 	for _, sec := range shelfData.Sections {
+		secHeaderColor := t.Muted
+		if isTodoFocused {
+			secHeaderColor = t.Accent
+		}
 		header := lipgloss.NewStyle().
-			Foreground(t.Accent).
-			Bold(true).
+			Foreground(secHeaderColor).
+			Bold(isTodoFocused).
 			Padding(0, 1).
 			Render(sec.Title)
 		rows = append(rows, header, subtleSep)

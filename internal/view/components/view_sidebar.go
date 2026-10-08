@@ -51,8 +51,18 @@ func RenderArcSidebar(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	if ver == "" {
 		ver = "v1.0.0"
 	}
-	brandLine := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(brand)
-	verLine := lipgloss.NewStyle().Foreground(t.Muted).Render(ver)
+	var brandLine string
+	var sepColor lipgloss.Color
+	if m.SidebarFocus {
+		brandLine = lipgloss.NewStyle().Foreground(t.Accent).Render("● ") +
+			lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(brand)
+		sepColor = t.Accent
+	} else {
+		brandLine = "  " + lipgloss.NewStyle().Foreground(t.Muted).Bold(true).Render(brand)
+		sepColor = lipgloss.Color("#2a2c37")
+	}
+	verLine := "  " + lipgloss.NewStyle().Foreground(t.Muted).Render(ver)
+	sep = lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", innerW))
 	rows = append(rows, brandLine, verLine, sep)
 
 	// User Context Node
@@ -64,8 +74,12 @@ func RenderArcSidebar(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	if len([]rune(profileText)) > innerW {
 		profileText = "👤 " + string([]rune(userName)[:innerW-5]) + "..."
 	}
+	profileFg := t.Fg
+	if !m.SidebarFocus {
+		profileFg = t.Muted
+	}
 	profileCard := lipgloss.NewStyle().
-		Foreground(t.Fg).
+		Foreground(profileFg).
 		Padding(1, 1).
 		Width(innerW).
 		Render(profileText)
@@ -339,7 +353,11 @@ func renderSidebarFooter(m *viewmodel.Model, t theme.Theme, innerW int, appConte
 	}
 
 	focusMins := todayFocusSeconds / 60
-	summaryTitle := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("  TODAY SUMMARY")
+	summaryTitleColor := t.Muted
+	if m.SidebarFocus {
+		summaryTitleColor = t.Accent
+	}
+	summaryTitle := lipgloss.NewStyle().Foreground(summaryTitleColor).Bold(m.SidebarFocus).Render("  TODAY SUMMARY")
 
 	tasksLabel := "  Tasks Completed"
 	tasksVal := fmt.Sprintf("%d/%d", todayCompletedCount, todayTotalCount)

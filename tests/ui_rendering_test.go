@@ -798,5 +798,66 @@ func TestResponsiveCardDetailsRendering(t *testing.T) {
 	}
 }
 
+func TestColumnFocusVisualStandout(t *testing.T) {
+	th := theme.NewTheme()
+	m := &viewmodel.Model{
+		Layout: viewmodel.Layout{
+			SidebarW:   25,
+			WorkspaceW: 100,
+			TimelineW:  70,
+			TodoW:      30,
+		},
+		SelectedDay: time.Now(),
+		Tasks: []model.Task{
+			{
+				UUID:           "task-1",
+				Title:          "Sample Task",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+		},
+	}
 
+	// 1. Sidebar Focused State
+	m.SidebarFocus = true
+	m.TodoShelfFocus = false
 
+	sidebarRender := components.RenderArcSidebar(m, th, 30)
+	if !strings.Contains(cleanAnsi(sidebarRender), "● ▲ s t r e a m") {
+		t.Errorf("Expected sidebar to have active dot indicator when focused, got:\n%s", cleanAnsi(sidebarRender))
+	}
+
+	shelfRender := components.RenderTodoShelf(m, th, 30)
+	if strings.Contains(cleanAnsi(shelfRender), "●") {
+		t.Errorf("Expected todo shelf not to have active dot indicator when sidebar is focused, got:\n%s", cleanAnsi(shelfRender))
+	}
+
+	// 2. Timeline Focused State (Day View)
+	m.SidebarFocus = false
+	m.TodoShelfFocus = false
+	m.CurrentView = viewmodel.DayView
+
+	sidebarUnfocused := components.RenderArcSidebar(m, th, 30)
+	if strings.Contains(cleanAnsi(sidebarUnfocused), "● ▲ s t r e a m") {
+		t.Errorf("Expected sidebar not to have active dot indicator when unfocused, got:\n%s", cleanAnsi(sidebarUnfocused))
+	}
+
+	timelineRender := pages.RenderDayTimeline(m, th, 30)
+	if !strings.Contains(cleanAnsi(timelineRender), "● ") {
+		t.Errorf("Expected day timeline to have active dot indicator when focused, got:\n%s", cleanAnsi(timelineRender))
+	}
+
+	// 3. Todo Shelf Focused State
+	m.SidebarFocus = false
+	m.TodoShelfFocus = true
+
+	shelfFocusedRender := components.RenderTodoShelf(m, th, 30)
+	if !strings.Contains(cleanAnsi(shelfFocusedRender), "● ") {
+		t.Errorf("Expected todo shelf to have active dot indicator when focused, got:\n%s", cleanAnsi(shelfFocusedRender))
+	}
+
+	timelineUnfocused := pages.RenderDayTimeline(m, th, 30)
+	if strings.Contains(cleanAnsi(timelineUnfocused), "● ") {
+		t.Errorf("Expected timeline not to have active dot indicator when todo shelf is focused, got:\n%s", cleanAnsi(timelineUnfocused))
+	}
+}

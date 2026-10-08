@@ -74,13 +74,20 @@ func (v *View) Render() string {
 
 		l := m.Layout
 
-		// ── Sidebar ─────────────────────────────────────────────────────
+		// ── Column Border Styling (Focused vs Unfocused) ─────────────
 		sidebarBorderCol := lipgloss.Color("#2a2c37")
+		todoBorderCol := lipgloss.Color("#2a2c37")
+
 		if m.SidebarFocus {
 			sidebarBorderCol = v.Theme.Accent
-		} else if m.CurrentView == viewmodel.DayView && !m.TodoShelfFocus { // Timeline is focused
+		} else if !m.TodoShelfFocus { // Workspace / Timeline / Sprint is focused
 			sidebarBorderCol = v.Theme.Accent
+			todoBorderCol = v.Theme.Accent
+		} else { // Todo shelf is focused
+			todoBorderCol = v.Theme.Accent
 		}
+
+		// ── Sidebar ─────────────────────────────────────────────────────
 		sidebarStyle := lipgloss.NewStyle().
 			Width(l.SidebarW).
 			Height(appContentHeight-2).
@@ -97,18 +104,12 @@ func (v *View) Render() string {
 			MaxHeight(appContentHeight-2).
 			Padding(1, 2)
 
-		// ── Day View: three-column layout ────────────────────────────────
+		// ── Day View / Sprint View: three-column layout ─────────────────
 		timelineStyle := lipgloss.NewStyle().
 			Width(l.TimelineW).
 			Height(appContentHeight).
 			MaxHeight(appContentHeight)
 
-		todoBorderCol := lipgloss.Color("#2a2c37")
-		if m.TodoShelfFocus && !m.SidebarFocus {
-			todoBorderCol = v.Theme.Accent
-		} else if !m.SidebarFocus && !m.TodoShelfFocus { // Timeline is focused
-			todoBorderCol = v.Theme.Accent
-		}
 		todoStyle := lipgloss.NewStyle().
 			Width(l.TodoW).
 			Height(appContentHeight).

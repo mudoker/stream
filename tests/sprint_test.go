@@ -9,10 +9,13 @@ import (
 	"stream/internal/db"
 	"stream/internal/model"
 	"stream/internal/view"
+	"stream/internal/view/pages"
+	"stream/internal/view/theme"
 	"stream/internal/viewmodel"
 	"stream/internal/viewmodel/tasks"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/google/uuid"
 )
 
@@ -667,6 +670,40 @@ func TestSprintHorizontalScrollingAndTaskNavigation(t *testing.T) {
 	m.AutoScrollSprintLane()
 	if m.SprintScrollColOffset < 2 {
 		t.Fatalf("expected horizontal scroll offset >= 2 for lane 4 in narrow view, got %d", m.SprintScrollColOffset)
+	}
+}
+
+func TestSprintViewFullHorizontalFill(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	m := viewmodel.NewModel(database, nil)
+	m.Layout = viewmodel.ComputeLayout(160, 40)
+	m.CurrentView = viewmodel.SprintView
+
+	th := theme.NewTheme()
+	rendered := pages.RenderSprintView(&m, th, 40)
+	lines := strings.Split(rendered, "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected at least 3 lines in sprint view, got %d", len(lines))
+	}
+
+	headerSepLine := lines[1]
+	sepWidth := lipgloss.Width(headerSepLine)
+
+	// Lane row line (e.g. line 2 contains the headers of swimlanes joined with │)
+	swimlaneLine := lines[2]
+	swimlaneWidth := lipgloss.Width(swimlaneLine)
+
+	if swimlaneWidth != sepWidth {
+		t.Errorf("expected swimlanes joined width (%d) to equal separator width (%d) to fill all available horizontal space", swimlaneWidth, sepWidth)
+	}
+
+	// Verify all 5 swimlanes are rendered in standard width
+	for _, laneName := range []string{"DEFINED", "IN PROGRESS", "REVIEW", "TESTING", "COMPLETED"} {
+		if !strings.Contains(swimlaneLine, laneName) {
+			t.Errorf("expected swimlane row to contain %s, got: %s", laneName, swimlaneLine)
+		}
 	}
 }
 

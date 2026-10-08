@@ -25,7 +25,9 @@ func RenderDashboard(m *viewmodel.Model, t theme.Theme, height int) string {
 	availH := appContentHeight
 
 	var headerDate, subDate string
+	var prefix string
 	if !m.SidebarFocus {
+		prefix = lipgloss.NewStyle().Foreground(t.Accent).Render("● ")
 		headerDate = lipgloss.NewStyle().
 			Foreground(t.Accent).
 			Bold(true).
@@ -35,6 +37,7 @@ func RenderDashboard(m *viewmodel.Model, t theme.Theme, height int) string {
 			Bold(true).
 			Render(today.Format("2006"))
 	} else {
+		prefix = "  "
 		headerDate = lipgloss.NewStyle().
 			Foreground(t.Muted).
 			Bold(true).
@@ -44,7 +47,7 @@ func RenderDashboard(m *viewmodel.Model, t theme.Theme, height int) string {
 			Bold(true).
 			Render(today.Format("2006"))
 	}
-	headerLine := headerDate + "  " + subDate
+	headerLine := prefix + headerDate + "  " + subDate
 
 	agendaTasks := m.GetAgendaTasks()
 	completedCount := 0

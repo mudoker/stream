@@ -28,16 +28,23 @@ func RenderWeekView(m *viewmodel.Model, t theme.Theme, height int) string {
 	endStr := strings.ToUpper(weekEnd.Format("January 2, 2006"))
 
 	weekTitle := fmt.Sprintf("◀  WEEK %d (%s - %s)  ▶", weekNum, startStr, endStr)
-	titleColor := t.Fg
-	if m.SidebarFocus {
+	isWeekFocused := !m.SidebarFocus
+
+	var prefix string
+	var titleColor lipgloss.Color
+	if isWeekFocused {
+		prefix = lipgloss.NewStyle().Foreground(t.Accent).Render("● ")
+		titleColor = t.Accent
+	} else {
+		prefix = "  "
 		titleColor = t.Muted
 	}
 	titleStyle := lipgloss.NewStyle().
 		Foreground(titleColor).
-		Bold(!m.SidebarFocus).
+		Bold(isWeekFocused).
 		Align(lipgloss.Center).
 		Width(m.Layout.WorkspaceW - 4)
-	renderedTitle := titleStyle.Render(weekTitle)
+	renderedTitle := titleStyle.Render(prefix + weekTitle)
 
 	weekdayNames := []string{"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"}
 	var colRendered []string

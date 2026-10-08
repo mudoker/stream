@@ -18,10 +18,11 @@ func RenderAnalyticsView(m *viewmodel.Model, t theme.Theme, height int) string {
 
 	var header, subhead string
 	if !m.SidebarFocus {
-		header = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▲ Analytics")
+		header = lipgloss.NewStyle().Foreground(t.Accent).Render("● ") +
+			lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▲ Analytics")
 		subhead = lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(today.Format("January 2006"))
 	} else {
-		header = lipgloss.NewStyle().Foreground(t.Muted).Bold(true).Render("▲ Analytics")
+		header = "  " + lipgloss.NewStyle().Foreground(t.Muted).Bold(true).Render("▲ Analytics")
 		subhead = lipgloss.NewStyle().Foreground(t.Muted).Bold(true).Render(today.Format("January 2006"))
 	}
 	headerLine := header + "  " + subhead

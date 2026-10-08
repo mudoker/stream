@@ -63,8 +63,6 @@ func RenderMonthView(m *viewmodel.Model, t theme.Theme, height int) string {
 		}
 		gridStart := firstOfCur.AddDate(0, 0, -offset)
 
-		title := fmt.Sprintf("   %s %d", strings.ToUpper(month.String()), year)
-
 		var gridRows []string
 		cellDay := gridStart
 		for week := 0; week < 6; week++ {
@@ -127,13 +125,24 @@ func RenderMonthView(m *viewmodel.Model, t theme.Theme, height int) string {
 		}
 		gridContent := strings.Join(gridRows, "\n")
 
+		titlePrefix := " "
 		titleColor := t.Accent
-		if m.SidebarFocus {
+		sepColor := lipgloss.Color("#2a2c37")
+		if !m.SidebarFocus {
+			titlePrefix = "●"
+			titleColor = t.Accent
+			sepColor = t.Accent
+		} else {
+			titlePrefix = " "
 			titleColor = t.Muted
+			sepColor = lipgloss.Color("#2a2c37")
 		}
+		title := fmt.Sprintf(" %s %s %d", titlePrefix, strings.ToUpper(month.String()), year)
+
 		monthBlock := fmt.Sprintf(
-			"  %s\n  Mo  Tu  We  Th  Fr  Sa  Su\n  ───────────────────────────\n%s",
-			lipgloss.NewStyle().Foreground(titleColor).Bold(true).Render(title),
+			"  %s\n  Mo  Tu  We  Th  Fr  Sa  Su\n  %s\n%s",
+			lipgloss.NewStyle().Foreground(titleColor).Bold(!m.SidebarFocus).Render(title),
+			lipgloss.NewStyle().Foreground(sepColor).Render("───────────────────────────"),
 			gridContent,
 		)
 		monthBlocks = append(monthBlocks, monthBlock)

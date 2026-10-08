@@ -48,7 +48,12 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 		activeSprint.StartDate.Format("Jan 02, 2006"),
 		activeSprint.EndDate.Format("Jan 02, 2006"),
 	)
-	titleStyled := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(sprintTitleStr)
+	var titleStyled string
+	if isSprintFocused {
+		titleStyled = lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(sprintTitleStr)
+	} else {
+		titleStyled = lipgloss.NewStyle().Foreground(t.Muted).Bold(true).Render(sprintTitleStr)
+	}
 
 	// Summary stats
 	defined, inProgress, review, testing, completed := tasks.GetSprintSwimlaneTasks(m.Tasks, activeSprint.UUID)
@@ -93,18 +98,14 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	sep := lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", workspaceW-2))
 
 	// ── 2. Swimlane Columns with Horizontal Scrolling ──────────────────
-	contentW := workspaceW - 4
-	numCols := 5
-	minColW := 22 // Comfortable swimlane width before horizontal scrolling kicks in
-
-	totalNeededW := numCols*minColW + (numCols-1)*1
-	colWidth := minColW
-	if contentW >= totalNeededW {
-		// All 5 columns fit; expand to fill width proportionally
-		colWidth = (contentW - (numCols-1)*1) / numCols
+	availW := workspaceW - 2
+	if availW < 20 {
+		availW = 20
 	}
+	numCols := 5
+	minColW := 15 // Comfortable minimum swimlane width before horizontal scrolling kicks in
 
-	visibleCols := (contentW + 1) / (colWidth + 1)
+	visibleCols := (availW + 1) / (minColW + 1)
 	if visibleCols < 1 {
 		visibleCols = 1
 	}
@@ -123,6 +124,11 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 			startCol = 0
 		}
 	}
+
+	// Distribute available width across visible columns to fill 100% of horizontal space
+	availForCols := availW - (visibleCols - 1)
+	baseColW := availForCols / visibleCols
+	remColW := availForCols % visibleCols
 
 	laneHeight := appContentHeight - 4
 	if laneHeight < 8 {
@@ -149,6 +155,15 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	for idx := startCol; idx < endCol; idx++ {
 		lane := swimlanes[idx]
 		isLaneActive := isSprintFocused && m.SprintSwimlaneIdx == idx
+
+		visIdx := idx - startCol
+		colWidth := baseColW
+		if visIdx < remColW {
+			colWidth++
+		}
+		if colWidth < minColW {
+			colWidth = minColW
+		}
 
 		laneSP := 0
 		for _, task := range lane.tasks {

@@ -538,13 +538,13 @@ func sprintLaneName(idx int) string {
 
 func (m *Model) AutoScrollSprintLane() {
 	numCols := 5
-	colW := 28
-	contentW := m.Layout.TimelineW - 4
-	if contentW < 20 {
-		contentW = 20
+	availW := m.Layout.TimelineW - 2
+	minColW := 15
+	if availW < minColW {
+		availW = minColW
 	}
 
-	visibleCols := (contentW + 1) / (colW + 1)
+	visibleCols := (availW + 1) / (minColW + 1)
 	if visibleCols < 1 {
 		visibleCols = 1
 	}

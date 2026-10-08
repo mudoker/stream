@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"stream/internal/model"
+	"stream/internal/view"
 	"stream/internal/view/components"
 	"stream/internal/view/modals"
 	"stream/internal/view/pages"
@@ -859,5 +860,32 @@ func TestColumnFocusVisualStandout(t *testing.T) {
 	timelineUnfocused := pages.RenderDayTimeline(m, th, 30)
 	if strings.Contains(cleanAnsi(timelineUnfocused), "● ") {
 		t.Errorf("Expected timeline not to have active dot indicator when todo shelf is focused, got:\n%s", cleanAnsi(timelineUnfocused))
+	}
+}
+
+func TestOverlayDialogDimsBackground(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	m := viewmodel.NewModel(database, nil)
+	m.Width = 100
+	m.Height = 30
+	m.Layout = viewmodel.ComputeLayout(100, 30)
+
+	v := view.NewView(&m)
+
+	// Normal view without modal
+	renderedNormal := v.Render()
+
+	// Open Help modal
+	m.HelpOpen = true
+	renderedWithModal := v.Render()
+
+	// Verify dim ANSI escape sequence is present in the rendered background
+	if !strings.Contains(renderedWithModal, "\x1b[2m") {
+		t.Errorf("Expected dimmed background to contain faint ANSI sequence \\x1b[2m")
+	}
+	if renderedNormal == renderedWithModal {
+		t.Errorf("Expected rendered canvas with modal to differ from normal canvas")
 	}
 }

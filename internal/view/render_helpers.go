@@ -121,6 +121,23 @@ func cellsToLine(cells []Cell) string {
 	return sb.String()
 }
 
+func dimCanvas(base string) string {
+	dimColorSeq := "\x1b[38;2;69;71;90m\x1b[2m" // Dim muted grey + ANSI faint
+	lines := strings.Split(base, "\n")
+	for i, l := range lines {
+		cells := parseLineToCells(l)
+		for j := range cells {
+			if strings.TrimSpace(cells[j].Text) != "" {
+				cells[j].Style = dimColorSeq
+			} else {
+				cells[j].Style = ""
+			}
+		}
+		lines[i] = cellsToLine(cells)
+	}
+	return strings.Join(lines, "\n")
+}
+
 func overlayString(base string, overlay string, x int, y int, baseWidth int) string {
 	baseLines := strings.Split(base, "\n")
 	overlayLines := strings.Split(overlay, "\n")

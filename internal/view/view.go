@@ -261,6 +261,7 @@ func (v *View) Render() string {
 		if leftPad < 0 {
 			leftPad = 0
 		}
+		canvas = dimCanvas(canvas)
 		canvas = overlayString(canvas, modalStr, leftPad, topPad, m.Width)
 	}
 

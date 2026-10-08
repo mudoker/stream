@@ -44,7 +44,8 @@ func (s *SyncEngine) defaultWorkspaceUUID() string {
 }
 
 func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
-	timeMin := time.Now().AddDate(0, 0, -30).Format(time.RFC3339)
+	timeMin := time.Now().AddDate(0, 0, -60).Format(time.RFC3339)
+	timeMax := time.Now().AddDate(0, 0, 180).Format(time.RFC3339)
 
 	ledger := s.localDB.GetLedger()
 	pendingDeleteUUIDs := make(map[string]bool)
@@ -91,7 +92,12 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 
 	pageToken := ""
 	for {
-		call := srv.Events.List("primary").TimeMin(timeMin).ShowDeleted(true).SingleEvents(true)
+		call := srv.Events.List("primary").
+			TimeMin(timeMin).
+			TimeMax(timeMax).
+			MaxResults(250).
+			ShowDeleted(true).
+			SingleEvents(true)
 		if pageToken != "" {
 			call = call.PageToken(pageToken)
 		}
@@ -133,9 +139,12 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 
 			if item.Status == "cancelled" {
 				if local, exists := localByGCalID[item.Id]; exists && model.IsGCalSyncable(local) {
-					_ = s.localDB.DeleteTaskNoLedger(local.UUID)
-					delete(localByUUID, local.UUID)
-					delete(localByGCalID, item.Id)
+					// If local has pending unpushed edits, do not delete local task (push will recreate on remote)
+					if !pendingLocalEdits[local.UUID] {
+						_ = s.localDB.DeleteTaskNoLedger(local.UUID)
+						delete(localByUUID, local.UUID)
+						delete(localByGCalID, item.Id)
+					}
 				}
 				continue
 			}
@@ -157,7 +166,10 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 			}
 			if item.End != nil {
 				end, _ = time.Parse(time.RFC3339, item.End.DateTime)
-				if end.IsZero() && item.Start != nil && item.Start.Date != "" {
+				if end.IsZero() && item.End.Date != "" {
+					end, _ = time.Parse("2006-01-02", item.End.Date)
+					isAllDay = true
+				} else if end.IsZero() && item.Start != nil && item.Start.Date != "" {
 					end = start.Add(24 * time.Hour)
 					isAllDay = true
 				}
@@ -184,7 +196,7 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 				seenGCalUUIDs[uuidVal] = item.Id
 			} else {
 				if primID, alreadySeen := seenGCalTitleTime[titleTimeKey]; alreadySeen && primID != item.Id {
-					// Duplicate exact event on GCal -> skip
+					// Duplicate exact event on GCal -> skip importing duplicates
 					continue
 				}
 				seenGCalTitleTime[titleTimeKey] = item.Id
@@ -216,8 +228,20 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 				hasPendingEdit := localTask.UUID != "" && pendingLocalEdits[localTask.UUID]
 
 				if hasPendingEdit {
-					// Local has pending unpushed edits queued in the ledger. Do not overwrite local content with stale remote data.
-					if localTask.GCalMetadata.EventID == "" {
+					// Conflict resolution: Local has pending unpushed edits in ledger.
+					// Keep local data intact and link GCal metadata.
+					if localTask.GCalMetadata.EventID != item.Id || localTask.GCalMetadata.ETag != item.Etag {
+						localTask.GCalMetadata.EventID = item.Id
+						localTask.GCalMetadata.ETag = item.Etag
+						localTask.GCalMetadata.SequenceID = item.Sequence
+						_ = s.localDB.UpdateTaskNoLedger(localTask)
+						localByUUID[localTask.UUID] = localTask
+						localByGCalID[item.Id] = localTask
+					}
+				} else if !remoteUpdated.IsZero() && !localTask.UpdatedAt.IsZero() && localTask.UpdatedAt.After(remoteUpdated) {
+					// Stale handling: Local task is strictly newer than remote event timestamp.
+					// Preserve local changes and link metadata.
+					if localTask.GCalMetadata.EventID != item.Id || localTask.GCalMetadata.ETag != item.Etag {
 						localTask.GCalMetadata.EventID = item.Id
 						localTask.GCalMetadata.ETag = item.Etag
 						localTask.GCalMetadata.SequenceID = item.Sequence
@@ -226,6 +250,7 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 						localByGCalID[item.Id] = localTask
 					}
 				} else {
+					// Remote is newer or equal: apply remote updates to local task
 					if !hasExplicitSched && localTask.SchedulingType != "" {
 						schedVal = localTask.SchedulingType
 					}
@@ -239,7 +264,6 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 						sourceVal = localTask.Source
 					}
 
-					// Remote is applied to local task
 					localTask.Title = item.Summary
 					localTask.Description = item.Description
 					localTask.TimeWindow.Start = start

@@ -157,7 +157,7 @@ func RenderHelpModal(m *viewmodel.Model, t theme.Theme) string {
 	body = append(body, formatKeyVal("1 - 5", "Switch views"))
 	body = append(body, formatKeyVal("j / k", "Navigate tasks vertically"))
 	body = append(body, formatKeyVal("h / l", "Navigate overlapping tasks"))
-	body = append(body, formatKeyVal("J / K", "Scroll timeline hours"))
+	body = append(body, formatKeyVal("J / K", "Timeline hours / shelf sections"))
 	body = append(body, formatKeyVal("H / L", "Day backward / forward"))
 	body = append(body, formatKeyVal("t", "Jump to today"))
 	body = append(body, formatKeyVal("Tab", "Toggle timeline ↔ backlog shelf"))

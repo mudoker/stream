@@ -93,7 +93,10 @@ func (s *SyncEngine) enqueueSync(req syncRequest) {
 	case s.syncChan <- req:
 	default:
 		select {
-		case <-s.syncChan:
+		case prev := <-s.syncChan:
+			if prev.includePull {
+				req.includePull = true
+			}
 		default:
 		}
 		s.syncChan <- req
@@ -191,12 +194,12 @@ func isRateLimitError(err error) bool {
 			errMsg := strings.ToLower(apiErr.Message)
 			return strings.Contains(errMsg, "rate limit") || strings.Contains(errMsg, "quota")
 		}
-		if apiErr.Code == 500 || apiErr.Code == 503 {
+		if apiErr.Code == 500 || apiErr.Code == 502 || apiErr.Code == 503 || apiErr.Code == 504 {
 			return true
 		}
 	}
 	errMsg := strings.ToLower(err.Error())
-	return strings.Contains(errMsg, "rate limit") || strings.Contains(errMsg, "quota exceeded")
+	return strings.Contains(errMsg, "rate limit") || strings.Contains(errMsg, "quota exceeded") || strings.Contains(errMsg, "resource has been exhausted")
 }
 
 func (s *SyncEngine) handleRateLimit(err error) {

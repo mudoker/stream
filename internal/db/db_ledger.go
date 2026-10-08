@@ -40,12 +40,24 @@ func (db *JSONDB) ClearLedger() error {
 }
 
 func (db *JSONDB) RemoveLedgerEntry(entryID string) error {
+	return db.RemoveLedgerEntries([]string{entryID})
+}
+
+func (db *JSONDB) RemoveLedgerEntries(entryIDs []string) error {
+	if len(entryIDs) == 0 {
+		return nil
+	}
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
+	idMap := make(map[string]bool, len(entryIDs))
+	for _, id := range entryIDs {
+		idMap[id] = true
+	}
+
 	filtered := db.ledger[:0]
 	for _, entry := range db.ledger {
-		if entry.ID != entryID {
+		if !idMap[entry.ID] {
 			filtered = append(filtered, entry)
 		}
 	}

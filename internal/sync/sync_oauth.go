@@ -18,6 +18,28 @@ import (
 	"google.golang.org/api/option"
 )
 
+type tokenPersister struct {
+	base      oauth2.TokenSource
+	tokenPath string
+	onUpdate  func(*oauth2.Token)
+}
+
+func (tp *tokenPersister) Token() (*oauth2.Token, error) {
+	tok, err := tp.base.Token()
+	if err != nil {
+		return nil, err
+	}
+	if tok != nil && tp.tokenPath != "" {
+		if data, err := json.MarshalIndent(tok, "", "  "); err == nil {
+			_ = os.WriteFile(tp.tokenPath, data, 0600)
+		}
+	}
+	if tp.onUpdate != nil && tok != nil {
+		tp.onUpdate(tok)
+	}
+	return tok, nil
+}
+
 func (s *SyncEngine) initOAuth() error {
 	secretPath := filepath.Join(s.localDB.GetConfigDir(), "client_secrets.json")
 	if _, err := os.Stat(secretPath); os.IsNotExist(err) {
@@ -58,7 +80,18 @@ func (s *SyncEngine) createService() error {
 		return errors.New("oauthConfig is nil")
 	}
 	ctx := context.Background()
-	client := s.oauthConfig.Client(ctx, s.token)
+	tokenPath := filepath.Join(s.localDB.GetConfigDir(), "credentials.json")
+	baseSource := s.oauthConfig.TokenSource(ctx, s.token)
+	persistingSource := &tokenPersister{
+		base:      baseSource,
+		tokenPath: tokenPath,
+		onUpdate: func(tok *oauth2.Token) {
+			s.mu.Lock()
+			s.token = tok
+			s.mu.Unlock()
+		},
+	}
+	client := oauth2.NewClient(ctx, persistingSource)
 	srv, err := calendar.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		return err

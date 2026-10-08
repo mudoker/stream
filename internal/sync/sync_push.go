@@ -37,32 +37,33 @@ func (s *SyncEngine) ManualPush() {
 }
 
 func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
-	// 1. Process deletions from the ledger first to remove deleted local tasks from GCal
+	// 1. Process and replay pending ledger entries in compacted batch first
 	ledger := s.localDB.GetLedger()
-	for _, entry := range ledger {
-		if entry.Op == "DELETE" {
-			if entry.Task.GCalMetadata.EventID != "" {
-				s.logCallback(fmt.Sprintf("Sync: Deleting GCal event '%s'...", entry.Task.Title))
-				if err := s.deleteRemoteEvent(srv, entry.Task); err != nil {
-					if isRateLimitError(err) {
-						return err
-					}
-				}
-				s.throttle()
+	if len(ledger) > 0 {
+		compacted := compactLedger(ledger)
+		if _, err := s.replayCompactedOps(srv, compacted); err != nil {
+			if isRateLimitError(err) {
+				return err
 			}
+			s.logCallback(fmt.Sprintf("Sync: ledger replay warning during push: %s", formatSyncError(err)))
 		}
-		_ = s.localDB.RemoveLedgerEntry(entry.ID)
 	}
 
-	// 2. Fetch GCal events to avoid duplicates
-	timeMin := time.Now().AddDate(0, 0, -30).Format(time.RFC3339)
+	// 2. Fetch remote GCal events in active horizon to index and deduplicate
+	timeMin := time.Now().AddDate(0, 0, -60).Format(time.RFC3339)
+	timeMax := time.Now().AddDate(0, 0, 180).Format(time.RFC3339)
 	gcalByEventID := make(map[string]*calendar.Event)
 	gcalByTitleTime := make(map[string]*calendar.Event)
 	gcalByUUID := make(map[string][]*calendar.Event)
 
 	pageToken := ""
 	for {
-		call := srv.Events.List("primary").TimeMin(timeMin).ShowDeleted(true).SingleEvents(true)
+		call := srv.Events.List("primary").
+			TimeMin(timeMin).
+			TimeMax(timeMax).
+			MaxResults(250).
+			ShowDeleted(true).
+			SingleEvents(true)
 		if pageToken != "" {
 			call = call.PageToken(pageToken)
 		}
@@ -84,9 +85,15 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 			var start, end time.Time
 			if item.Start != nil {
 				start, _ = time.Parse(time.RFC3339, item.Start.DateTime)
+				if start.IsZero() && item.Start.Date != "" {
+					start, _ = time.Parse("2006-01-02", item.Start.Date)
+				}
 			}
 			if item.End != nil {
 				end, _ = time.Parse(time.RFC3339, item.End.DateTime)
+				if end.IsZero() && item.End.Date != "" {
+					end, _ = time.Parse("2006-01-02", item.End.Date)
+				}
 			}
 			if !start.IsZero() && !end.IsZero() {
 				key := normalizeTitleTimeKey(item.Summary, start, end)
@@ -101,8 +108,8 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 		s.throttle()
 	}
 
-	// 3. Scan local database for ANCHORED tasks and push
-	windowStart := time.Now().AddDate(0, 0, -30)
+	// 3. Scan local database for syncable tasks and push with duplicate cleanup & no-op skipping
+	windowStart := time.Now().AddDate(0, 0, -60)
 	localTasks := s.localDB.GetTasks()
 	for _, t := range localTasks {
 		if !model.IsGCalSyncable(t) {
@@ -112,7 +119,7 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 			continue
 		}
 
-		// Check if GCal has multiple ghost events with this task's UUID -> clean them up!
+		// Deduplicate: Clean up ghost duplicate events on GCal for this task's UUID
 		if evts, hasDups := gcalByUUID[t.UUID]; hasDups && len(evts) > 1 {
 			bestIdx := 0
 			for i, e := range evts {
@@ -121,7 +128,7 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 					break
 				}
 			}
-			// Delete the duplicate ghost events from GCal
+			// Delete duplicate ghost events from GCal
 			for i, e := range evts {
 				if i != bestIdx {
 					_ = s.deleteRemoteEvent(srv, model.Task{GCalMetadata: model.GCalMetadata{EventID: e.Id}})
@@ -141,7 +148,7 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 			}
 		}
 		if matchedEvent == nil {
-			// Try title+time matching
+			// Fallback: match by normalized title and time window
 			key := normalizeTitleTimeKey(t.Title, t.TimeWindow.Start, t.TimeWindow.End)
 			matchedEvent = gcalByTitleTime[key]
 		}
@@ -154,12 +161,17 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 				continue
 			}
 
-			// If event is already identical, skip sending redundant API requests
-			if t.GCalMetadata.ETag == matchedEvent.Etag && t.Title == matchedEvent.Summary && t.Description == matchedEvent.Description {
+			// Optimisation: No-Op skipping if remote event is semantically identical
+			if isTaskAndEventEqual(t, matchedEvent) {
+				if t.GCalMetadata.ETag != matchedEvent.Etag || t.GCalMetadata.SequenceID != matchedEvent.Sequence {
+					t.GCalMetadata.ETag = matchedEvent.Etag
+					t.GCalMetadata.SequenceID = matchedEvent.Sequence
+					_ = s.localDB.UpdateTaskNoLedger(t)
+				}
 				continue
 			}
 
-			// Exists on GCal: Update it (local is source of truth)
+			// Exists on GCal but differs: Update remote event
 			if err := s.updateRemoteEvent(srv, t); err != nil {
 				if isRateLimitError(err) {
 					return err
@@ -167,7 +179,7 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 				s.logCallback(fmt.Sprintf("Sync: Failed to update GCal event '%s': %s", t.Title, formatSyncError(err)))
 			}
 		} else {
-			// Does not exist on GCal: Create it
+			// Does not exist on GCal: Create new remote event
 			if err := s.createRemoteEvent(srv, t); err != nil {
 				if isRateLimitError(err) {
 					return err

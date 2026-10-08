@@ -18,6 +18,7 @@ import (
 	"stream/internal/db"
 	"stream/internal/model"
 
+	"golang.org/x/oauth2"
 	"google.golang.org/api/calendar/v3"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
@@ -975,6 +976,168 @@ func TestSyncEngine_RateLimitProgression(t *testing.T) {
 		t.Errorf("expected consecutiveRateLimits to reset to 0, got %d", engine.consecutiveRateLimits)
 	}
 }
+
+func TestCompactLedger_Deduplication(t *testing.T) {
+	// Scenario 1: CREATE + UPDATE + UPDATE -> single CREATE with latest task payload
+	e1 := db.LedgerEntry{ID: "e1", Op: "CREATE", TaskUUID: "t1", Task: model.Task{UUID: "t1", Title: "Initial"}}
+	e2 := db.LedgerEntry{ID: "e2", Op: "UPDATE", TaskUUID: "t1", Task: model.Task{UUID: "t1", Title: "Mid"}}
+	e3 := db.LedgerEntry{ID: "e3", Op: "UPDATE", TaskUUID: "t1", Task: model.Task{UUID: "t1", Title: "Final"}}
+
+	// Scenario 2: CREATE + DELETE (without remote EventID) -> NOOP (0 network calls)
+	e4 := db.LedgerEntry{ID: "e4", Op: "CREATE", TaskUUID: "t2", Task: model.Task{UUID: "t2", Title: "Shortlived"}}
+	e5 := db.LedgerEntry{ID: "e5", Op: "DELETE", TaskUUID: "t2", Task: model.Task{UUID: "t2", Title: "Shortlived"}}
+
+	// Scenario 3: UPDATE + UPDATE + DELETE -> single DELETE
+	e6 := db.LedgerEntry{ID: "e6", Op: "UPDATE", TaskUUID: "t3", Task: model.Task{UUID: "t3", Title: "Update1", GCalMetadata: model.GCalMetadata{EventID: "ev-3"}}}
+	e7 := db.LedgerEntry{ID: "e7", Op: "UPDATE", TaskUUID: "t3", Task: model.Task{UUID: "t3", Title: "Update2", GCalMetadata: model.GCalMetadata{EventID: "ev-3"}}}
+	e8 := db.LedgerEntry{ID: "e8", Op: "DELETE", TaskUUID: "t3", Task: model.Task{UUID: "t3", Title: "Update2", GCalMetadata: model.GCalMetadata{EventID: "ev-3"}}}
+
+	entries := []db.LedgerEntry{e1, e2, e3, e4, e5, e6, e7, e8}
+	compacted := compactLedger(entries)
+
+	if len(compacted) != 3 {
+		t.Fatalf("expected 3 compacted ops, got %d", len(compacted))
+	}
+
+	// Verify t1 is CREATE with Title "Final" and all 3 IDs
+	if compacted[0].Op != "CREATE" || compacted[0].Task.Title != "Final" || len(compacted[0].SourceEntryIDs) != 3 {
+		t.Errorf("unexpected t1 compaction: %+v", compacted[0])
+	}
+
+	// Verify t2 is NOOP with 2 IDs
+	if compacted[1].Op != "NOOP" || len(compacted[1].SourceEntryIDs) != 2 {
+		t.Errorf("unexpected t2 compaction: %+v", compacted[1])
+	}
+
+	// Verify t3 is DELETE with 3 IDs
+	if compacted[2].Op != "DELETE" || compacted[2].Task.GCalMetadata.EventID != "ev-3" || len(compacted[2].SourceEntryIDs) != 3 {
+		t.Errorf("unexpected t3 compaction: %+v", compacted[2])
+	}
+}
+
+func TestIsTaskAndEventEqual(t *testing.T) {
+	start := time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC)
+	end := time.Date(2026, 6, 11, 11, 0, 0, 0, time.UTC)
+
+	task := model.Task{
+		UUID:           "task-eq-1",
+		Title:          "Team Sync",
+		Description:    "Weekly sync meeting",
+		Location:       "Room 404",
+		Priority:       model.P1,
+		StoryPoints:    2,
+		LifecycleState: model.StateScheduled,
+		SchedulingType: model.Anchored,
+		TimeWindow:     model.TimeWindow{Start: start, End: end},
+	}
+
+	event := &calendar.Event{
+		Summary:     "Team Sync",
+		Description: "Weekly sync meeting",
+		Location:    "Room 404",
+		Start:       &calendar.EventDateTime{DateTime: start.Format(time.RFC3339)},
+		End:         &calendar.EventDateTime{DateTime: end.Format(time.RFC3339)},
+		ExtendedProperties: &calendar.EventExtendedProperties{
+			Private: map[string]string{
+				"uuid":            "task-eq-1",
+				"priority":        "P1",
+				"story_points":    "2",
+				"lifecycle_state": "SCHEDULED",
+				"scheduling_type": "ANCHORED",
+			},
+		},
+	}
+
+	if !isTaskAndEventEqual(task, event) {
+		t.Errorf("expected task and event to be equal")
+	}
+
+	// Modify title -> should not be equal
+	taskDiff := task
+	taskDiff.Title = "Team Standup"
+	if isTaskAndEventEqual(taskDiff, event) {
+		t.Errorf("expected different title to return false")
+	}
+
+	// Modify time -> should not be equal
+	taskDiffTime := task
+	taskDiffTime.TimeWindow.End = end.Add(30 * time.Minute)
+	if isTaskAndEventEqual(taskDiffTime, event) {
+		t.Errorf("expected different time to return false")
+	}
+}
+
+func TestNormalizeTitleTimeKey(t *testing.T) {
+	start := time.Date(2026, 6, 11, 10, 0, 0, 123456, time.UTC)
+	end := time.Date(2026, 6, 11, 11, 0, 0, 999999, time.UTC)
+
+	k1 := normalizeTitleTimeKey("  Review PR   #42  ", start, end)
+	k2 := normalizeTitleTimeKey("review pr #42", start.Truncate(time.Second), end.Truncate(time.Second))
+
+	if k1 != k2 {
+		t.Errorf("expected normalized keys to match: %q vs %q", k1, k2)
+	}
+}
+
+func TestBatchRemoveLedgerEntries(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	localDB, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create db: %v", err)
+	}
+
+	t1 := model.Task{UUID: "t1", Title: "Task 1", SchedulingType: model.Anchored}
+	t2 := model.Task{UUID: "t2", Title: "Task 2", SchedulingType: model.Anchored}
+	_ = localDB.AddTask(t1)
+	_ = localDB.AddTask(t2)
+
+	ledger := localDB.GetLedger()
+	if len(ledger) != 2 {
+		t.Fatalf("expected 2 ledger entries, got %d", len(ledger))
+	}
+
+	// Batch remove both
+	ids := []string{ledger[0].ID, ledger[1].ID}
+	if err := localDB.RemoveLedgerEntries(ids); err != nil {
+		t.Fatalf("RemoveLedgerEntries failed: %v", err)
+	}
+
+	if len(localDB.GetLedger()) != 0 {
+		t.Errorf("expected ledger to be empty after batch remove, got %d", len(localDB.GetLedger()))
+	}
+}
+
+func TestTokenPersisterOnRefresh(t *testing.T) {
+	tmpDir := t.TempDir()
+	tokenPath := filepath.Join(tmpDir, "credentials.json")
+
+	var updatedToken *oauth2.Token
+	persister := &tokenPersister{
+		base:      oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "refreshed-token-123"}),
+		tokenPath: tokenPath,
+		onUpdate: func(tok *oauth2.Token) {
+			updatedToken = tok
+		},
+	}
+
+	tok, err := persister.Token()
+	if err != nil {
+		t.Fatalf("Token failed: %v", err)
+	}
+	if tok.AccessToken != "refreshed-token-123" {
+		t.Errorf("expected refreshed token, got %q", tok.AccessToken)
+	}
+	if updatedToken == nil || updatedToken.AccessToken != "refreshed-token-123" {
+		t.Errorf("expected onUpdate to be called with refreshed token")
+	}
+
+	// Check file written
+	data, err := os.ReadFile(tokenPath)
+	if err != nil || !strings.Contains(string(data), "refreshed-token-123") {
+		t.Errorf("expected credentials.json to be saved with new token")
+	}
+}
+
 
 
 

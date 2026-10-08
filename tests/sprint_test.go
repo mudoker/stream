@@ -302,6 +302,43 @@ func TestSprintSwimlaneSwitchingWithHL(t *testing.T) {
 	if m.SelectedTaskUUID != "task-def" {
 		t.Fatalf("expected selection to be task-def, got %s", m.SelectedTaskUUID)
 	}
+
+	// Test lowercase 'l': should switch from task-def in Defined (0) to task-prog in In Progress (1)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	if m.SprintSwimlaneIdx != 1 {
+		t.Fatalf("expected swimlane 1 (In Progress) after 'l', got %d", m.SprintSwimlaneIdx)
+	}
+	if m.SelectedTaskUUID != "task-prog" {
+		t.Fatalf("expected selection to be task-prog after 'l', got %s", m.SelectedTaskUUID)
+	}
+
+	// Review (2), Testing (3), Completed (4) are empty.
+	// Pressing 'l' from In Progress should NOT allow moving right since no tasks exist to the right
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	if m.SprintSwimlaneIdx != 1 {
+		t.Fatalf("expected swimlane to remain 1 when right swimlanes are empty, got %d", m.SprintSwimlaneIdx)
+	}
+	if m.SelectedTaskUUID != "task-prog" {
+		t.Fatalf("expected selection to remain task-prog, got %s", m.SelectedTaskUUID)
+	}
+
+	// Pressing 'h' from In Progress should switch back to Defined (0)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	if m.SprintSwimlaneIdx != 0 {
+		t.Fatalf("expected swimlane 0 (Defined) after 'h', got %d", m.SprintSwimlaneIdx)
+	}
+	if m.SelectedTaskUUID != "task-def" {
+		t.Fatalf("expected selection to be task-def after 'h', got %s", m.SelectedTaskUUID)
+	}
+
+	// Pressing 'h' from Defined should NOT allow moving left since lane 0 is leftmost
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	if m.SprintSwimlaneIdx != 0 {
+		t.Fatalf("expected swimlane to remain 0, got %d", m.SprintSwimlaneIdx)
+	}
+	if m.SelectedTaskUUID != "task-def" {
+		t.Fatalf("expected selection to remain task-def, got %s", m.SelectedTaskUUID)
+	}
 }
 
 func TestSidebarFocusIsolation(t *testing.T) {
@@ -651,10 +688,22 @@ func TestSprintHorizontalScrollingAndTaskNavigation(t *testing.T) {
 		t.Fatalf("expected task-def-1, got %s", m.SelectedTaskUUID)
 	}
 
-	// Lowercase 'l' should NOT change swimlanes (stays in lane 0)
+	// Lowercase 'l' switches to next non-empty swimlane (lane 1)
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	if m.SprintSwimlaneIdx != 1 {
+		t.Fatalf("expected swimlane 1 after lowercase 'l', got %d", m.SprintSwimlaneIdx)
+	}
+	if m.SelectedTaskUUID != "task-prog-1" {
+		t.Fatalf("expected task-prog-1 after 'l', got %s", m.SelectedTaskUUID)
+	}
+
+	// Lowercase 'h' switches back to previous non-empty swimlane (lane 0)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
 	if m.SprintSwimlaneIdx != 0 {
-		t.Fatalf("expected swimlane to remain 0 after lowercase 'l', got %d", m.SprintSwimlaneIdx)
+		t.Fatalf("expected swimlane 0 after lowercase 'h', got %d", m.SprintSwimlaneIdx)
+	}
+	if m.SelectedTaskUUID != "task-def-1" {
+		t.Fatalf("expected task-def-1 after 'h', got %s", m.SelectedTaskUUID)
 	}
 
 	// Capital 'L' switches across swimlanes (from lane 0 to lane 1)

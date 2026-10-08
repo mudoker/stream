@@ -349,9 +349,67 @@ func (m *Model) handleSprintNav(key string) {
 
 	switch key {
 	case "h", "left":
-		// Lowercase h does not switch swimlanes - reserved for horizontal features if any
+		if !m.TodoShelfFocus && !m.SidebarFocus {
+			curLane := lanes[m.SprintSwimlaneIdx]
+			curIdx := 0
+			for i, t := range curLane {
+				if t.UUID == m.SelectedTaskUUID {
+					curIdx = i
+					break
+				}
+			}
+
+			targetLaneIdx := -1
+			for idx := m.SprintSwimlaneIdx - 1; idx >= 0; idx-- {
+				if len(lanes[idx]) > 0 {
+					targetLaneIdx = idx
+					break
+				}
+			}
+
+			if targetLaneIdx != -1 {
+				m.SprintSwimlaneIdx = targetLaneIdx
+				targetLane := lanes[targetLaneIdx]
+				newIdx := curIdx
+				if newIdx >= len(targetLane) {
+					newIdx = len(targetLane) - 1
+				}
+				m.SelectedTaskUUID = targetLane[newIdx].UUID
+				m.AutoScrollSprintLane()
+				m.StatusMsg = fmt.Sprintf("Switched to %s swimlane.", sprintLaneName(targetLaneIdx))
+			}
+		}
 	case "l", "right":
-		// Lowercase l does not switch swimlanes - reserved for horizontal features if any
+		if !m.TodoShelfFocus && !m.SidebarFocus {
+			curLane := lanes[m.SprintSwimlaneIdx]
+			curIdx := 0
+			for i, t := range curLane {
+				if t.UUID == m.SelectedTaskUUID {
+					curIdx = i
+					break
+				}
+			}
+
+			targetLaneIdx := -1
+			for idx := m.SprintSwimlaneIdx + 1; idx < len(lanes); idx++ {
+				if len(lanes[idx]) > 0 {
+					targetLaneIdx = idx
+					break
+				}
+			}
+
+			if targetLaneIdx != -1 {
+				m.SprintSwimlaneIdx = targetLaneIdx
+				targetLane := lanes[targetLaneIdx]
+				newIdx := curIdx
+				if newIdx >= len(targetLane) {
+					newIdx = len(targetLane) - 1
+				}
+				m.SelectedTaskUUID = targetLane[newIdx].UUID
+				m.AutoScrollSprintLane()
+				m.StatusMsg = fmt.Sprintf("Switched to %s swimlane.", sprintLaneName(targetLaneIdx))
+			}
+		}
 	case "j", "down":
 		if m.TodoShelfFocus {
 			m.MoveTaskSelection(1)

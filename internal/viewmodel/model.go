@@ -33,6 +33,7 @@ const (
 	ModeForm            UIState = "WIZARD"
 	ModeSprintForm      UIState = "SPRINT_WIZARD"
 	ModeTaskMove        UIState = "TASK_MOVE"
+	ModeSprintTaskMove  UIState = "SPRINT_TASK_MOVE"
 	ModeTaskDurationAdjust UIState = "DURATION_ADJUST"
 	ModeWorkspaceForm   UIState = "WORKSPACE_WIZARD"
 	ModeWorkspacePicker UIState = "WS_PICKER"
@@ -163,6 +164,8 @@ type Model struct {
 	TaskMovePrefix             string
 	TaskMoveOriginalTimeWindow model.TimeWindow
 	TaskMoveIsClone            bool
+	SprintMoveOriginalTasks    []model.Task
+	SprintMoveTaskUUID         string
 	TaskDurationAdjustTop      bool
 	ZenPrefix                  string
 

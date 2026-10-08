@@ -124,6 +124,7 @@ type Task struct {
 	CompletedDates        []string         `json:"completed_dates,omitempty"`
 	RecurringParentUUID   string           `json:"recurring_parent_uuid,omitempty"`
 	EstimatedDurationMins int              `json:"estimated_duration_mins,omitempty"` // explicit duration for floating tasks
+	SprintOrder           int              `json:"sprint_order,omitempty"`           // manual order within sprint swimlane
 	IsAllDay              bool             `json:"is_all_day"`
 }
 

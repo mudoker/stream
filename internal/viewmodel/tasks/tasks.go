@@ -52,6 +52,29 @@ func ImportSort(tasks []model.Task) {
 	})
 }
 
+func SprintSort(tasks []model.Task) {
+	sort.SliceStable(tasks, func(i, j int) bool {
+		if tasks[i].SprintOrder != tasks[j].SprintOrder {
+			if tasks[i].SprintOrder == 0 {
+				return false
+			}
+			if tasks[j].SprintOrder == 0 {
+				return true
+			}
+			return tasks[i].SprintOrder < tasks[j].SprintOrder
+		}
+		pI := getPriorityVal(tasks[i].Priority)
+		pJ := getPriorityVal(tasks[j].Priority)
+		if pI != pJ {
+			return pI > pJ
+		}
+		if tasks[i].CreatedAt.Equal(tasks[j].CreatedAt) {
+			return tasks[i].UUID < tasks[j].UUID
+		}
+		return tasks[i].CreatedAt.Before(tasks[j].CreatedAt)
+	})
+}
+
 func GetDayTasks(allTasks []model.Task, day time.Time, isCloneMove ...bool) []model.Task {
 	clones := make(map[string]bool)
 	isClone := len(isCloneMove) > 0 && isCloneMove[0]
@@ -257,11 +280,11 @@ func GetSprintSwimlaneTasks(allTasks []model.Task, sprintUUID string) (defined, 
 			defined = append(defined, t)
 		}
 	}
-	ImportSort(defined)
-	ImportSort(inProgress)
-	ImportSort(review)
-	ImportSort(testing)
-	ImportSort(completed)
+	SprintSort(defined)
+	SprintSort(inProgress)
+	SprintSort(review)
+	SprintSort(testing)
+	SprintSort(completed)
 	return defined, inProgress, review, testing, completed
 }
 

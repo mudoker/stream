@@ -349,59 +349,9 @@ func (m *Model) handleSprintNav(key string) {
 
 	switch key {
 	case "h", "left":
-		if !m.TodoShelfFocus {
-			// Navigate horizontally to the left swimlane
-			curLane := lanes[m.SprintSwimlaneIdx]
-			curIdx := 0
-			for i, t := range curLane {
-				if t.UUID == m.SelectedTaskUUID {
-					curIdx = i
-					break
-				}
-			}
-			newLaneIdx := m.SprintSwimlaneIdx - 1
-			if newLaneIdx < 0 {
-				newLaneIdx = 4
-			}
-			m.SprintSwimlaneIdx = newLaneIdx
-			m.AutoScrollSprintLane()
-			newLane := lanes[newLaneIdx]
-			if len(newLane) > 0 {
-				if curIdx >= len(newLane) {
-					curIdx = len(newLane) - 1
-				}
-				m.SelectedTaskUUID = newLane[curIdx].UUID
-			} else {
-				m.SelectedTaskUUID = ""
-			}
-		}
+		// Lowercase h does not switch swimlanes - reserved for horizontal features if any
 	case "l", "right":
-		if !m.TodoShelfFocus {
-			// Navigate horizontally to the right swimlane
-			curLane := lanes[m.SprintSwimlaneIdx]
-			curIdx := 0
-			for i, t := range curLane {
-				if t.UUID == m.SelectedTaskUUID {
-					curIdx = i
-					break
-				}
-			}
-			newLaneIdx := m.SprintSwimlaneIdx + 1
-			if newLaneIdx > 4 {
-				newLaneIdx = 0
-			}
-			m.SprintSwimlaneIdx = newLaneIdx
-			m.AutoScrollSprintLane()
-			newLane := lanes[newLaneIdx]
-			if len(newLane) > 0 {
-				if curIdx >= len(newLane) {
-					curIdx = len(newLane) - 1
-				}
-				m.SelectedTaskUUID = newLane[curIdx].UUID
-			} else {
-				m.SelectedTaskUUID = ""
-			}
-		}
+		// Lowercase l does not switch swimlanes - reserved for horizontal features if any
 	case "j", "down":
 		if m.TodoShelfFocus {
 			m.MoveTaskSelection(1)

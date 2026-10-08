@@ -77,7 +77,16 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	metricsText := fmt.Sprintf("• %d Features • %d SP [%d%%]", totalFeatures, totalSP, pct)
 	metricsStyled := lipgloss.NewStyle().Foreground(t.Muted).Render(metricsText)
 
-	navHint := lipgloss.NewStyle().Foreground(t.Muted).Render("s ◂ · ▸ S Switch Sprint")
+	var navHintStr string
+	if m.CurrentMode == viewmodel.ModeSprintTaskMove {
+		navHintStr = "MOVE: j/k reorder • h/l lane • ↵ save • esc cancel"
+	} else {
+		navHintStr = "s ◂ · ▸ S Switch Sprint"
+	}
+	navHint := lipgloss.NewStyle().Foreground(t.Muted).Render(navHintStr)
+	if m.CurrentMode == viewmodel.ModeSprintTaskMove {
+		navHint = lipgloss.NewStyle().Foreground(lipgloss.Color("#f9e2af")).Bold(true).Render(navHintStr)
+	}
 
 	usedLeft := lipgloss.Width(prefix) + lipgloss.Width(titleStyled)
 	usedRight := lipgloss.Width(navHint)
@@ -365,7 +374,11 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 
 	borderColor := lipgloss.Color("#313244")
 	if isSelected {
-		borderColor = t.FocusPurple
+		if m.CurrentMode == viewmodel.ModeSprintTaskMove {
+			borderColor = lipgloss.Color("#f9e2af")
+		} else {
+			borderColor = t.FocusPurple
+		}
 	} else if isDone {
 		borderColor = lipgloss.Color("#4c644f")
 	} else if task.Priority == model.P0 {
@@ -376,7 +389,11 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 
 	cursor := "  "
 	if isSelected {
-		cursor = "▶ "
+		if m.CurrentMode == viewmodel.ModeSprintTaskMove {
+			cursor = "❖ "
+		} else {
+			cursor = "▶ "
+		}
 	}
 
 	// Concise ID display

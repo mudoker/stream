@@ -14,6 +14,7 @@ import (
 
 var PriorityOptions = []string{"0 (Critical)", "1 (High)", "2 (Medium)", "3 (Low)"}
 var TaskTypeOptions = []string{"Feature", "Defect", "Improvement", "Task", "Reminder", "Habit", "Event"}
+var StatusOptions = []string{"Defined", "In Progress", "Review", "Testing", "Completed"}
 var SPOptions = []int{0, 1, 2, 3, 5, 8, 13}
 
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -92,6 +93,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 22:
 			m.Form.AddToTodayIdx = (m.Form.AddToTodayIdx - 1 + 2) % 2
 			return m, nil
+		case 23:
+			m.Form.StatusIdx = (m.Form.StatusIdx - 1 + len(StatusOptions)) % len(StatusOptions)
+			return m, nil
 		}
 	case "right":
 		switch m.Form.ActiveField {
@@ -140,6 +144,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 22:
 			m.Form.AddToTodayIdx = (m.Form.AddToTodayIdx + 1) % 2
 			return m, nil
+		case 23:
+			m.Form.StatusIdx = (m.Form.StatusIdx + 1) % len(StatusOptions)
+			return m, nil
 		}
 	case " ":
 		switch m.Form.ActiveField {
@@ -183,6 +190,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case 22:
 			m.Form.AddToTodayIdx = (m.Form.AddToTodayIdx + 1) % 2
+			return m, nil
+		case 23:
+			m.Form.StatusIdx = (m.Form.StatusIdx + 1) % len(StatusOptions)
 			return m, nil
 		}
 	case "enter":
@@ -424,11 +434,16 @@ func (m *Model) SubmitForm() {
 		newTask.TimeWindow = model.TimeWindow{}
 		newTask.EstimatedDurationMins = 0
 		newTask.StoryPoints = spVal
-		if isEdit && existingTask.LifecycleState == model.StateCompleted {
+		switch m.Form.StatusIdx {
+		case 4:
 			newTask.LifecycleState = model.StateCompleted
-		} else if isEdit && existingTask.LifecycleState != "" {
-			newTask.LifecycleState = existingTask.LifecycleState
-		} else {
+		case 3:
+			newTask.LifecycleState = model.StateTesting
+		case 2:
+			newTask.LifecycleState = model.StateReview
+		case 1:
+			newTask.LifecycleState = model.StateActive
+		default:
 			newTask.LifecycleState = model.StateReady
 		}
 	} else if taskType == 3 {
@@ -466,9 +481,16 @@ func (m *Model) SubmitForm() {
 			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
 				newTask.EstimatedDurationMins = d
 			}
-			if isEdit && existingTask.LifecycleState == model.StateCompleted {
+			switch m.Form.StatusIdx {
+			case 4:
 				newTask.LifecycleState = model.StateCompleted
-			} else {
+			case 3:
+				newTask.LifecycleState = model.StateTesting
+			case 2:
+				newTask.LifecycleState = model.StateReview
+			case 1:
+				newTask.LifecycleState = model.StateActive
+			default:
 				newTask.LifecycleState = model.StateReady
 			}
 		}

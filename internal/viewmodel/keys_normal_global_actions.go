@@ -56,6 +56,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		m.Form = NewTaskFormWithDate(m.SelectedDay)
 		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
 			m.Form.TaskTypeIdx = 0 // Feature
+			m.Form.StatusIdx = m.SprintSwimlaneIdx
 		} else {
 			m.Form.TaskTypeIdx = 3 // Task
 		}
@@ -230,6 +231,10 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		}
 		return true, nil
 	case "y":
+		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
+			m.EnterSprintTaskMoveMode()
+			return true, nil
+		}
 		m.EnterTaskMoveMode()
 		return true, nil
 	case "Y":

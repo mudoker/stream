@@ -18,6 +18,7 @@ type TaskForm struct {
 	PriorityIdx           int // 0: P0, 1: P1, 2: P2, 3: P3
 	SPIdx                 int // index in []int{0, 1, 2, 3, 5, 8, 13}
 	TaskTypeIdx           int // 0: Feature, 1: Defect, 2: Improvement, 3: Task, 4: Reminder, 5: Habit, 6: Event
+	StatusIdx             int // 0: Defined, 1: In Progress, 2: Review, 3: Testing, 4: Completed
 	IsAnchoredIdx         int // 0: No, 1: Yes
 	IsAllDayIdx           int // 0: No, 1: Yes
 	LinkSprintIdx         int // 0: No, 1: Yes
@@ -156,13 +157,13 @@ func (f TaskForm) VisibleFields() []int {
 
 	// Feature (0), Defect (1), Improvement (2)
 	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 2 {
-		fields = append(fields, 3, 21, 9, 10) // Story Points, Blocked By, Tags, Submit
+		fields = append(fields, 23, 3, 21, 9, 10) // Status, Story Points, Blocked By, Tags, Submit
 		return fields
 	}
 
 	// Task (3)
 	if f.TaskTypeIdx == 3 {
-		fields = append(fields, 3, 16) // Story Points, Is Anchored
+		fields = append(fields, 23, 3, 16) // Status, Story Points, Is Anchored
 		if f.IsAnchoredIdx == 1 {
 			fields = append(fields, 5, 6) // Start Time, Duration
 		} else {

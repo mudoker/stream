@@ -136,6 +136,9 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Link to Sprint", sprintOptStr, f.ActiveField == 18, t))
 		case 9:
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Tags (csv)", tagsView, f.ActiveField == 9, t))
+		case 23:
+			statusValStr := viewmodel.StatusOptions[f.StatusIdx]
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Status", statusValStr, f.ActiveField == 23, t))
 		}
 	}
 

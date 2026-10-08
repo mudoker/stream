@@ -651,10 +651,16 @@ func TestSprintHorizontalScrollingAndTaskNavigation(t *testing.T) {
 		t.Fatalf("expected task-def-1, got %s", m.SelectedTaskUUID)
 	}
 
-	// Navigate right with 'l' across swimlanes (from lane 0 to lane 1)
+	// Lowercase 'l' should NOT change swimlanes (stays in lane 0)
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	if m.SprintSwimlaneIdx != 0 {
+		t.Fatalf("expected swimlane to remain 0 after lowercase 'l', got %d", m.SprintSwimlaneIdx)
+	}
+
+	// Capital 'L' switches across swimlanes (from lane 0 to lane 1)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
 	if m.SprintSwimlaneIdx != 1 {
-		t.Fatalf("expected swimlane 1, got %d", m.SprintSwimlaneIdx)
+		t.Fatalf("expected swimlane 1 after 'L', got %d", m.SprintSwimlaneIdx)
 	}
 	if m.SelectedTaskUUID != "task-prog-1" {
 		t.Fatalf("expected task-prog-1, got %s", m.SelectedTaskUUID)
@@ -672,6 +678,91 @@ func TestSprintHorizontalScrollingAndTaskNavigation(t *testing.T) {
 	m.AutoScrollSprintLane()
 	if m.SprintScrollColOffset < 2 {
 		t.Fatalf("expected horizontal scroll offset >= 2 for lane 4 in narrow view, got %d", m.SprintScrollColOffset)
+	}
+}
+
+func TestSprintStatusSelectionAndMoveMode(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	if len(sprints) == 0 {
+		t.Fatal("expected default sprint")
+	}
+	sprint := sprints[0]
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+	m.SprintSwimlaneIdx = 2 // REVIEW swimlane
+	m.SidebarFocus = false
+	m.TodoShelfFocus = false
+
+	// 1. Creating a feature in Sprint View defaults status to the focused swimlane (2: Review)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	if m.Form.TaskTypeIdx != 0 {
+		t.Fatalf("expected Feature type (0), got %d", m.Form.TaskTypeIdx)
+	}
+	if m.Form.StatusIdx != 2 {
+		t.Fatalf("expected StatusIdx 2 (Review), got %d", m.Form.StatusIdx)
+	}
+
+	m.Form.TitleInput.SetValue("Code Review Checklist")
+	m.SubmitForm()
+	m.CurrentMode = viewmodel.ModeNormal
+
+	// Verify task exists with StateReview
+	var createdTask model.Task
+	for _, tk := range m.Tasks {
+		if tk.Title == "Code Review Checklist" {
+			createdTask = tk
+			break
+		}
+	}
+	if createdTask.LifecycleState != model.StateReview {
+		t.Fatalf("expected created task to have StateReview, got %s", createdTask.LifecycleState)
+	}
+
+	// 2. Sprint Move Mode: 'y' to enter move mode, j/k to reorder, h/l to move swimlane
+	m.SelectedTaskUUID = createdTask.UUID
+	m.SprintSwimlaneIdx = 2
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if m.CurrentMode != viewmodel.ModeSprintTaskMove {
+		t.Fatalf("expected CurrentMode to be ModeSprintTaskMove, got %s", m.CurrentMode)
+	}
+
+	// Move left to lane 1 (IN PROGRESS) using 'h'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	if m.SprintSwimlaneIdx != 1 {
+		t.Fatalf("expected swimlane 1 after 'h', got %d", m.SprintSwimlaneIdx)
+	}
+	activeTask, _ := m.GetActiveTask()
+	if activeTask.LifecycleState != model.StateActive {
+		t.Fatalf("expected active state, got %s", activeTask.LifecycleState)
+	}
+
+	// Confirm move with Enter
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.CurrentMode != viewmodel.ModeNormal {
+		t.Fatalf("expected ModeNormal after enter, got %s", m.CurrentMode)
+	}
+
+	// Verify updated in database
+	dbTask, ok := database.GetTask(createdTask.UUID)
+	if !ok || dbTask.LifecycleState != model.StateActive {
+		t.Fatalf("expected persisted state StateActive in DB, got %v", dbTask.LifecycleState)
+	}
+
+	// 3. Test cancel move mode with 'esc'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}) // Move to Review
+	m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if m.CurrentMode != viewmodel.ModeNormal {
+		t.Fatalf("expected ModeNormal after cancel, got %s", m.CurrentMode)
+	}
+	dbTaskAfterCancel, _ := database.GetTask(createdTask.UUID)
+	if dbTaskAfterCancel.LifecycleState != model.StateActive {
+		t.Fatalf("expected state to remain StateActive after cancelling move, got %s", dbTaskAfterCancel.LifecycleState)
 	}
 }
 

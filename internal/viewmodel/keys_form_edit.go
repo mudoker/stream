@@ -39,6 +39,19 @@ func (m *Model) startEditMode(task model.Task) {
 		}
 	}
 
+	switch task.LifecycleState {
+	case model.StateCompleted:
+		m.Form.StatusIdx = 4
+	case model.StateTesting:
+		m.Form.StatusIdx = 3
+	case model.StateReview:
+		m.Form.StatusIdx = 2
+	case model.StateActive, model.StateScheduled, model.StatePaused:
+		m.Form.StatusIdx = 1
+	default:
+		m.Form.StatusIdx = 0
+	}
+
 	m.Form.LocationInput.SetValue("")
 	m.Form.CommuteInput.SetValue("0")
 

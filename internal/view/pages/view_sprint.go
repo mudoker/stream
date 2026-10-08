@@ -99,11 +99,11 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 
 	// ── 2. Swimlane Columns with Horizontal Scrolling ──────────────────
 	availW := workspaceW - 2
-	if availW < 20 {
-		availW = 20
+	if availW < 16 {
+		availW = 16
 	}
 	numCols := 5
-	minColW := 15 // Comfortable minimum swimlane width before horizontal scrolling kicks in
+	minColW := 16 // Comfortable minimum swimlane width before horizontal scrolling kicks in
 
 	visibleCols := (availW + 1) / (minColW + 1)
 	if visibleCols < 1 {
@@ -386,28 +386,26 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 
 	// Line 1: [ID] Icon Type • Priority • SP
-	var badges []string
-	badges = append(badges, fmt.Sprintf("[%s]", idStr))
-	badges = append(badges, fmt.Sprintf("%s %s", typeIcon, typeLabel))
-	badges = append(badges, string(task.Priority))
-	if task.StoryPoints > 0 {
-		badges = append(badges, fmt.Sprintf("%d SP", task.StoryPoints))
-	}
-	topLine := cursor + strings.Join(badges, " • ")
-	if len([]rune(topLine)) > innerW {
-		badges2 := []string{fmt.Sprintf("[%s]", idStr), fmt.Sprintf("%s %s", typeIcon, typeLabel), string(task.Priority)}
-		topLine2 := cursor + strings.Join(badges2, " • ")
-		if len([]rune(topLine2)) <= innerW {
-			topLine = topLine2
-		} else {
-			badges3 := []string{fmt.Sprintf("[%s]", idStr), typeIcon, string(task.Priority)}
-			topLine3 := cursor + strings.Join(badges3, " • ")
-			if len([]rune(topLine3)) <= innerW {
-				topLine = topLine3
-			} else if len([]rune(topLine)) > innerW {
-				topLine = string([]rune(topLine)[:innerW])
-			}
-		}
+	opt1 := fmt.Sprintf("%s[%s] %s %s • %s • %d SP", cursor, idStr, typeIcon, typeLabel, task.Priority, task.StoryPoints)
+	opt2 := fmt.Sprintf("%s[%s] %s %s • %s", cursor, idStr, typeIcon, typeLabel, task.Priority)
+	opt3 := fmt.Sprintf("%s[%s] %s %s", cursor, idStr, typeIcon, typeLabel)
+	opt4 := fmt.Sprintf("%s[%s] %s • %s", cursor, idStr, typeIcon, task.Priority)
+	opt5 := fmt.Sprintf("%s[%s] %s", cursor, idStr, typeIcon)
+	opt6 := fmt.Sprintf("%s[%s]", cursor, idStr)
+
+	var topLine string
+	if task.StoryPoints > 0 && lipgloss.Width(opt1) <= innerW {
+		topLine = opt1
+	} else if lipgloss.Width(opt2) <= innerW {
+		topLine = opt2
+	} else if lipgloss.Width(opt3) <= innerW {
+		topLine = opt3
+	} else if lipgloss.Width(opt4) <= innerW {
+		topLine = opt4
+	} else if lipgloss.Width(opt5) <= innerW {
+		topLine = opt5
+	} else {
+		topLine = opt6
 	}
 
 	// Line 2: Title
@@ -417,12 +415,15 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 	title := theme.SentenceCase(task.Title)
 	maxTitleW := innerW - 4
-	if len([]rune(title)) > maxTitleW {
-		if maxTitleW > 2 {
-			title = string([]rune(title)[:maxTitleW-1]) + "…"
-		} else {
-			title = string([]rune(title)[:maxTitleW])
+	if maxTitleW < 4 {
+		maxTitleW = 4
+	}
+	if lipgloss.Width(title) > maxTitleW {
+		runes := []rune(title)
+		for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxTitleW {
+			runes = runes[:len(runes)-1]
 		}
+		title = string(runes) + "…"
 	}
 	titleLine := "  " + chk + " " + title
 
@@ -431,12 +432,15 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	if len(task.Tags) > 0 {
 		tagStr := strings.Join(task.Tags, ", ")
 		maxTagW := innerW - 4
-		if len([]rune(tagStr)) > maxTagW {
-			if maxTagW > 2 {
-				tagStr = string([]rune(tagStr)[:maxTagW-1]) + "…"
-			} else {
-				tagStr = string([]rune(tagStr)[:maxTagW])
+		if maxTagW < 4 {
+			maxTagW = 4
+		}
+		if lipgloss.Width(tagStr) > maxTagW {
+			runes := []rune(tagStr)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxTagW {
+				runes = runes[:len(runes)-1]
 			}
+			tagStr = string(runes) + "…"
 		}
 		tagLine = "  🏷 " + tagStr
 	}
@@ -446,12 +450,15 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	if strings.TrimSpace(task.Description) != "" {
 		desc := strings.TrimSpace(task.Description)
 		maxDescW := innerW - 4
-		if len([]rune(desc)) > maxDescW {
-			if maxDescW > 2 {
-				desc = string([]rune(desc)[:maxDescW-1]) + "…"
-			} else {
-				desc = string([]rune(desc)[:maxDescW])
+		if maxDescW < 4 {
+			maxDescW = 4
+		}
+		if lipgloss.Width(desc) > maxDescW {
+			runes := []rune(desc)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxDescW {
+				runes = runes[:len(runes)-1]
 			}
+			desc = string(runes) + "…"
 		}
 		descLine = "  " + desc
 	}
@@ -490,7 +497,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 
 	content := strings.Join(cardLines, "\n")
 	cardBox := lipgloss.NewStyle().
-		Width(colW).
+		Width(innerW).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
 		Padding(0, 0).

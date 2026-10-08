@@ -1218,6 +1218,58 @@ func TestSprintViewDisallowHabitReminderEvent(t *testing.T) {
 	}
 }
 
+func TestSprintCardBordersAndHorizontalNavigation(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	if len(sprints) == 0 {
+		t.Fatal("expected default sprint")
+	}
+	sprint := sprints[0]
+
+	feat := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "FEAT-10",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Implement user authentication flow with PKCE",
+		Priority:       model.P1,
+		StoryPoints:    8,
+		SprintUUID:     sprint.UUID,
+		LifecycleState: model.StateReady,
+		SchedulingType: model.Floating,
+		Description:    "Ensure secure OAuth2.0 authentication",
+		Tags:           []string{"security", "auth"},
+	}
+	database.AddTask(feat)
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+	m.Layout.TimelineW = 50 // Small width forces fewer visible columns and horizontal scrolling
+
+	th := theme.NewTheme()
+	rendered := pages.RenderSprintView(&m, th, 30)
+
+	// Verify rounded card border characters appear intact and not wrapped
+	if !strings.Contains(rendered, "╭") || !strings.Contains(rendered, "╰") {
+		t.Errorf("expected rendered sprint view to contain intact rounded border cards, got:\n%s", rendered)
+	}
+
+	// Verify horizontal navigation H and L with smaller timeline width
+	m.SprintSwimlaneIdx = 0
+	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
+	if m.SprintSwimlaneIdx != 1 {
+		t.Fatalf("expected swimlane index 1 after 'L', got %d", m.SprintSwimlaneIdx)
+	}
+
+	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("H")})
+	if m.SprintSwimlaneIdx != 0 {
+		t.Fatalf("expected swimlane index 0 after 'H', got %d", m.SprintSwimlaneIdx)
+	}
+}
+
+
 
 
 

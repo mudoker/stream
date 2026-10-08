@@ -10,6 +10,7 @@ type ShelfSectionType string
 
 const (
 	SectionToday     ShelfSectionType = "TODAY"
+	SectionTasks     ShelfSectionType = "TASKS"
 	SectionReminders ShelfSectionType = "REMINDERS"
 	SectionHabits    ShelfSectionType = "HABITS"
 	SectionBacklog   ShelfSectionType = "BACKLOG"
@@ -50,29 +51,43 @@ func (m *Model) GetShelfData() ShelfData {
 
 	shelfTasks := m.GetCurrentShelfTasks()
 
-	var todayTasks []model.Task
-	todayUUIDs := make(map[string]bool)
-
 	if isGlobal {
-		activeSprint, hasSprint := m.GetActiveSprint()
-		if hasSprint {
-			activeFeatIDs := make(map[string]bool)
-			for _, t := range m.Tasks {
-				if t.SprintUUID == activeSprint.UUID && t.ID != "" {
-					activeFeatIDs[t.ID] = true
-				}
+		var tasksList []model.Task
+		var completedList []model.Task
+
+		for _, task := range shelfTasks {
+			if task.LifecycleState == model.StateCompleted {
+				completedList = append(completedList, task)
+			} else {
+				tasksList = append(tasksList, task)
 			}
-			for _, t := range m.Tasks {
-				if m.ActiveWorkspaceUUID != "ALL_WORKSPACES" && t.WorkspaceUUID != m.ActiveWorkspaceUUID {
-					continue
-				}
-				if t.AddedToToday && t.LifecycleState != model.StateCompleted {
-					if (t.LinkedFeatureID != "" && activeFeatIDs[t.LinkedFeatureID]) || t.SprintUUID == activeSprint.UUID {
-						todayTasks = append(todayTasks, t)
-						todayUUIDs[t.UUID] = true
-					}
-				}
-			}
+		}
+
+		sections := []ShelfSection{
+			{
+				Type:  SectionTasks,
+				Title: fmt.Sprintf("TASKS (%d)", len(tasksList)),
+				Icon:  "📋",
+				Tasks: tasksList,
+			},
+			{
+				Type:  SectionCompleted,
+				Title: fmt.Sprintf("COMPLETED (%d)", len(completedList)),
+				Icon:  "✓",
+				Tasks: completedList,
+			},
+		}
+
+		var flatTasks []model.Task
+		for _, sec := range sections {
+			flatTasks = append(flatTasks, sec.Tasks...)
+		}
+
+		return ShelfData{
+			Title:           shelfTitle,
+			IsGlobalBacklog: true,
+			Tasks:           flatTasks,
+			Sections:        sections,
 		}
 	}
 
@@ -82,10 +97,6 @@ func (m *Model) GetShelfData() ShelfData {
 	var completed []model.Task
 
 	for _, task := range shelfTasks {
-		if todayUUIDs[task.UUID] {
-			continue
-		}
-
 		isDone := false
 		if task.SchedulingType == model.Habit {
 			dateStr := m.SelectedDay.Format("2006-01-02")
@@ -111,38 +122,27 @@ func (m *Model) GetShelfData() ShelfData {
 	}
 
 	var sections []ShelfSection
-	if isGlobal {
-		sections = append(sections, ShelfSection{
-			Type:  SectionToday,
-			Title: fmt.Sprintf("⚡ TODAY SHELF (%d)", len(todayTasks)),
-			Icon:  "⚡",
-			Tasks: todayTasks,
-		})
-	} else {
-		sections = append(sections, ShelfSection{
-			Type:  SectionReminders,
-			Title: fmt.Sprintf("⏰ REMINDERS (%d)", len(reminders)),
-			Icon:  "⏰",
-			Tasks: reminders,
-		})
-		sections = append(sections, ShelfSection{
-			Type:  SectionHabits,
-			Title: fmt.Sprintf("🔁 HABITS (%d)", len(habits)),
-			Icon:  "🔁",
-			Tasks: habits,
-		})
-	}
-
+	sections = append(sections, ShelfSection{
+		Type:  SectionReminders,
+		Title: fmt.Sprintf("REMINDERS (%d)", len(reminders)),
+		Icon:  "⏰",
+		Tasks: reminders,
+	})
+	sections = append(sections, ShelfSection{
+		Type:  SectionHabits,
+		Title: fmt.Sprintf("HABITS (%d)", len(habits)),
+		Icon:  "🔁",
+		Tasks: habits,
+	})
 	sections = append(sections, ShelfSection{
 		Type:  SectionBacklog,
-		Title: fmt.Sprintf("☱ BACKLOG (%d)", len(backlog)),
+		Title: fmt.Sprintf("BACKLOG (%d)", len(backlog)),
 		Icon:  "☱",
 		Tasks: backlog,
 	})
-
 	sections = append(sections, ShelfSection{
 		Type:  SectionCompleted,
-		Title: fmt.Sprintf("✓ COMPLETED (%d)", len(completed)),
+		Title: fmt.Sprintf("COMPLETED (%d)", len(completed)),
 		Icon:  "✓",
 		Tasks: completed,
 	})

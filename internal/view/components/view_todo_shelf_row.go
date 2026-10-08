@@ -49,11 +49,14 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 	titleLine := fmt.Sprintf("%s%s %s", prefix, chk, title)
 
 	var details []string
+	if task.ID != "" {
+		details = append(details, task.ID)
+	}
 	details = append(details, string(task.Priority))
-	if task.SchedulingType == model.Floating && task.EstimatedDurationMins > 0 {
-		details = append(details, fmt.Sprintf("%dm remaining", task.EstimatedDurationMins))
-	} else if task.SchedulingType != model.Reminder {
+	if task.StoryPoints > 0 {
 		details = append(details, fmt.Sprintf("%d SP", task.StoryPoints))
+	} else if task.SchedulingType == model.Floating && task.EstimatedDurationMins > 0 {
+		details = append(details, fmt.Sprintf("%dm remaining", task.EstimatedDurationMins))
 	}
 	if task.SchedulingType == model.Reminder {
 		remDays := formatRemainingDays(task.TimeWindow.Start)
@@ -62,9 +65,18 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 		} else {
 			details = append(details, fmt.Sprintf("due %s (%s)", task.TimeWindow.Start.Format("15:04"), remDays))
 		}
+	} else if task.SchedulingType == model.Floating {
+		if task.AddedToToday {
+			details = append(details, "⚡ Today")
+		} else {
+			details = append(details, "Unassigned")
+		}
 	}
-	if task.AddedToToday {
-		details = append(details, "⚡ Today")
+	if task.LinkedFeatureID != "" {
+		details = append(details, "🔗 "+task.LinkedFeatureID)
+	}
+	if task.BlockedBy != "" {
+		details = append(details, "⛔ "+task.BlockedBy)
 	}
 	if len(task.Tags) > 0 {
 		details = append(details, strings.Join(task.Tags, ", "))

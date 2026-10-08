@@ -991,20 +991,20 @@ func TestGlobalBacklogTodayShelf(t *testing.T) {
 		t.Fatalf("expected IsGlobalBacklog to be true on SprintView")
 	}
 
-	// Should have TODAY SHELF section
-	var todaySec *viewmodel.ShelfSection
+	// Should have TASKS section
+	var tasksSec *viewmodel.ShelfSection
 	for _, sec := range shelfData.Sections {
-		if sec.Type == viewmodel.SectionToday {
+		if sec.Type == viewmodel.SectionTasks {
 			sCopy := sec
-			todaySec = &sCopy
+			tasksSec = &sCopy
 			break
 		}
 	}
-	if todaySec == nil {
-		t.Fatalf("expected TODAY SHELF section in Global Backlog")
+	if tasksSec == nil {
+		t.Fatalf("expected TASKS section in Global Backlog")
 	}
-	if len(todaySec.Tasks) != 1 || todaySec.Tasks[0].UUID != todayTask.UUID {
-		t.Fatalf("expected todayTask in TODAY SHELF section, got %+v", todaySec.Tasks)
+	if len(tasksSec.Tasks) != 2 {
+		t.Fatalf("expected 2 tasks in TASKS section, got %d: %+v", len(tasksSec.Tasks), tasksSec.Tasks)
 	}
 }
 
@@ -1162,28 +1162,28 @@ func TestCreateTaskFromFeatureShortcut(t *testing.T) {
 		t.Errorf("expected ID prefix 'TASK-', got '%s'", createdTask.ID)
 	}
 
-	// 4. Verify it appears on Today Shelf in Global Backlog
+	// 4. Verify it appears in TASKS section in Global Backlog
 	shelfData := m.GetShelfData()
-	var todaySec *viewmodel.ShelfSection
+	var tasksSec *viewmodel.ShelfSection
 	for _, sec := range shelfData.Sections {
-		if sec.Type == viewmodel.SectionToday {
+		if sec.Type == viewmodel.SectionTasks {
 			sCopy := sec
-			todaySec = &sCopy
+			tasksSec = &sCopy
 			break
 		}
 	}
-	if todaySec == nil {
-		t.Fatalf("expected SectionToday to be present in Global Backlog")
+	if tasksSec == nil {
+		t.Fatalf("expected SectionTasks to be present in Global Backlog")
 	}
-	foundInToday := false
-	for _, tsk := range todaySec.Tasks {
+	foundInTasks := false
+	for _, tsk := range tasksSec.Tasks {
 		if tsk.UUID == createdTask.UUID {
-			foundInToday = true
+			foundInTasks = true
 			break
 		}
 	}
-	if !foundInToday {
-		t.Fatalf("expected created task to appear in Global Backlog Today Shelf section")
+	if !foundInTasks {
+		t.Fatalf("expected created task to appear in Global Backlog TASKS section")
 	}
 }
 

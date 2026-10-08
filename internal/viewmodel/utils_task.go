@@ -66,33 +66,39 @@ func movingTaskBaseUUID(uuid string) string {
 }
 
 func GenerateWorkItemID(itemType model.WorkItemType, allTasks []model.Task) string {
-	prefix := "FEAT"
+	prefix := "FEA"
+	var legacyPrefixes []string
 	switch itemType {
 	case model.WorkItemDefect:
 		prefix = "DEF"
+		legacyPrefixes = []string{"DEF-"}
 	case model.WorkItemImprovement:
 		prefix = "IMP"
+		legacyPrefixes = []string{"IMP-"}
 	case model.WorkItemTask:
-		prefix = "TASK"
+		prefix = "TSK"
+		legacyPrefixes = []string{"TSK-", "TASK-"}
 	default:
-		prefix = "FEAT"
+		prefix = "FEA"
+		legacyPrefixes = []string{"FEA-", "FEAT-", "FT-"}
 	}
 
 	maxNum := 0
-	prefixWithDash := prefix + "-"
 	for _, t := range allTasks {
-		if strings.HasPrefix(t.ID, prefixWithDash) {
-			numStr := strings.TrimPrefix(t.ID, prefixWithDash)
-			var n int
-			for _, ch := range numStr {
-				if ch >= '0' && ch <= '9' {
-					n = n*10 + int(ch-'0')
-				} else {
-					break
+		for _, p := range legacyPrefixes {
+			if strings.HasPrefix(t.ID, p) {
+				numStr := strings.TrimPrefix(t.ID, p)
+				var n int
+				for _, ch := range numStr {
+					if ch >= '0' && ch <= '9' {
+						n = n*10 + int(ch-'0')
+					} else {
+						break
+					}
 				}
-			}
-			if n > maxNum {
-				maxNum = n
+				if n > maxNum {
+					maxNum = n
+				}
 			}
 		}
 	}

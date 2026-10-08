@@ -365,13 +365,21 @@ func getWorkItemTypeDetails(itemType model.WorkItemType) (label string, color li
 	}
 }
 
+func renderSprintBlockedBufferBlock(w int, text string, isSelected bool) string {
+	color := lipgloss.Color("#f38ba8")
+	borderStyle := lipgloss.NewStyle().Foreground(color)
+	textStyle := lipgloss.NewStyle().Foreground(color).Bold(isSelected)
+
+	return embedTextInLine("└", "┘", "╌", " "+text+" ", w, borderStyle, textStyle)
+}
+
 func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW int, isSelected bool) []string {
 	innerW := colW - 2
 	if innerW < 10 {
 		innerW = 10
 	}
 
-	typeLabel, typeColor := getWorkItemTypeDetails(task.WorkItemType)
+	_, typeColor := getWorkItemTypeDetails(task.WorkItemType)
 	pColor := t.PriorityColor(task.Priority)
 	isDone := task.LifecycleState == model.StateCompleted
 
@@ -399,41 +407,19 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		}
 	}
 
-	// Concise ID display
+	// Concise 3-letter ID display
 	idStr := task.ID
 	if idStr == "" {
-		idStr = "FEAT"
+		idStr = "FEA-1"
 	}
 
-	// Line 1: [ID] Type • Priority • SP
-	opt1 := fmt.Sprintf("%s[%s] %s • %s • %d SP", cursor, idStr, typeLabel, task.Priority, task.StoryPoints)
-	opt2 := fmt.Sprintf("%s[%s] %s • %s", cursor, idStr, typeLabel, task.Priority)
-	opt3 := fmt.Sprintf("%s[%s] %s", cursor, idStr, typeLabel)
-	opt4 := fmt.Sprintf("%s[%s] %s", cursor, idStr, task.Priority)
-	opt5 := fmt.Sprintf("%s[%s]", cursor, idStr)
-
-	var topLine string
-	if task.StoryPoints > 0 && lipgloss.Width(opt1) <= innerW {
-		topLine = opt1
-	} else if lipgloss.Width(opt2) <= innerW {
-		topLine = opt2
-	} else if lipgloss.Width(opt3) <= innerW {
-		topLine = opt3
-	} else if lipgloss.Width(opt4) <= innerW {
-		topLine = opt4
-	} else {
-		topLine = opt5
-	}
-
-	// Line 2: Title
-	chk := "☐"
-	if isDone {
-		chk = "☑"
-	}
+	// Line 1: [ID] Title directly (no checkbox, no spelled-out type)
+	idBadge := fmt.Sprintf("%s[%s] ", cursor, idStr)
+	idBadgeW := lipgloss.Width(idBadge)
 	title := theme.SentenceCase(task.Title)
-	maxTitleW := innerW - 4
-	if maxTitleW < 4 {
-		maxTitleW = 4
+	maxTitleW := innerW - idBadgeW
+	if maxTitleW < 3 {
+		maxTitleW = 3
 	}
 	if lipgloss.Width(title) > maxTitleW {
 		runes := []rune(title)
@@ -442,34 +428,43 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		}
 		title = string(runes) + "…"
 	}
-	titleLine := "  " + chk + " " + title
 
-	// Card content rows
-	var cardLines []string
-	topStyle := lipgloss.NewStyle().Foreground(typeColor).Bold(true)
+	idStyle := lipgloss.NewStyle().Foreground(typeColor).Bold(true)
 	if isSelected {
-		topStyle = topStyle.Foreground(t.FocusPurple)
+		idStyle = idStyle.Foreground(t.FocusPurple)
 	}
-	cardLines = append(cardLines, topStyle.Render(topLine))
-
 	titleStyle := lipgloss.NewStyle().Foreground(t.Fg).Bold(isSelected)
 	if isDone {
 		titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Bold(true)
 	}
-	cardLines = append(cardLines, titleStyle.Render(titleLine))
+	topLine := idStyle.Render(idBadge) + titleStyle.Render(title)
 
-	// Optional Line 3: Blocked By or Linked Feature
-	if task.BlockedBy != "" {
-		blockedStr := fmt.Sprintf("  Blocked: %s", task.BlockedBy)
-		if lipgloss.Width(blockedStr) > innerW {
-			runes := []rune(blockedStr)
-			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > innerW {
-				runes = runes[:len(runes)-1]
-			}
-			blockedStr = string(runes) + "…"
+	// Line 2: Priority, Story Points, Tags / Description
+	var metaParts []string
+	metaParts = append(metaParts, string(task.Priority))
+	if task.StoryPoints > 0 {
+		metaParts = append(metaParts, fmt.Sprintf("%d SP", task.StoryPoints))
+	}
+	if len(task.Tags) > 0 {
+		metaParts = append(metaParts, "# "+strings.Join(task.Tags, ", "))
+	} else if strings.TrimSpace(task.Description) != "" {
+		metaParts = append(metaParts, strings.TrimSpace(task.Description))
+	}
+	metaStr := "  " + strings.Join(metaParts, " • ")
+	if lipgloss.Width(metaStr) > innerW {
+		runes := []rune(metaStr)
+		for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > innerW {
+			runes = runes[:len(runes)-1]
 		}
-		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")).Render(blockedStr))
-	} else if task.LinkedFeatureID != "" {
+		metaStr = string(runes) + "…"
+	}
+	metaLine := lipgloss.NewStyle().Foreground(t.Muted).Render(metaStr)
+
+	var cardLines []string
+	cardLines = append(cardLines, topLine, metaLine)
+
+	// If linked to another feature and not blocked
+	if task.LinkedFeatureID != "" && task.BlockedBy == "" {
 		linkStr := fmt.Sprintf("  Link: %s", task.LinkedFeatureID)
 		if lipgloss.Width(linkStr) > innerW {
 			runes := []rune(linkStr)
@@ -481,37 +476,6 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(lipgloss.Color("#89b4fa")).Render(linkStr))
 	}
 
-	// Optional Line 4: Tags
-	if len(task.Tags) > 0 {
-		tagStr := strings.Join(task.Tags, ", ")
-		maxTagW := innerW - 4
-		if maxTagW < 4 {
-			maxTagW = 4
-		}
-		if lipgloss.Width(tagStr) > maxTagW {
-			runes := []rune(tagStr)
-			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxTagW {
-				runes = runes[:len(runes)-1]
-			}
-			tagStr = string(runes) + "…"
-		}
-		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render("  # "+tagStr))
-	} else if strings.TrimSpace(task.Description) != "" {
-		desc := strings.TrimSpace(task.Description)
-		maxDescW := innerW - 4
-		if maxDescW < 4 {
-			maxDescW = 4
-		}
-		if lipgloss.Width(desc) > maxDescW {
-			runes := []rune(desc)
-			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxDescW {
-				runes = runes[:len(runes)-1]
-			}
-			desc = string(runes) + "…"
-		}
-		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render("  "+desc))
-	}
-
 	content := strings.Join(cardLines, "\n")
 	cardBox := lipgloss.NewStyle().
 		Width(innerW).
@@ -520,5 +484,14 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		Padding(0, 0).
 		Render(content)
 
-	return strings.Split(cardBox, "\n")
+	resultLines := strings.Split(cardBox, "\n")
+
+	// If blocked, render an additional continuous card below saying blocked and blocked by
+	if task.BlockedBy != "" {
+		blockedText := fmt.Sprintf("⛔ Blocked by %s", task.BlockedBy)
+		blockedBlock := renderSprintBlockedBufferBlock(innerW+2, blockedText, isSelected)
+		resultLines = append(resultLines, blockedBlock)
+	}
+
+	return resultLines
 }

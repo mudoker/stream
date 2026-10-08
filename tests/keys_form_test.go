@@ -991,8 +991,8 @@ func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
 	if createdFeature.WorkItemType != model.WorkItemFeature {
 		t.Fatalf("expected WorkItemType Feature, got %s", createdFeature.WorkItemType)
 	}
-	if createdFeature.ID != "FEAT-1" {
-		t.Fatalf("expected concise ID 'FEAT-1', got %s", createdFeature.ID)
+	if createdFeature.ID != "FEA-1" {
+		t.Fatalf("expected concise ID 'FEA-1', got %s", createdFeature.ID)
 	}
 
 	// 4. Create Task linked to Feature
@@ -1001,7 +1001,7 @@ func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
 	m.Form.TaskTypeIdx = 3 // Task
 	m.PopulateFormAvailableFeaturesAndBlockers()
 	m.Form.TitleInput.SetValue("Implement Login endpoint")
-	m.Form.LinkedFeatureIdx = 1 // Link to FEAT-1
+	m.Form.LinkedFeatureIdx = 1 // Link to FEA-1
 	m.SubmitForm()
 
 	tasks = database.GetTasks()
@@ -1016,8 +1016,8 @@ func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
 	if createdTask == nil {
 		t.Fatalf("expected task 'Implement Login endpoint' to be created")
 	}
-	if createdTask.LinkedFeatureID != "FEAT-1" {
-		t.Fatalf("expected task LinkedFeatureID 'FEAT-1', got %s", createdTask.LinkedFeatureID)
+	if createdTask.LinkedFeatureID != "FEA-1" {
+		t.Fatalf("expected task LinkedFeatureID 'FEA-1', got %s", createdTask.LinkedFeatureID)
 	}
 
 	// 5. Test Modal Rendering for Feature Form

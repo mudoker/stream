@@ -917,17 +917,17 @@ func TestSprintViewWorkItemCardRendering(t *testing.T) {
 	th := theme.NewTheme()
 	rendered := pages.RenderSprintView(&m, th, 30)
 
-	if !strings.Contains(rendered, "FEAT-1") {
-		t.Fatalf("expected sprint view to contain 'FEAT-1', got:\n%s", rendered)
+	if !strings.Contains(rendered, "FEAT-1") && !strings.Contains(rendered, "FEA-1") {
+		t.Fatalf("expected sprint view to contain 'FEAT-1' or 'FEA-1', got:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "DEF-1") {
 		t.Fatalf("expected sprint view to contain 'DEF-1', got:\n%s", rendered)
 	}
-	if !strings.Contains(rendered, "Defect") {
-		t.Fatalf("expected sprint view to contain 'Defect', got:\n%s", rendered)
+	if !strings.Contains(rendered, "OAuth Login") {
+		t.Fatalf("expected sprint view to contain 'OAuth Login', got:\n%s", rendered)
 	}
-	if !strings.Contains(rendered, "Feature") {
-		t.Fatalf("expected sprint view to contain 'Feature', got:\n%s", rendered)
+	if !strings.Contains(rendered, "Crash on large") {
+		t.Fatalf("expected sprint view to contain 'Crash on large', got:\n%s", rendered)
 	}
 	if !strings.Contains(rendered, "Features") {
 		t.Fatalf("expected sprint view to contain 'Features' metric, got:\n%s", rendered)
@@ -1158,8 +1158,8 @@ func TestCreateTaskFromFeatureShortcut(t *testing.T) {
 	if createdTask.SchedulingType != model.Floating {
 		t.Errorf("expected Floating scheduling type, got %s", createdTask.SchedulingType)
 	}
-	if !strings.HasPrefix(createdTask.ID, "TASK-") {
-		t.Errorf("expected ID prefix 'TASK-', got '%s'", createdTask.ID)
+	if !strings.HasPrefix(createdTask.ID, "TSK-") {
+		t.Errorf("expected ID prefix 'TSK-', got '%s'", createdTask.ID)
 	}
 
 	// 4. Verify it appears in TASKS section in Global Backlog
@@ -1357,6 +1357,58 @@ func TestSprintCardBordersAndHorizontalNavigation(t *testing.T) {
 	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("H")})
 	if m.SprintSwimlaneIdx != 0 {
 		t.Fatalf("expected swimlane index 0 after 'H', got %d", m.SprintSwimlaneIdx)
+	}
+}
+
+func TestSprintCardRedesignAndBlockedSubcard(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	sprint := sprints[0]
+
+	// Create blocked feature
+	feat := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "FEA-1",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Checkout Flow",
+		Priority:       model.P0,
+		StoryPoints:    5,
+		SprintUUID:     sprint.UUID,
+		LifecycleState: model.StateReady,
+		SchedulingType: model.Floating,
+		BlockedBy:      "DEF-2",
+		Tags:           []string{"billing"},
+	}
+	database.AddTask(feat)
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+	m.Layout.TimelineW = 160
+
+	th := theme.NewTheme()
+	rendered := pages.RenderSprintView(&m, th, 30)
+
+	// 1. Should have [FEA-1] Checkout Flow directly
+	if !strings.Contains(rendered, "[FEA-1] Checkout") {
+		t.Errorf("expected rendered card to contain '[FEA-1] Checkout', got:\n%s", rendered)
+	}
+
+	// 2. Should NOT contain checkbox '☐'
+	if strings.Contains(rendered, "☐") {
+		t.Errorf("expected rendered sprint card to NOT contain checkbox '☐', got:\n%s", rendered)
+	}
+
+	// 3. Should contain priority and points
+	if !strings.Contains(rendered, "P0 • 5 SP") {
+		t.Errorf("expected rendered card to contain 'P0 • 5 SP', got:\n%s", rendered)
+	}
+
+	// 4. Should contain continuous attached blocked subcard
+	if !strings.Contains(rendered, "Blocked by DEF-2") {
+		t.Errorf("expected rendered card to contain continuous blocked subcard with 'Blocked by DEF-2', got:\n%s", rendered)
 	}
 }
 

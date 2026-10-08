@@ -11,14 +11,34 @@ import (
 )
 
 func RenderCommandPalette(m *viewmodel.Model, t theme.Theme) string {
+	modalW := 80
+	if modalW > m.Width-4 {
+		modalW = m.Width - 4
+	}
+	if modalW < 40 {
+		modalW = 40
+	}
+	innerW := modalW - 6
+
+	termH := m.Height
+	if termH < 15 {
+		termH = 15
+	}
+	maxVisible := termH - 10
+	if maxVisible < 5 {
+		maxVisible = 5
+	}
+	if maxVisible > 12 {
+		maxVisible = 12
+	}
+
 	var sb strings.Builder
 
 	divColor := lipgloss.NewStyle().Foreground(lipgloss.Color("#2a2c37"))
 	mutedStyle := lipgloss.NewStyle().Foreground(t.Muted)
-	innerW := m.Width - 8
 
-	sb.WriteString(lipgloss.NewStyle().Padding(1, 2).Render(m.CommandInput.View()) + "\n")
-	sb.WriteString(divColor.Render(strings.Repeat("─", innerW)) + "\n\n")
+	sb.WriteString(lipgloss.NewStyle().Padding(0, 1).Render(m.CommandInput.View()) + "\n")
+	sb.WriteString(divColor.Render(strings.Repeat("─", innerW)) + "\n")
 
 	val := strings.ToLower(m.CommandInput.Value())
 	allCommands := m.GetCommandList()
@@ -45,14 +65,18 @@ func RenderCommandPalette(m *viewmodel.Model, t theme.Theme) string {
 	}
 	filteredGeneric := filterGroup(genericEntries)
 	filteredWS := filterGroup(wsEntries)
-	totalEntries := len(filteredGeneric) + len(filteredWS)
+
+	var allFiltered []viewmodel.CommandEntry
+	allFiltered = append(allFiltered, filteredGeneric...)
+	allFiltered = append(allFiltered, filteredWS...)
+	totalEntries := len(allFiltered)
 
 	selIdx := m.CommandSelectedIndex
 	if totalEntries > 0 && selIdx >= totalEntries {
 		selIdx = totalEntries - 1
 	}
 
-	nameW := 26
+	nameW := 24
 	renderRow := func(globalIdx int, c viewmodel.CommandEntry) string {
 		isSelected := selIdx >= 0 && globalIdx == selIdx
 		if isSelected {
@@ -61,45 +85,45 @@ func RenderCommandPalette(m *viewmodel.Model, t theme.Theme) string {
 				Render(fmt.Sprintf("%-*s", nameW, c.Name))
 			desc := lipgloss.NewStyle().Foreground(t.Fg).Bold(true).Render(c.Desc)
 			return lipgloss.NewStyle().Width(innerW).
-				Render(fmt.Sprintf("%s  %s  %s", indicator, keyword, desc))
+				Render(fmt.Sprintf("%s %s %s", indicator, keyword, desc))
 		}
 		keyword := lipgloss.NewStyle().Foreground(t.Fg).
 			Render(fmt.Sprintf("%-*s", nameW, c.Name))
 		desc := mutedStyle.Render(c.Desc)
 		return lipgloss.NewStyle().Width(innerW).
-			Render(fmt.Sprintf("   %s  %s", keyword, desc))
-	}
-
-	if len(filteredGeneric) > 0 {
-		sb.WriteString("  " + mutedStyle.Render("COMMANDS") + "\n\n")
-		for i, e := range filteredGeneric {
-			sb.WriteString(renderRow(i, e) + "\n")
-		}
-		sb.WriteString("\n")
-	}
-
-	if len(filteredWS) > 0 {
-		sb.WriteString("  " + mutedStyle.Render("SWITCH WORKSPACE") + "\n\n")
-		base := len(filteredGeneric)
-		for i, e := range filteredWS {
-			sb.WriteString(renderRow(base+i, e) + "\n")
-		}
-		sb.WriteString("\n")
+			Render(fmt.Sprintf("  %s %s", keyword, desc))
 	}
 
 	if totalEntries == 0 {
-		sb.WriteString("  " + mutedStyle.Render("No matching commands") + "\n\n")
+		sb.WriteString("  " + mutedStyle.Render("No matching commands") + "\n")
+	} else {
+		startIdx := 0
+		if selIdx >= maxVisible {
+			startIdx = selIdx - maxVisible + 1
+		}
+		endIdx := startIdx + maxVisible
+		if endIdx > totalEntries {
+			endIdx = totalEntries
+		}
+
+		for i := startIdx; i < endIdx; i++ {
+			sb.WriteString(renderRow(i, allFiltered[i]) + "\n")
+		}
 	}
 
 	sb.WriteString(divColor.Render(strings.Repeat("─", innerW)) + "\n")
-	sb.WriteString(mutedStyle.Render("  ↑↓ navigate  ↵ execute  esc close  w/W quick-switch") + "\n")
+	footerStr := "  ↑↓ navigate  ↵ execute  esc close  w/W quick-switch"
+	if totalEntries > maxVisible {
+		footerStr = fmt.Sprintf("  ↑↓ (%d/%d)  ↵ execute  esc close", selIdx+1, totalEntries)
+	}
+	sb.WriteString(mutedStyle.Render(footerStr) + "\n")
 
 	return lipgloss.NewStyle().
 		Foreground(t.Fg).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(t.Accent).
-		Width(m.Width-4).
-		Padding(0, 2).
+		Width(innerW + 2).
+		Padding(0, 1).
 		Render(sb.String())
 }
 

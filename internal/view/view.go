@@ -59,15 +59,7 @@ func (v *View) Render() string {
 	if m.CurrentMode == viewmodel.ModeZen {
 		canvas = pages.RenderZenMode(m, v.Theme)
 	} else {
-		// Calculate dynamic workspace height based on cmd palette presence to prevent bottom overflow
-		cmdPaletteH := 0
-		var cmdPaletteStr string
-		if m.CurrentMode == viewmodel.ModeCommand {
-			cmdPaletteStr = modals.RenderCommandPalette(m, v.Theme)
-			cmdPaletteH = lipgloss.Height(cmdPaletteStr)
-		}
-
-		appContentHeight := m.Height - cmdPaletteH - 1
+		appContentHeight := m.Height - 1
 		if appContentHeight < 10 {
 			appContentHeight = 10
 		}
@@ -205,17 +197,14 @@ func (v *View) Render() string {
 
 		statusBarStr := modeStyle.Render(modeStr) + statusRendered + strings.Repeat(" ", paddingW) + syncStr
 		canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, statusBarStr)
-
-		// Command Palette overlaid below status bar
-		if m.CurrentMode == viewmodel.ModeCommand {
-			canvas = lipgloss.JoinVertical(lipgloss.Left, canvas, cmdPaletteStr)
-		}
 	}
 
 	// Centered floating modal over the full canvas
-	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeSprintForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.LogSessionPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen || m.JazzLoungeOpen || m.UpdatePromptOpen || m.CurrentMode == viewmodel.ModeTagsCRUD {
+	if m.WarningOpen || m.AuthNoticeOpen || m.CurrentMode == viewmodel.ModeForm || m.CurrentMode == viewmodel.ModeSprintForm || m.CurrentMode == viewmodel.ModeWorkspaceForm || m.CurrentMode == viewmodel.ModeWorkspacePicker || m.PromptOpen || m.ReviewOpen || m.HelpOpen || m.DetailOpen || m.ConfirmOpen || m.AnchorPromptOpen || m.LogSessionPromptOpen || m.CurrentMode == viewmodel.ModeProfileForm || m.CurrentMode == viewmodel.ModeSyncForm || m.SessionExpiryPromptOpen || m.JazzLoungeOpen || m.UpdatePromptOpen || m.CurrentMode == viewmodel.ModeTagsCRUD || m.CurrentMode == viewmodel.ModeCommand {
 		var modalStr string
 		switch {
+		case m.CurrentMode == viewmodel.ModeCommand:
+			modalStr = modals.RenderCommandPalette(m, v.Theme)
 		case m.WarningOpen:
 			modalStr = modals.RenderWarningModal(m, v.Theme)
 		case m.AuthNoticeOpen:
@@ -259,6 +248,12 @@ func (v *View) Render() string {
 		modalW := lipgloss.Width(modalStr)
 		modalH := lipgloss.Height(modalStr)
 		topPad := (m.Height - modalH) / 2
+		if m.CurrentMode == viewmodel.ModeCommand {
+			topPad = (m.Height - modalH) / 3
+			if topPad < 1 {
+				topPad = 1
+			}
+		}
 		leftPad := (m.Width - modalW) / 2
 		if topPad < 0 {
 			topPad = 0

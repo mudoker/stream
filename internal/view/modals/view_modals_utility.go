@@ -124,6 +124,9 @@ func RenderHelpModal(m *viewmodel.Model, t theme.Theme) string {
 	if visibleRows < 5 {
 		visibleRows = 5
 	}
+	if visibleRows > 18 {
+		visibleRows = 18
+	}
 
 	accent := lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#a6adc8"))
@@ -234,6 +237,7 @@ func RenderHelpModal(m *viewmodel.Model, t theme.Theme) string {
 	if offset < 0 {
 		offset = 0
 	}
+	m.HelpScrollOffset = offset
 
 	end := offset + visibleRows
 	if end > len(body) {

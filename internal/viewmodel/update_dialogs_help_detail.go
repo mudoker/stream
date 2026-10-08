@@ -11,32 +11,32 @@ import (
 func (m *Model) handleHelpAndDetailKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 	if m.HelpOpen {
 		switch msg.String() {
-		case "esc", "q", "?":
+		case "esc", "q", "?", "enter":
 			m.HelpOpen = false
 			m.HelpScrollOffset = 0
 			return true, nil
-		case "j", "down":
+		case "j", "down", "J":
 			m.HelpScrollOffset++
 			return true, nil
-		case "k", "up":
+		case "k", "up", "K":
 			if m.HelpScrollOffset > 0 {
 				m.HelpScrollOffset--
 			}
 			return true, nil
-		case "ctrl+d":
-			m.HelpScrollOffset += 5
+		case "ctrl+d", "d", "pgdown", "space":
+			m.HelpScrollOffset += 6
 			return true, nil
-		case "ctrl+u":
-			m.HelpScrollOffset -= 5
+		case "ctrl+u", "u", "pgup":
+			m.HelpScrollOffset -= 6
 			if m.HelpScrollOffset < 0 {
 				m.HelpScrollOffset = 0
 			}
 			return true, nil
-		case "g":
+		case "g", "home":
 			m.HelpScrollOffset = 0
 			return true, nil
-		case "G":
-			m.HelpScrollOffset = 9999
+		case "G", "end":
+			m.HelpScrollOffset = 100
 			return true, nil
 		}
 		return true, nil

@@ -8,8 +8,8 @@ func (m *Model) AdjustSelectionBeforeDeletion(uuid string) {
 		return
 	}
 
-	// 1. Check if the task is on the todo shelf
-	shelf := m.GetTodoShelfTasks()
+	// 1. Check if the task is on the todo shelf / backlog
+	shelf := m.GetCurrentShelfTasks()
 	idx := -1
 	for i, t := range shelf {
 		if t.UUID == uuid {

@@ -7,7 +7,7 @@ import (
 )
 
 func (m *Model) MoveTaskSelection(dir int) {
-	shelf := m.GetTodoShelfTasks()
+	shelf := m.GetCurrentShelfTasks()
 	if len(shelf) == 0 {
 		return
 	}
@@ -21,7 +21,11 @@ func (m *Model) MoveTaskSelection(dir int) {
 	}
 
 	if idx == -1 {
-		m.SelectedTaskUUID = shelf[0].UUID
+		if dir >= 0 {
+			m.SelectedTaskUUID = shelf[0].UUID
+		} else {
+			m.SelectedTaskUUID = shelf[len(shelf)-1].UUID
+		}
 		return
 	}
 
@@ -36,7 +40,7 @@ func (m *Model) MoveTaskSelection(dir int) {
 
 func (m *Model) selectDefaultTaskForSelectedDay() {
 	if m.TodoShelfFocus {
-		shelf := m.GetTodoShelfTasks()
+		shelf := m.GetCurrentShelfTasks()
 		if len(shelf) > 0 {
 			m.SelectedTaskUUID = shelf[0].UUID
 		} else {

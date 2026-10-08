@@ -573,3 +573,172 @@ func TestRecurringAndHabitShelfBehavior(t *testing.T) {
 	}
 }
 
+func TestGlobalBacklogMoveTaskSelection(t *testing.T) {
+	m := &viewmodel.Model{
+		CurrentView:      viewmodel.SprintView,
+		TodoShelfFocus:   true,
+		SelectedTaskUUID: "gb-1",
+		Tasks: []model.Task{
+			{
+				UUID:           "gb-1",
+				Title:          "Backlog Task 1",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "gb-2",
+				Title:          "Backlog Task 2",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "gb-3",
+				Title:          "Backlog Task 3",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateCompleted,
+			},
+		},
+	}
+
+	// 1. Move down from gb-1 -> gb-2
+	m.MoveTaskSelection(1)
+	if m.SelectedTaskUUID != "gb-2" {
+		t.Errorf("expected selection to move to gb-2, got %s", m.SelectedTaskUUID)
+	}
+
+	// 2. Move down from gb-2 -> gb-3 (completed)
+	m.MoveTaskSelection(1)
+	if m.SelectedTaskUUID != "gb-3" {
+		t.Errorf("expected selection to move to gb-3, got %s", m.SelectedTaskUUID)
+	}
+
+	// 3. Move down from gb-3 -> wrap to gb-1
+	m.MoveTaskSelection(1)
+	if m.SelectedTaskUUID != "gb-1" {
+		t.Errorf("expected selection to wrap to gb-1, got %s", m.SelectedTaskUUID)
+	}
+
+	// 4. Move up from gb-1 -> wrap to gb-3
+	m.MoveTaskSelection(-1)
+	if m.SelectedTaskUUID != "gb-3" {
+		t.Errorf("expected selection to wrap backwards to gb-3, got %s", m.SelectedTaskUUID)
+	}
+}
+
+func TestTodoShelfMoveShelfSectionJK(t *testing.T) {
+	now := time.Now()
+	m := &viewmodel.Model{
+		CurrentView:      viewmodel.DayView,
+		TodoShelfFocus:   true,
+		SelectedDay:      now,
+		SelectedTaskUUID: "rem-1",
+		Tasks: []model.Task{
+			{
+				UUID:           "rem-1",
+				Title:          "Reminder 1",
+				SchedulingType: model.Reminder,
+				LifecycleState: model.StateReady,
+				TimeWindow:     model.TimeWindow{Start: now},
+			},
+			{
+				UUID:           "rem-2",
+				Title:          "Reminder 2",
+				SchedulingType: model.Reminder,
+				LifecycleState: model.StateReady,
+				TimeWindow:     model.TimeWindow{Start: now.Add(time.Hour)},
+			},
+			// Habits empty!
+			{
+				UUID:           "back-1",
+				Title:          "Backlog 1",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "back-2",
+				Title:          "Backlog 2",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "comp-1",
+				Title:          "Completed 1",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateCompleted,
+			},
+		},
+	}
+
+	// 1. Initial selection is in Reminders (rem-1).
+	// Pressing J (MoveShelfSection(1)) should skip empty Habits and jump to Backlog (back-1)!
+	m.MoveShelfSection(1)
+	if m.SelectedTaskUUID != "back-1" {
+		t.Errorf("expected J to jump to back-1 (Backlog), got %s", m.SelectedTaskUUID)
+	}
+
+	// 2. Pressing J again should jump to Completed (comp-1)
+	m.MoveShelfSection(1)
+	if m.SelectedTaskUUID != "comp-1" {
+		t.Errorf("expected J to jump to comp-1 (Completed), got %s", m.SelectedTaskUUID)
+	}
+
+	// 3. Pressing J again should wrap to Reminders (rem-1)
+	m.MoveShelfSection(1)
+	if m.SelectedTaskUUID != "rem-1" {
+		t.Errorf("expected J to wrap back to rem-1 (Reminders), got %s", m.SelectedTaskUUID)
+	}
+
+	// 4. Pressing K (MoveShelfSection(-1)) should jump backwards to Completed (comp-1)
+	m.MoveShelfSection(-1)
+	if m.SelectedTaskUUID != "comp-1" {
+		t.Errorf("expected K to jump backwards to comp-1 (Completed), got %s", m.SelectedTaskUUID)
+	}
+
+	// 5. Pressing K again should jump backwards to Backlog (back-1)
+	m.MoveShelfSection(-1)
+	if m.SelectedTaskUUID != "back-1" {
+		t.Errorf("expected K to jump backwards to back-1 (Backlog), got %s", m.SelectedTaskUUID)
+	}
+}
+
+func TestGlobalBacklogMoveShelfSectionJK(t *testing.T) {
+	m := &viewmodel.Model{
+		CurrentView:      viewmodel.SprintView,
+		TodoShelfFocus:   true,
+		SelectedTaskUUID: "gb-back-1",
+		Tasks: []model.Task{
+			{
+				UUID:           "gb-back-1",
+				Title:          "Global Backlog 1",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateReady,
+			},
+			{
+				UUID:           "gb-comp-1",
+				Title:          "Global Completed 1",
+				SchedulingType: model.Floating,
+				LifecycleState: model.StateCompleted,
+			},
+		},
+	}
+
+	// J from Backlog -> Completed
+	m.MoveShelfSection(1)
+	if m.SelectedTaskUUID != "gb-comp-1" {
+		t.Errorf("expected J to jump to gb-comp-1, got %s", m.SelectedTaskUUID)
+	}
+
+	// J from Completed -> Backlog
+	m.MoveShelfSection(1)
+	if m.SelectedTaskUUID != "gb-back-1" {
+		t.Errorf("expected J to wrap back to gb-back-1, got %s", m.SelectedTaskUUID)
+	}
+
+	// K from Backlog -> Completed
+	m.MoveShelfSection(-1)
+	if m.SelectedTaskUUID != "gb-comp-1" {
+		t.Errorf("expected K to jump backwards to gb-comp-1, got %s", m.SelectedTaskUUID)
+	}
+}
+
+

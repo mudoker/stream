@@ -73,43 +73,13 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			keyStr = "enter"
 		}
 
-		// Handle Tab / Shift+Tab to switch focus between options list and buttons
-		if keyStr == "tab" {
-			m.ConfirmFocusArea = (m.ConfirmFocusArea + 1) % 3
+		// Handle key navigation between options
+		if keyStr == "j" || keyStr == "down" || keyStr == "l" || keyStr == "right" || keyStr == "tab" {
+			m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex + 1) % numOpts
 			return true, nil
-		} else if keyStr == "shift+tab" {
-			m.ConfirmFocusArea = (m.ConfirmFocusArea - 1 + 3) % 3
+		} else if keyStr == "k" || keyStr == "up" || keyStr == "h" || keyStr == "left" || keyStr == "shift+tab" {
+			m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex - 1 + numOpts) % numOpts
 			return true, nil
-		}
-
-		// Handle key navigation based on focus area
-		if m.ConfirmFocusArea == 0 {
-			if keyStr == "j" || keyStr == "down" || keyStr == "l" || keyStr == "right" {
-				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex + 1) % numOpts
-				return true, nil
-			} else if keyStr == "k" || keyStr == "up" || keyStr == "h" || keyStr == "left" {
-				m.ConfirmSelectedIndex = (m.ConfirmSelectedIndex - 1 + numOpts) % numOpts
-				return true, nil
-			}
-		} else {
-			// Area 1 (Confirm) or Area 2 (Cancel)
-			if keyStr == "h" || keyStr == "left" {
-				m.ConfirmFocusArea = 1
-				return true, nil
-			} else if keyStr == "l" || keyStr == "right" {
-				m.ConfirmFocusArea = 2
-				return true, nil
-			} else if keyStr == "j" || keyStr == "down" || keyStr == "k" || keyStr == "up" {
-				// Scoped to action buttons section, ignore vertical navigation across sections
-				return true, nil
-			}
-		}
-
-		if keyStr == "enter" {
-			if m.ConfirmFocusArea == 2 {
-				// Cancel button selected: treat like esc/cancel
-				keyStr = "esc"
-			}
 		}
 
 		if keyStr == "enter" {

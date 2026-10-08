@@ -262,7 +262,7 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			itemTypeName = string(m.ConfirmTask.WorkItemType)
 		}
 		return components.RenderBaseConfirmModal(
-			"⚡ CREATE TASK FOR "+strings.ToUpper(itemTypeName),
+			"CREATE TASK FOR "+strings.ToUpper(itemTypeName),
 			[]string{
 				fmt.Sprintf("Create a corresponding task for %s:", strings.ToLower(itemTypeName)),
 				fmt.Sprintf("  \"%s\"?", featName),

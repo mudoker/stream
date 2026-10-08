@@ -141,39 +141,18 @@ func RenderBaseConfirmModal(title string, descLines []string, options []string, 
 			if idx == destructiveIdx {
 				color = t.P0Color
 			}
-			if focusArea == 0 {
-				optStr = lipgloss.NewStyle().Foreground(color).Bold(true).Render("  ▶ " + opt + " ◀")
-			} else {
-				optStr = lipgloss.NewStyle().Foreground(color).Render("  ◦ " + opt)
-			}
+			optStr = lipgloss.NewStyle().Foreground(color).Bold(true).Render("  ▶ " + opt + " ◀")
 		} else {
 			optStr = lipgloss.NewStyle().Foreground(t.Muted).Render("    " + opt)
 		}
 		bodyLines = append(bodyLines, optStr)
 	}
 
-	var buttons []string
-	if focusArea == 0 {
-		buttons = []string{
-			lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  "),
-			lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  "),
-		}
-	} else if focusArea == 1 {
-		buttons = []string{
-			lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render("▶ Confirm ◀"),
-			lipgloss.NewStyle().Foreground(t.Muted).Render("  Cancel  "),
-		}
-	} else {
-		buttons = []string{
-			lipgloss.NewStyle().Foreground(t.Accent).Render("  Confirm  "),
-			lipgloss.NewStyle().Foreground(t.P0Color).Bold(true).Render("▶ Cancel ◀"),
-		}
-	}
-
 	return RenderBaseModal(BaseModalConfig{
 		Title:      title,
 		BodyLines:  bodyLines,
-		Buttons:    buttons,
+		Buttons:    nil, // Options in body are the direct actionable choices
+		FooterText: lipgloss.NewStyle().Foreground(t.Muted).Render("↵ Select • esc Cancel • j/k Navigate"),
 		InnerWidth: innerW,
 		Theme:      t,
 	})

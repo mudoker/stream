@@ -771,7 +771,7 @@ func TestSprintViewFullHorizontalFill(t *testing.T) {
 	defer cleanup()
 
 	m := viewmodel.NewModel(database, nil)
-	m.Layout = viewmodel.ComputeLayout(160, 40)
+	m.Layout = viewmodel.ComputeLayout(200, 40)
 	m.CurrentView = viewmodel.SprintView
 
 	th := theme.NewTheme()

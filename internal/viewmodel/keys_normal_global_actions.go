@@ -53,7 +53,10 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		return true, nil
 	case "i":
 		m.CurrentMode = ModeForm
+		m.IsEditing = false
+		m.EditingTaskUUID = ""
 		m.Form = NewTaskFormWithDate(m.SelectedDay)
+		m.Form.IsEditing = false
 		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
 			m.Form.TaskTypeIdx = 0 // Feature
 			m.Form.StatusIdx = m.SprintSwimlaneIdx

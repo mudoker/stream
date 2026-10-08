@@ -108,11 +108,11 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 
 	// ── 2. Swimlane Columns with Horizontal Scrolling ──────────────────
 	availW := workspaceW - 2
-	if availW < 16 {
-		availW = 16
+	if availW < 20 {
+		availW = 20
 	}
 	numCols := 5
-	minColW := 16 // Comfortable minimum swimlane width before horizontal scrolling kicks in
+	minColW := 20 // 1.25x wider minimum swimlane width
 
 	visibleCols := (availW + 1) / (minColW + 1)
 	if visibleCols < 1 {
@@ -147,17 +147,16 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	type laneDef struct {
 		name      string
 		shortName string
-		icon      string
 		tasks     []model.Task
 		color     lipgloss.Color
 	}
 
 	swimlanes := []laneDef{
-		{name: "DEFINED", shortName: "DEF", icon: "📋", tasks: defined, color: lipgloss.Color("#b4befe")},
-		{name: "IN PROGRESS", shortName: "IN PROG", icon: "⚡", tasks: inProgress, color: lipgloss.Color("#f9e2af")},
-		{name: "REVIEW", shortName: "REV", icon: "🔍", tasks: review, color: lipgloss.Color("#89dceb")},
-		{name: "TESTING", shortName: "TEST", icon: "🧪", tasks: testing, color: lipgloss.Color("#cba6f7")},
-		{name: "COMPLETED", shortName: "DONE", icon: "✓", tasks: completed, color: lipgloss.Color("#a6e3a1")},
+		{name: "DEFINED", shortName: "DEF", tasks: defined, color: lipgloss.Color("#b4befe")},
+		{name: "IN PROGRESS", shortName: "IN PROG", tasks: inProgress, color: lipgloss.Color("#f9e2af")},
+		{name: "REVIEW", shortName: "REV", tasks: review, color: lipgloss.Color("#89dceb")},
+		{name: "TESTING", shortName: "TEST", tasks: testing, color: lipgloss.Color("#cba6f7")},
+		{name: "COMPLETED", shortName: "DONE", tasks: completed, color: lipgloss.Color("#a6e3a1")},
 	}
 
 	var renderedColumns []string
@@ -179,7 +178,7 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 			laneSP += task.StoryPoints
 		}
 
-		headerTitle := formatSprintHeader(lane.icon, lane.name, lane.shortName, len(lane.tasks), laneSP, colWidth)
+		headerTitle := formatSprintHeader(lane.name, lane.shortName, len(lane.tasks), laneSP, colWidth)
 
 		var headerStyle lipgloss.Style
 		var colSepColor lipgloss.Color
@@ -221,7 +220,6 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 				if isSelected {
 					selectedCardEnd = len(allCardLines)
 				}
-				allCardLines = append(allCardLines, "") // card spacing
 			}
 		}
 
@@ -313,27 +311,29 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	return strings.Join(fullView, "\n")
 }
 
-func formatSprintHeader(icon, name, shortName string, count int, sp int, maxW int) string {
+func formatSprintHeader(name, shortName string, count int, sp int, maxW int) string {
 	// Level 1: Full name + count + SP
-	opt1 := fmt.Sprintf("%s %s (%d • %d SP)", icon, name, count, sp)
-	if lipgloss.Width(opt1) <= maxW {
-		return opt1
+	if sp > 0 {
+		opt1 := fmt.Sprintf("%s (%d • %d SP)", name, count, sp)
+		if lipgloss.Width(opt1) <= maxW {
+			return opt1
+		}
 	}
 
 	// Level 2: Full name + count
-	opt2 := fmt.Sprintf("%s %s (%d)", icon, name, count)
+	opt2 := fmt.Sprintf("%s (%d)", name, count)
 	if lipgloss.Width(opt2) <= maxW {
 		return opt2
 	}
 
 	// Level 3: Short name + count
-	opt3 := fmt.Sprintf("%s %s (%d)", icon, shortName, count)
+	opt3 := fmt.Sprintf("%s (%d)", shortName, count)
 	if lipgloss.Width(opt3) <= maxW {
 		return opt3
 	}
 
 	// Level 4: Short name only
-	opt4 := fmt.Sprintf("%s %s", icon, shortName)
+	opt4 := shortName
 	if lipgloss.Width(opt4) <= maxW {
 		return opt4
 	}
@@ -346,19 +346,22 @@ func formatSprintHeader(icon, name, shortName string, count int, sp int, maxW in
 		}
 		return opt4
 	}
-	return icon
+	if len(name) > 0 {
+		return string([]rune(name)[:1])
+	}
+	return ""
 }
 
-func getWorkItemTypeDetails(itemType model.WorkItemType) (icon string, label string, color lipgloss.Color) {
+func getWorkItemTypeDetails(itemType model.WorkItemType) (label string, color lipgloss.Color) {
 	switch itemType {
 	case model.WorkItemDefect:
-		return "🐞", "Defect", lipgloss.Color("#f38ba8")
+		return "Defect", lipgloss.Color("#f38ba8")
 	case model.WorkItemImprovement:
-		return "⚡", "Improvement", lipgloss.Color("#fab387")
+		return "Improvement", lipgloss.Color("#fab387")
 	case model.WorkItemTask:
-		return "📋", "Task", lipgloss.Color("#b4befe")
+		return "Task", lipgloss.Color("#b4befe")
 	default:
-		return "✨", "Feature", lipgloss.Color("#89dceb")
+		return "Feature", lipgloss.Color("#89dceb")
 	}
 }
 
@@ -368,7 +371,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		innerW = 10
 	}
 
-	typeIcon, typeLabel, typeColor := getWorkItemTypeDetails(task.WorkItemType)
+	typeLabel, typeColor := getWorkItemTypeDetails(task.WorkItemType)
 	pColor := t.PriorityColor(task.Priority)
 	isDone := task.LifecycleState == model.StateCompleted
 
@@ -402,13 +405,12 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		idStr = "FEAT"
 	}
 
-	// Line 1: [ID] Icon Type • Priority • SP
-	opt1 := fmt.Sprintf("%s[%s] %s %s • %s • %d SP", cursor, idStr, typeIcon, typeLabel, task.Priority, task.StoryPoints)
-	opt2 := fmt.Sprintf("%s[%s] %s %s • %s", cursor, idStr, typeIcon, typeLabel, task.Priority)
-	opt3 := fmt.Sprintf("%s[%s] %s %s", cursor, idStr, typeIcon, typeLabel)
-	opt4 := fmt.Sprintf("%s[%s] %s • %s", cursor, idStr, typeIcon, task.Priority)
-	opt5 := fmt.Sprintf("%s[%s] %s", cursor, idStr, typeIcon)
-	opt6 := fmt.Sprintf("%s[%s]", cursor, idStr)
+	// Line 1: [ID] Type • Priority • SP
+	opt1 := fmt.Sprintf("%s[%s] %s • %s • %d SP", cursor, idStr, typeLabel, task.Priority, task.StoryPoints)
+	opt2 := fmt.Sprintf("%s[%s] %s • %s", cursor, idStr, typeLabel, task.Priority)
+	opt3 := fmt.Sprintf("%s[%s] %s", cursor, idStr, typeLabel)
+	opt4 := fmt.Sprintf("%s[%s] %s", cursor, idStr, task.Priority)
+	opt5 := fmt.Sprintf("%s[%s]", cursor, idStr)
 
 	var topLine string
 	if task.StoryPoints > 0 && lipgloss.Width(opt1) <= innerW {
@@ -419,10 +421,8 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		topLine = opt3
 	} else if lipgloss.Width(opt4) <= innerW {
 		topLine = opt4
-	} else if lipgloss.Width(opt5) <= innerW {
-		topLine = opt5
 	} else {
-		topLine = opt6
+		topLine = opt5
 	}
 
 	// Line 2: Title
@@ -444,42 +444,6 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 	titleLine := "  " + chk + " " + title
 
-	// Line 3: Tags
-	var tagLine string
-	if len(task.Tags) > 0 {
-		tagStr := strings.Join(task.Tags, ", ")
-		maxTagW := innerW - 4
-		if maxTagW < 4 {
-			maxTagW = 4
-		}
-		if lipgloss.Width(tagStr) > maxTagW {
-			runes := []rune(tagStr)
-			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxTagW {
-				runes = runes[:len(runes)-1]
-			}
-			tagStr = string(runes) + "…"
-		}
-		tagLine = "  🏷 " + tagStr
-	}
-
-	// Line 4: Description preview
-	var descLine string
-	if strings.TrimSpace(task.Description) != "" {
-		desc := strings.TrimSpace(task.Description)
-		maxDescW := innerW - 4
-		if maxDescW < 4 {
-			maxDescW = 4
-		}
-		if lipgloss.Width(desc) > maxDescW {
-			runes := []rune(desc)
-			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxDescW {
-				runes = runes[:len(runes)-1]
-			}
-			desc = string(runes) + "…"
-		}
-		descLine = "  " + desc
-	}
-
 	// Card content rows
 	var cardLines []string
 	topStyle := lipgloss.NewStyle().Foreground(typeColor).Bold(true)
@@ -494,22 +458,58 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 	cardLines = append(cardLines, titleStyle.Render(titleLine))
 
-	// Dynamic height proportional to type and priority / story points:
-	// Defect / P0 / P1 / SP >= 5: 4 content rows
-	// Others: 3 content rows
-	targetContentHeight := 3
-	if task.WorkItemType == model.WorkItemDefect || task.Priority == model.P0 || task.Priority == model.P1 || task.StoryPoints >= 5 {
-		targetContentHeight = 4
-		if descLine != "" {
-			cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(descLine))
+	// Optional Line 3: Blocked By or Linked Feature
+	if task.BlockedBy != "" {
+		blockedStr := fmt.Sprintf("  Blocked: %s", task.BlockedBy)
+		if lipgloss.Width(blockedStr) > innerW {
+			runes := []rune(blockedStr)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > innerW {
+				runes = runes[:len(runes)-1]
+			}
+			blockedStr = string(runes) + "…"
 		}
-	}
-	if tagLine != "" && len(cardLines) < targetContentHeight {
-		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(tagLine))
+		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8")).Render(blockedStr))
+	} else if task.LinkedFeatureID != "" {
+		linkStr := fmt.Sprintf("  Link: %s", task.LinkedFeatureID)
+		if lipgloss.Width(linkStr) > innerW {
+			runes := []rune(linkStr)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > innerW {
+				runes = runes[:len(runes)-1]
+			}
+			linkStr = string(runes) + "…"
+		}
+		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(lipgloss.Color("#89b4fa")).Render(linkStr))
 	}
 
-	for len(cardLines) < targetContentHeight {
-		cardLines = append(cardLines, "")
+	// Optional Line 4: Tags
+	if len(task.Tags) > 0 {
+		tagStr := strings.Join(task.Tags, ", ")
+		maxTagW := innerW - 4
+		if maxTagW < 4 {
+			maxTagW = 4
+		}
+		if lipgloss.Width(tagStr) > maxTagW {
+			runes := []rune(tagStr)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxTagW {
+				runes = runes[:len(runes)-1]
+			}
+			tagStr = string(runes) + "…"
+		}
+		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render("  # "+tagStr))
+	} else if strings.TrimSpace(task.Description) != "" {
+		desc := strings.TrimSpace(task.Description)
+		maxDescW := innerW - 4
+		if maxDescW < 4 {
+			maxDescW = 4
+		}
+		if lipgloss.Width(desc) > maxDescW {
+			runes := []rune(desc)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxDescW {
+				runes = runes[:len(runes)-1]
+			}
+			desc = string(runes) + "…"
+		}
+		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render("  "+desc))
 	}
 
 	content := strings.Join(cardLines, "\n")

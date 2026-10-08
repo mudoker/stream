@@ -9,6 +9,8 @@ import (
 	"stream/internal/model"
 	"stream/internal/sync"
 	"stream/internal/viewmodel"
+	"stream/internal/view/modals"
+	"stream/internal/view/theme"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -931,5 +933,113 @@ func TestFormPrepopulateSelectedDay(t *testing.T) {
 	startTimeVal := m.Form.StartTimeInput.Value()
 	if len(startTimeVal) != 5 || startTimeVal[2] != ':' {
 		t.Errorf("expected StartTimeInput to be a valid HH:MM string, got %q", startTimeVal)
+	}
+}
+
+func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+	syncEngine, err := sync.NewSyncEngine(database, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+
+	// 1. Verify defaults
+	form := viewmodel.NewTaskForm()
+	if form.IsAnchoredIdx != 0 {
+		t.Fatalf("expected default IsAnchoredIdx to be 0 (No), got %d", form.IsAnchoredIdx)
+	}
+	if form.LinkSprintIdx != 0 {
+		t.Fatalf("expected default LinkSprintIdx to be 0 (No), got %d", form.LinkSprintIdx)
+	}
+
+	// 2. Add a sprint to DB
+	sprints := database.GetSprints()
+	if len(sprints) == 0 {
+		t.Fatalf("expected default sprint in database")
+	}
+	activeSprint := sprints[0]
+	m.ActiveSprintUUID = activeSprint.UUID
+
+	// 3. Create Feature on Sprint View
+	m.CurrentMode = viewmodel.ModeForm
+	m.Form = viewmodel.NewFeatureForm()
+	m.Form.TitleInput.SetValue("User Auth Module")
+	m.Form.WorkItemTypeIdx = 0 // Feature
+	m.SubmitForm()
+
+	tasks := database.GetTasks()
+	var createdFeature *model.Task
+	for _, tk := range tasks {
+		if tk.Title == "User Auth Module" {
+			tCopy := tk
+			createdFeature = &tCopy
+			break
+		}
+	}
+	if createdFeature == nil {
+		t.Fatalf("expected feature 'User Auth Module' to be created")
+	}
+	if createdFeature.SprintUUID != activeSprint.UUID {
+		t.Fatalf("expected feature to have SprintUUID %s, got %s", activeSprint.UUID, createdFeature.SprintUUID)
+	}
+	if createdFeature.WorkItemType != model.WorkItemFeature {
+		t.Fatalf("expected WorkItemType Feature, got %s", createdFeature.WorkItemType)
+	}
+	if createdFeature.ID != "FEAT-1" {
+		t.Fatalf("expected concise ID 'FEAT-1', got %s", createdFeature.ID)
+	}
+
+	// 4. Create Task linked to Feature
+	m.CurrentMode = viewmodel.ModeForm
+	m.Form = viewmodel.NewTaskForm()
+	m.PopulateFormAvailableFeatures()
+	m.Form.TitleInput.SetValue("Implement Login endpoint")
+	m.Form.LinkedFeatureIdx = 1 // Link to FEAT-1
+	m.SubmitForm()
+
+	tasks = database.GetTasks()
+	var createdTask *model.Task
+	for _, tk := range tasks {
+		if tk.Title == "Implement Login endpoint" {
+			tCopy := tk
+			createdTask = &tCopy
+			break
+		}
+	}
+	if createdTask == nil {
+		t.Fatalf("expected task 'Implement Login endpoint' to be created")
+	}
+	if createdTask.LinkedFeatureID != "FEAT-1" {
+		t.Fatalf("expected task LinkedFeatureID 'FEAT-1', got %s", createdTask.LinkedFeatureID)
+	}
+
+	// 5. Test Modal Rendering for Feature Form
+	th := theme.NewTheme()
+	featForm := viewmodel.NewFeatureForm()
+	m.Form = featForm
+	renderedFeat := modals.RenderFormModal(&m, th)
+	if !strings.Contains(renderedFeat, "Create Feature") {
+		t.Fatalf("expected modal to contain 'Create Feature', got: %s", renderedFeat)
+	}
+	if strings.Contains(renderedFeat, "Start Time") || strings.Contains(renderedFeat, "Is Recurring") {
+		t.Fatalf("feature form should not have Start Time or Is Recurring, got: %s", renderedFeat)
+	}
+
+	// 6. Test Modal Rendering for Task Form
+	taskForm := viewmodel.NewTaskForm()
+	m.Form = taskForm
+	m.PopulateFormAvailableFeatures()
+	renderedTask := modals.RenderFormModal(&m, th)
+	if !strings.Contains(renderedTask, "Create Task") {
+		t.Fatalf("expected modal to contain 'Create Task', got: %s", renderedTask)
+	}
+	if !strings.Contains(renderedTask, "Link to Feature") {
+		t.Fatalf("expected task modal to contain 'Link to Feature', got: %s", renderedTask)
 	}
 }

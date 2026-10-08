@@ -19,7 +19,12 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 
 	var fields []string
 	headerText := "Create Task"
-	if m.IsEditing {
+	if f.IsFeatureMode {
+		headerText = "Create Feature"
+		if m.IsEditing {
+			headerText = "Edit Feature"
+		}
+	} else if m.IsEditing {
 		headerText = "Edit Task"
 	}
 	title := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(headerText)
@@ -51,6 +56,9 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Title", f.TitleInput.View(), f.ActiveField == 0, t))
 		case 1:
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Description", f.DescInput.View(), f.ActiveField == 1, t))
+		case 19:
+			wiTypeStr := viewmodel.WorkItemTypeOptions[f.WorkItemTypeIdx]
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Type", wiTypeStr, f.ActiveField == 19, t))
 		case 2:
 			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Priority", priorityValStr, f.ActiveField == 2, t))
 		case 3:
@@ -89,6 +97,13 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Location", f.LocationInput.View(), f.ActiveField == 7, t))
 		case 8:
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Commute buffer (m)", f.CommuteInput.View(), f.ActiveField == 8, t))
+		case 20:
+			featOptStr := "None"
+			if f.LinkedFeatureIdx > 0 && f.LinkedFeatureIdx <= len(f.AvailableFeatures) {
+				feat := f.AvailableFeatures[f.LinkedFeatureIdx-1]
+				featOptStr = fmt.Sprintf("[%s] %s", feat.ID, feat.Title)
+			}
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Link to Feature", featOptStr, f.ActiveField == 20, t))
 		case 11:
 			recOptStr := "No"
 			if f.IsRecurringIdx == 1 {
@@ -99,6 +114,17 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "End Date", f.RecurringEndDateInput.View(), f.ActiveField == 12, t))
 		case 13:
 			fields = append(fields, components.RenderDaysSelect(nextFieldNum(), "Recurring Days", f.RecurringDaysSelected[:], f.RecurringDaysSubIdx, f.ActiveField == 13, t))
+		case 18:
+			sprintOptStr := "No"
+			if f.LinkSprintIdx == 1 {
+				activeSprint, ok := m.GetActiveSprint()
+				if ok && activeSprint.Name != "" {
+					sprintOptStr = fmt.Sprintf("Yes (%s)", activeSprint.Name)
+				} else {
+					sprintOptStr = "Yes"
+				}
+			}
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Link to Sprint", sprintOptStr, f.ActiveField == 18, t))
 		case 9:
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Tags (csv)", tagsView, f.ActiveField == 9, t))
 		}

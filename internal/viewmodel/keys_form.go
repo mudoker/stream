@@ -14,6 +14,7 @@ import (
 
 var PriorityOptions = []string{"0 (Critical)", "1 (High)", "2 (Medium)", "3 (Low)"}
 var TaskTypeOptions = []string{"Task", "Reminder", "Habit", "Event"}
+var WorkItemTypeOptions = []string{"Feature", "Defect", "Improvement", "Task"}
 var SPOptions = []int{0, 1, 2, 3, 5, 8, 13}
 
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -73,6 +74,16 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 17:
 			m.Form.IsAllDayIdx = (m.Form.IsAllDayIdx - 1 + 2) % 2
 			return m, nil
+		case 18:
+			m.Form.LinkSprintIdx = (m.Form.LinkSprintIdx - 1 + 2) % 2
+			return m, nil
+		case 19:
+			m.Form.WorkItemTypeIdx = (m.Form.WorkItemTypeIdx - 1 + len(WorkItemTypeOptions)) % len(WorkItemTypeOptions)
+			return m, nil
+		case 20:
+			totalFeatOpts := len(m.Form.AvailableFeatures) + 1
+			m.Form.LinkedFeatureIdx = (m.Form.LinkedFeatureIdx - 1 + totalFeatOpts) % totalFeatOpts
+			return m, nil
 		}
 	case "right":
 		switch m.Form.ActiveField {
@@ -102,6 +113,16 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 17:
 			m.Form.IsAllDayIdx = (m.Form.IsAllDayIdx + 1) % 2
 			return m, nil
+		case 18:
+			m.Form.LinkSprintIdx = (m.Form.LinkSprintIdx + 1) % 2
+			return m, nil
+		case 19:
+			m.Form.WorkItemTypeIdx = (m.Form.WorkItemTypeIdx + 1) % len(WorkItemTypeOptions)
+			return m, nil
+		case 20:
+			totalFeatOpts := len(m.Form.AvailableFeatures) + 1
+			m.Form.LinkedFeatureIdx = (m.Form.LinkedFeatureIdx + 1) % totalFeatOpts
+			return m, nil
 		}
 	case " ":
 		switch m.Form.ActiveField {
@@ -126,6 +147,16 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case 17:
 			m.Form.IsAllDayIdx = (m.Form.IsAllDayIdx + 1) % 2
+			return m, nil
+		case 18:
+			m.Form.LinkSprintIdx = (m.Form.LinkSprintIdx + 1) % 2
+			return m, nil
+		case 19:
+			m.Form.WorkItemTypeIdx = (m.Form.WorkItemTypeIdx + 1) % len(WorkItemTypeOptions)
+			return m, nil
+		case 20:
+			totalFeatOpts := len(m.Form.AvailableFeatures) + 1
+			m.Form.LinkedFeatureIdx = (m.Form.LinkedFeatureIdx + 1) % totalFeatOpts
 			return m, nil
 		}
 	case "enter":
@@ -337,34 +368,76 @@ func (m *Model) SubmitForm() {
 		newTask.GCalMetadata = existingTask.GCalMetadata
 		newTask.Notes = existingTask.Notes
 		newTask.RecurringParentUUID = existingTask.RecurringParentUUID
+		newTask.ID = existingTask.ID
+		newTask.WorkItemType = existingTask.WorkItemType
+		newTask.LinkedFeatureID = existingTask.LinkedFeatureID
 	}
 
-	if taskType == 0 {
-		if m.Form.IsAnchoredIdx == 1 {
-			newTask.SchedulingType = model.Anchored
-			newTask.TimeWindow = model.TimeWindow{
-				Start: startTime,
-				End:   startTime.Add(time.Duration(duration) * time.Minute),
-			}
-			if isEdit && existingTask.LifecycleState == model.StateCompleted {
-				newTask.LifecycleState = model.StateCompleted
-			} else {
-				newTask.LifecycleState = model.StateScheduled
+	if m.Form.IsFeatureMode {
+		itemType := model.WorkItemType(WorkItemTypeOptions[m.Form.WorkItemTypeIdx])
+		newTask.WorkItemType = itemType
+		if isEdit && existingTask.ID != "" {
+			newTask.ID = existingTask.ID
+		} else {
+			newTask.ID = GenerateWorkItemID(itemType, m.Tasks)
+		}
+		if activeSprint, ok := m.GetActiveSprint(); ok {
+			newTask.SprintUUID = activeSprint.UUID
+		}
+		newTask.SchedulingType = model.Floating
+		newTask.TimeWindow = model.TimeWindow{}
+		newTask.EstimatedDurationMins = 0
+		newTask.StoryPoints = spVal
+		if isEdit && existingTask.LifecycleState == model.StateCompleted {
+			newTask.LifecycleState = model.StateCompleted
+		} else if isEdit && existingTask.LifecycleState != "" {
+			newTask.LifecycleState = existingTask.LifecycleState
+		} else {
+			newTask.LifecycleState = model.StateReady
+		}
+	} else {
+		if m.Form.LinkedFeatureIdx > 0 && m.Form.LinkedFeatureIdx <= len(m.Form.AvailableFeatures) {
+			newTask.LinkedFeatureID = m.Form.AvailableFeatures[m.Form.LinkedFeatureIdx-1].ID
+		} else {
+			newTask.LinkedFeatureID = ""
+		}
+
+		if m.Form.LinkSprintIdx == 1 {
+			if isEdit && existingTask.SprintUUID != "" {
+				newTask.SprintUUID = existingTask.SprintUUID
+			} else if activeSprint, ok := m.GetActiveSprint(); ok {
+				newTask.SprintUUID = activeSprint.UUID
 			}
 		} else {
-			newTask.SchedulingType = model.Floating
-			newTask.StoryPoints = spVal
-			durStr := m.Form.DurationInput.Value()
-			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
-				newTask.EstimatedDurationMins = d
-			}
-			if isEdit && existingTask.LifecycleState == model.StateCompleted {
-				newTask.LifecycleState = model.StateCompleted
-			} else {
-				newTask.LifecycleState = model.StateReady
-			}
+			newTask.SprintUUID = ""
 		}
-	} else if taskType == 3 {
+
+		if taskType == 0 {
+			if m.Form.IsAnchoredIdx == 1 {
+				newTask.SchedulingType = model.Anchored
+				newTask.TimeWindow = model.TimeWindow{
+					Start: startTime,
+					End:   startTime.Add(time.Duration(duration) * time.Minute),
+				}
+				if isEdit && existingTask.LifecycleState == model.StateCompleted {
+					newTask.LifecycleState = model.StateCompleted
+				} else {
+					newTask.LifecycleState = model.StateScheduled
+				}
+			} else {
+				newTask.SchedulingType = model.Floating
+				newTask.StoryPoints = spVal
+				durStr := m.Form.DurationInput.Value()
+				if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+					newTask.EstimatedDurationMins = d
+				}
+				if isEdit && existingTask.LifecycleState == model.StateCompleted {
+					newTask.LifecycleState = model.StateCompleted
+				} else {
+					newTask.LifecycleState = model.StateReady
+				}
+			}
+		} else if taskType == 3 {
 		newTask.SchedulingType = model.Event
 		newTask.StoryPoints = 0
 		newTask.IsAllDay = m.Form.IsAllDayIdx == 1
@@ -450,6 +523,7 @@ func (m *Model) SubmitForm() {
 			newTask.LifecycleState = model.StateReady
 		}
 	}
+}
 
 	// Check for new tags
 	var newTags []string

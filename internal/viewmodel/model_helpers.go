@@ -106,6 +106,20 @@ func (m *Model) GetActiveSprint() (model.Sprint, bool) {
 	return model.Sprint{}, false
 }
 
+func (m *Model) GetFeatures() []model.Task {
+	var feats []model.Task
+	for _, t := range m.Tasks {
+		if t.WorkItemType != "" || t.SprintUUID != "" || strings.HasPrefix(t.ID, "FEAT-") || strings.HasPrefix(t.ID, "DEF-") || strings.HasPrefix(t.ID, "IMP-") || strings.HasPrefix(t.ID, "TASK-") {
+			feats = append(feats, t)
+		}
+	}
+	return feats
+}
+
+func (m *Model) PopulateFormAvailableFeatures() {
+	m.Form.AvailableFeatures = m.GetFeatures()
+}
+
 func (m *Model) DeleteSprint(uuid string) {
 	if m.DB != nil {
 		m.DB.DeleteSprint(uuid)

@@ -8,6 +8,10 @@ import (
 	"stream/internal/model"
 )
 
+func (m *Model) StartEditMode(task model.Task) {
+	m.startEditMode(task)
+}
+
 func (m *Model) startEditMode(task model.Task) {
 	m.IsEditing = true
 	m.Form.IsEditing = true
@@ -107,6 +111,32 @@ func (m *Model) startEditMode(task model.Task) {
 	}
 
 	m.Form.TagsInput.SetValue(strings.Join(task.Tags, ", "))
+
+	m.Form.IsFeatureMode = (task.WorkItemType != "" || m.CurrentView == SprintView)
+	m.Form.WorkItemTypeIdx = 0
+	for idx, opt := range WorkItemTypeOptions {
+		if string(task.WorkItemType) == opt {
+			m.Form.WorkItemTypeIdx = idx
+			break
+		}
+	}
+
+	m.PopulateFormAvailableFeatures()
+	m.Form.LinkedFeatureIdx = 0
+	if task.LinkedFeatureID != "" {
+		for idx, f := range m.Form.AvailableFeatures {
+			if f.ID == task.LinkedFeatureID {
+				m.Form.LinkedFeatureIdx = idx + 1
+				break
+			}
+		}
+	}
+
+	if task.SprintUUID != "" {
+		m.Form.LinkSprintIdx = 1
+	} else {
+		m.Form.LinkSprintIdx = 0
+	}
 
 	// Reset recurring form fields first
 	m.Form.IsRecurringIdx = 0

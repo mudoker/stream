@@ -781,5 +781,67 @@ func TestSprintDeleteFocusIsolationAndConfirmation(t *testing.T) {
 	}
 }
 
+func TestSprintViewWorkItemCardRendering(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	if len(sprints) == 0 {
+		t.Fatal("expected at least one sprint")
+	}
+	sprint := sprints[0]
+
+	// Create a Feature, a Defect, and an Improvement
+	feat := model.Task{
+		UUID:          uuid.New().String(),
+		ID:            "FEAT-1",
+		WorkItemType:  model.WorkItemFeature,
+		Title:         "OAuth Login Support",
+		Priority:      model.P1,
+		StoryPoints:   5,
+		SprintUUID:    sprint.UUID,
+		LifecycleState: model.StateReady,
+		SchedulingType: model.Floating,
+	}
+	def := model.Task{
+		UUID:          uuid.New().String(),
+		ID:            "DEF-1",
+		WorkItemType:  model.WorkItemDefect,
+		Title:         "Crash on large payload",
+		Priority:      model.P0,
+		StoryPoints:   3,
+		SprintUUID:    sprint.UUID,
+		LifecycleState: model.StateActive,
+		SchedulingType: model.Floating,
+	}
+
+	database.AddTask(feat)
+	database.AddTask(def)
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+	m.Layout.TimelineW = 140
+
+	th := theme.NewTheme()
+	rendered := pages.RenderSprintView(&m, th, 30)
+
+	if !strings.Contains(rendered, "FEAT-1") {
+		t.Fatalf("expected sprint view to contain 'FEAT-1', got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "DEF-1") {
+		t.Fatalf("expected sprint view to contain 'DEF-1', got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "Defect") {
+		t.Fatalf("expected sprint view to contain 'Defect', got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "Feature") {
+		t.Fatalf("expected sprint view to contain 'Feature', got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "Features") {
+		t.Fatalf("expected sprint view to contain 'Features' metric, got:\n%s", rendered)
+	}
+}
+
 
 

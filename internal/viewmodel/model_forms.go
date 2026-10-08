@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"stream/internal/model"
+
 	"github.com/charmbracelet/bubbles/textinput"
 )
 
@@ -18,10 +20,15 @@ type TaskForm struct {
 	TaskTypeIdx           int // 0: Task, 1: Reminder, 2: Habit, 3: Event
 	IsAnchoredIdx         int // 0: No, 1: Yes
 	IsAllDayIdx           int // 0: No, 1: Yes
+	LinkSprintIdx         int // 0: No, 1: Yes
+	IsFeatureMode         bool
+	WorkItemTypeIdx       int // 0: Feature, 1: Defect, 2: Improvement, 3: Task
+	LinkedFeatureIdx      int // 0: None, 1..N: index into AvailableFeatures
+	AvailableFeatures     []model.Task
 	StartHour             int
 	StartMin              int
 	DurationMins          int
-	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days, 14: Start Date, 15: End Date, 16: Is Anchored, 17: Is All Day
+	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days, 14: Start Date, 15: End Date, 16: Is Anchored, 17: Is All Day, 18: Link to Sprint, 19: Work Item Type, 20: Link to Feature
 	TitleInput            textinput.Model
 	DescInput             textinput.Model
 	StartTimeInput        textinput.Model
@@ -42,6 +49,15 @@ type TaskForm struct {
 
 func NewTaskForm() TaskForm {
 	return NewTaskFormWithDate(time.Now())
+}
+
+func NewFeatureForm() TaskForm {
+	form := NewTaskFormWithDate(time.Now())
+	form.IsFeatureMode = true
+	form.TitleInput.Placeholder = "Implement user authentication..."
+	form.DescInput.Placeholder = "Add OAuth2 and session token handling..."
+	form.LinkSprintIdx = 1
+	return form
 }
 
 // smartDefaultTime returns the current time rounded up to the next 30-minute mark.
@@ -111,8 +127,12 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 		PriorityIdx:           2,
 		SPIdx:                 2,
 		TaskTypeIdx:           0,
-		IsAnchoredIdx:         1,
+		IsAnchoredIdx:         0,
 		IsAllDayIdx:           0,
+		LinkSprintIdx:         0,
+		IsFeatureMode:         false,
+		WorkItemTypeIdx:       0,
+		LinkedFeatureIdx:      0,
 		StartHour:             baseDate.Hour(),
 		StartMin:              baseDate.Minute(),
 		DurationMins:          60,
@@ -139,6 +159,11 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 }
 
 func (f TaskForm) VisibleFields() []int {
+	if f.IsFeatureMode {
+		// Feature / Defect mode on Sprint View: Title, Description, Work Item Type, Priority, Story Points, Tags, Submit
+		return []int{0, 1, 19, 2, 3, 9, 10}
+	}
+
 	var fields []int
 	fields = append(fields, 0, 1, 2)
 	// Story Points (3) only visible for Task (0)
@@ -177,6 +202,11 @@ func (f TaskForm) VisibleFields() []int {
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
 			fields = append(fields, 8)
 		}
+	}
+
+	// Link to Feature (20) visible for Task (0)
+	if f.TaskTypeIdx == 0 {
+		fields = append(fields, 20)
 	}
 
 	if f.TaskTypeIdx == 2 {

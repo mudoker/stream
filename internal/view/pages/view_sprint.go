@@ -57,7 +57,7 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 
 	// Summary stats
 	defined, inProgress, review, testing, completed := tasks.GetSprintSwimlaneTasks(m.Tasks, activeSprint.UUID)
-	totalTasks := len(defined) + len(inProgress) + len(review) + len(testing) + len(completed)
+	totalFeatures := len(defined) + len(inProgress) + len(review) + len(testing) + len(completed)
 	totalSP := 0
 	completedSP := 0
 	for _, tList := range [][]model.Task{defined, inProgress, review, testing, completed} {
@@ -74,7 +74,7 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 		pct = (completedSP * 100) / totalSP
 	}
 
-	metricsText := fmt.Sprintf("• %d Tasks • %d SP [%d%%]", totalTasks, totalSP, pct)
+	metricsText := fmt.Sprintf("• %d Features • %d SP [%d%%]", totalFeatures, totalSP, pct)
 	metricsStyled := lipgloss.NewStyle().Foreground(t.Muted).Render(metricsText)
 
 	navHint := lipgloss.NewStyle().Foreground(t.Muted).Render("s ◂ · ▸ S Switch Sprint")
@@ -199,7 +199,7 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 		selectedCardEnd := -1
 
 		if len(lane.tasks) == 0 {
-			emptyMsg := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Width(colWidth).Align(lipgloss.Center).Render("(No tasks)")
+			emptyMsg := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Width(colWidth).Align(lipgloss.Center).Render("(No features)")
 			allCardLines = append(allCardLines, emptyMsg)
 		} else {
 			for _, task := range lane.tasks {
@@ -340,35 +340,17 @@ func formatSprintHeader(icon, name, shortName string, count int, sp int, maxW in
 	return icon
 }
 
-func getTaskDurationMinutes(task model.Task) int {
-	if !task.TimeWindow.Start.IsZero() && !task.TimeWindow.End.IsZero() && task.TimeWindow.End.After(task.TimeWindow.Start) {
-		mins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
-		if mins > 0 {
-			return mins
-		}
+func getWorkItemTypeDetails(itemType model.WorkItemType) (icon string, label string, color lipgloss.Color) {
+	switch itemType {
+	case model.WorkItemDefect:
+		return "🐞", "Defect", lipgloss.Color("#f38ba8")
+	case model.WorkItemImprovement:
+		return "⚡", "Improvement", lipgloss.Color("#fab387")
+	case model.WorkItemTask:
+		return "📋", "Task", lipgloss.Color("#b4befe")
+	default:
+		return "✨", "Feature", lipgloss.Color("#89dceb")
 	}
-	if task.EstimatedDurationMins > 0 {
-		return task.EstimatedDurationMins
-	}
-	if task.StoryPoints > 0 {
-		return task.StoryPoints * 30
-	}
-	return 30
-}
-
-func formatDurationBadge(mins int) string {
-	if mins <= 0 {
-		return ""
-	}
-	if mins < 60 {
-		return fmt.Sprintf("󱑂 %dm", mins)
-	}
-	h := mins / 60
-	remM := mins % 60
-	if remM == 0 {
-		return fmt.Sprintf("󱑂 %dh", h)
-	}
-	return fmt.Sprintf("󱑂 %dh%dm", h, remM)
 }
 
 func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW int, isSelected bool) []string {
@@ -377,6 +359,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		innerW = 10
 	}
 
+	typeIcon, typeLabel, typeColor := getWorkItemTypeDetails(task.WorkItemType)
 	pColor := t.PriorityColor(task.Priority)
 	isDone := task.LifecycleState == model.StateCompleted
 
@@ -385,8 +368,10 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		borderColor = t.FocusPurple
 	} else if isDone {
 		borderColor = lipgloss.Color("#4c644f")
-	} else {
+	} else if task.Priority == model.P0 {
 		borderColor = pColor
+	} else {
+		borderColor = typeColor
 	}
 
 	cursor := "  "
@@ -394,24 +379,35 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		cursor = "▶ "
 	}
 
-	durMins := getTaskDurationMinutes(task)
-	durBadge := formatDurationBadge(durMins)
+	// Concise ID display
+	idStr := task.ID
+	if idStr == "" {
+		idStr = "FEAT"
+	}
 
-	// Line 1: Priority + SP + Duration badge + Today badge
+	// Line 1: [ID] Icon Type • Priority • SP
 	var badges []string
+	badges = append(badges, fmt.Sprintf("[%s]", idStr))
+	badges = append(badges, fmt.Sprintf("%s %s", typeIcon, typeLabel))
 	badges = append(badges, string(task.Priority))
 	if task.StoryPoints > 0 {
 		badges = append(badges, fmt.Sprintf("%d SP", task.StoryPoints))
 	}
-	if durBadge != "" {
-		badges = append(badges, durBadge)
-	}
-	if task.AddedToToday {
-		badges = append(badges, "⚡ Today")
-	}
 	topLine := cursor + strings.Join(badges, " • ")
 	if len([]rune(topLine)) > innerW {
-		topLine = string([]rune(topLine)[:innerW])
+		badges2 := []string{fmt.Sprintf("[%s]", idStr), fmt.Sprintf("%s %s", typeIcon, typeLabel), string(task.Priority)}
+		topLine2 := cursor + strings.Join(badges2, " • ")
+		if len([]rune(topLine2)) <= innerW {
+			topLine = topLine2
+		} else {
+			badges3 := []string{fmt.Sprintf("[%s]", idStr), typeIcon, string(task.Priority)}
+			topLine3 := cursor + strings.Join(badges3, " • ")
+			if len([]rune(topLine3)) <= innerW {
+				topLine = topLine3
+			} else if len([]rune(topLine)) > innerW {
+				topLine = string([]rune(topLine)[:innerW])
+			}
+		}
 	}
 
 	// Line 2: Title
@@ -430,19 +426,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 	titleLine := "  " + chk + " " + title
 
-	// Line 3: Time Window (if scheduled/anchored)
-	var timeLine string
-	if !task.TimeWindow.Start.IsZero() && !task.TimeWindow.End.IsZero() {
-		timeLine = fmt.Sprintf("  🕒 %s - %s",
-			task.TimeWindow.Start.Format("15:04"),
-			task.TimeWindow.End.Format("15:04"),
-		)
-		if len([]rune(timeLine)) > innerW {
-			timeLine = string([]rune(timeLine)[:innerW])
-		}
-	}
-
-	// Line 4: Tags or description
+	// Line 3: Tags
 	var tagLine string
 	if len(task.Tags) > 0 {
 		tagStr := strings.Join(task.Tags, ", ")
@@ -457,6 +441,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		tagLine = "  🏷 " + tagStr
 	}
 
+	// Line 4: Description preview
 	var descLine string
 	if strings.TrimSpace(task.Description) != "" {
 		desc := strings.TrimSpace(task.Description)
@@ -473,7 +458,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 
 	// Card content rows
 	var cardLines []string
-	topStyle := lipgloss.NewStyle().Foreground(pColor).Bold(true)
+	topStyle := lipgloss.NewStyle().Foreground(typeColor).Bold(true)
 	if isSelected {
 		topStyle = topStyle.Foreground(t.FocusPurple)
 	}
@@ -485,28 +470,18 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 	cardLines = append(cardLines, titleStyle.Render(titleLine))
 
-	if timeLine != "" {
-		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(timeLine))
-	}
-	if descLine != "" && durMins >= 45 {
-		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(descLine))
-	}
-	if tagLine != "" {
-		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(tagLine))
-	}
-
-	// Dynamic height proportional to task duration:
-	// <= 30m: 3 content rows
-	// 45-60m: 4 content rows
-	// 90-120m: 5-6 content rows
-	// > 120m: 7-8 content rows
+	// Dynamic height proportional to type and priority / story points:
+	// Defect / P0 / P1 / SP >= 5: 4 content rows
+	// Others: 3 content rows
 	targetContentHeight := 3
-	if durMins > 30 && durMins <= 60 {
+	if task.WorkItemType == model.WorkItemDefect || task.Priority == model.P0 || task.Priority == model.P1 || task.StoryPoints >= 5 {
 		targetContentHeight = 4
-	} else if durMins > 60 && durMins <= 120 {
-		targetContentHeight = 5
-	} else if durMins > 120 {
-		targetContentHeight = 6
+		if descLine != "" {
+			cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(descLine))
+		}
+	}
+	if tagLine != "" && len(cardLines) < targetContentHeight {
+		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(tagLine))
 	}
 
 	for len(cardLines) < targetContentHeight {

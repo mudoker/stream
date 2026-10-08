@@ -1,6 +1,7 @@
 package viewmodel
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -62,4 +63,38 @@ func movingTaskBaseUUID(uuid string) string {
 	uuid = strings.TrimSuffix(uuid, "_moving")
 	uuid = strings.TrimSuffix(uuid, "_adjusting")
 	return uuid
+}
+
+func GenerateWorkItemID(itemType model.WorkItemType, allTasks []model.Task) string {
+	prefix := "FEAT"
+	switch itemType {
+	case model.WorkItemDefect:
+		prefix = "DEF"
+	case model.WorkItemImprovement:
+		prefix = "IMP"
+	case model.WorkItemTask:
+		prefix = "TASK"
+	default:
+		prefix = "FEAT"
+	}
+
+	maxNum := 0
+	prefixWithDash := prefix + "-"
+	for _, t := range allTasks {
+		if strings.HasPrefix(t.ID, prefixWithDash) {
+			numStr := strings.TrimPrefix(t.ID, prefixWithDash)
+			var n int
+			for _, ch := range numStr {
+				if ch >= '0' && ch <= '9' {
+					n = n*10 + int(ch-'0')
+				} else {
+					break
+				}
+			}
+			if n > maxNum {
+				maxNum = n
+			}
+		}
+	}
+	return fmt.Sprintf("%s-%d", prefix, maxNum+1)
 }

@@ -121,16 +121,24 @@ func cellsToLine(cells []Cell) string {
 	return sb.String()
 }
 
+func dimStyle(style string) string {
+	if style == "" || style == "\x1b[0m" {
+		return "\x1b[2m\x1b[38;2;147;153;178m"
+	}
+	s := strings.ReplaceAll(style, "\x1b[1m", "")
+	if !strings.HasPrefix(s, "\x1b[2m") {
+		s = "\x1b[2m" + s
+	}
+	return s
+}
+
 func dimCanvas(base string) string {
-	dimColorSeq := "\x1b[38;2;69;71;90m\x1b[2m" // Dim muted grey + ANSI faint
 	lines := strings.Split(base, "\n")
 	for i, l := range lines {
 		cells := parseLineToCells(l)
 		for j := range cells {
 			if strings.TrimSpace(cells[j].Text) != "" {
-				cells[j].Style = dimColorSeq
-			} else {
-				cells[j].Style = ""
+				cells[j].Style = dimStyle(cells[j].Style)
 			}
 		}
 		lines[i] = cellsToLine(cells)

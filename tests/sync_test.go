@@ -12,24 +12,33 @@ import (
 
 func TestIsGCalSyncable(t *testing.T) {
 	tests := []struct {
-		name     string
-		taskType model.SchedulingType
-		want     bool
+		name         string
+		taskType     model.SchedulingType
+		workItemType model.WorkItemType
+		want         bool
 	}{
-		{"Anchored task is syncable", model.Anchored, true},
-		{"Event task is syncable", model.Event, true},
-		{"Floating task is not syncable", model.Floating, false},
-		{"Reminder task is not syncable", model.Reminder, false},
-		{"Habit task is not syncable", model.Habit, false},
-		{"Recurring task is not syncable", model.Recurring, false},
+		{"Anchored task is syncable", model.Anchored, model.WorkItemTask, true},
+		{"Anchored task without explicit workItemType is syncable", model.Anchored, "", true},
+		{"Event task is syncable", model.Event, model.WorkItemTask, true},
+		{"Floating task is not syncable", model.Floating, model.WorkItemTask, false},
+		{"Reminder task is not syncable", model.Reminder, "", false},
+		{"Habit task is not syncable", model.Habit, "", false},
+		{"Recurring task is not syncable", model.Recurring, "", false},
+		{"Feature is not syncable", model.Anchored, model.WorkItemFeature, false},
+		{"Defect is not syncable", model.Anchored, model.WorkItemDefect, false},
+		{"Improvement is not syncable", model.Anchored, model.WorkItemImprovement, false},
+		{"Feature floating is not syncable", model.Floating, model.WorkItemFeature, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			task := model.Task{SchedulingType: tt.taskType}
+			task := model.Task{
+				SchedulingType: tt.taskType,
+				WorkItemType:   tt.workItemType,
+			}
 			got := model.IsGCalSyncable(task)
 			if got != tt.want {
-				t.Errorf("IsGCalSyncable() for %s = %v, want %v", tt.taskType, got, tt.want)
+				t.Errorf("IsGCalSyncable() for %s (workItem: %s) = %v, want %v", tt.taskType, tt.workItemType, got, tt.want)
 			}
 		})
 	}

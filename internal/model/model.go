@@ -191,6 +191,14 @@ type UserSettings struct {
 }
 
 func IsGCalSyncable(task Task) bool {
+	// Only tasks and events can sync to GCal.
+	// Features, defects, improvements, and other sprint/feature-level items must NEVER sync to GCal.
+	if task.WorkItemType == WorkItemFeature || task.WorkItemType == WorkItemDefect || task.WorkItemType == WorkItemImprovement {
+		return false
+	}
+	if task.WorkItemType != "" && task.WorkItemType != WorkItemTask {
+		return false
+	}
 	return task.SchedulingType == Anchored || task.SchedulingType == Event
 }
 

@@ -9,6 +9,7 @@ import (
 	"stream/internal/db"
 	"stream/internal/model"
 	"stream/internal/view"
+	"stream/internal/view/modals"
 	"stream/internal/view/pages"
 	"stream/internal/view/theme"
 	"stream/internal/viewmodel"
@@ -55,7 +56,7 @@ func TestSprintDBCRUDAndRecurring(t *testing.T) {
 
 	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	end := start.AddDate(0, 0, 14)
+	end := start.AddDate(0, 0, 13)
 
 	customSprint := model.Sprint{
 		UUID:      uuid.New().String(),
@@ -93,12 +94,13 @@ func TestSprintDBCRUDAndRecurring(t *testing.T) {
 	if len(recurring) != 3 {
 		t.Fatalf("expected 3 recurring sprints, got %d", len(recurring))
 	}
-	if !recurring[0].StartDate.Equal(updated.EndDate) {
-		t.Fatalf("first recurring sprint start (%v) should match base sprint end (%v)", recurring[0].StartDate, updated.EndDate)
+	expectedStart := updated.EndDate.AddDate(0, 0, 1)
+	if !recurring[0].StartDate.Equal(expectedStart) {
+		t.Fatalf("first recurring sprint start (%v) should be day after base sprint end (%v)", recurring[0].StartDate, expectedStart)
 	}
 	gap := recurring[0].EndDate.Sub(recurring[0].StartDate)
-	if int(gap.Hours()/24) != 14 {
-		t.Fatalf("expected 14-day gap, got %v", gap)
+	if int(gap.Hours()/24) != 13 {
+		t.Fatalf("expected 13-day delta (14 inclusive days), got %v", gap)
 	}
 
 	// Delete Sprint
@@ -706,5 +708,78 @@ func TestSprintViewFullHorizontalFill(t *testing.T) {
 		}
 	}
 }
+
+func TestSprintDeleteFocusIsolationAndConfirmation(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	if len(sprints) == 0 {
+		t.Fatal("expected at least 1 default sprint")
+	}
+	initialSprintUUID := sprints[0].UUID
+
+	m := viewmodel.NewModel(database, nil)
+	m.CurrentView = viewmodel.SprintView
+
+	// 1. When on TodoShelfFocus (Global Backlog), pressing 'D' must NOT delete sprint or open sprint confirm dialog
+	m.TodoShelfFocus = true
+	m.SidebarFocus = false
+
+	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	if m.ConfirmOpen {
+		t.Fatalf("expected ConfirmOpen to be false when pressing Shift+D on Todo Shelf, got true (action: %s)", m.ConfirmActionType)
+	}
+	if len(database.GetSprints()) != len(sprints) {
+		t.Fatalf("sprint count changed unexpectedly when pressing Shift+D on Todo Shelf")
+	}
+
+	// 2. When focused on the Sprint board, pressing 'D' must open the confirmation modal
+	m.TodoShelfFocus = false
+	m.SidebarFocus = false
+
+	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	if !m.ConfirmOpen {
+		t.Fatal("expected ConfirmOpen to be true when pressing Shift+D on focused sprint board")
+	}
+	if m.ConfirmActionType != "delete_sprint" {
+		t.Fatalf("expected ConfirmActionType to be 'delete_sprint', got '%s'", m.ConfirmActionType)
+	}
+	if m.ConfirmSprint.UUID != initialSprintUUID {
+		t.Fatalf("expected ConfirmSprint UUID to be %s, got %s", initialSprintUUID, m.ConfirmSprint.UUID)
+	}
+
+	// Verify the confirmation modal renders properly
+	th := theme.NewTheme()
+	modalRes := modals.RenderConfirmModal(&m, th)
+	if !strings.Contains(modalRes, "DELETE SPRINT") {
+		t.Errorf("expected modal to contain 'DELETE SPRINT', got:\n%s", modalRes)
+	}
+
+	// 3. Canceling with 'n' must NOT delete the sprint
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	if m.ConfirmOpen {
+		t.Fatal("expected ConfirmOpen to be false after cancel")
+	}
+	if len(database.GetSprints()) == 0 {
+		t.Fatal("sprint was deleted despite cancelling")
+	}
+
+	// 4. Confirming deletion with 'y' must delete the sprint
+	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	if !m.ConfirmOpen {
+		t.Fatal("expected ConfirmOpen to be true on second Shift+D")
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if m.ConfirmOpen {
+		t.Fatal("expected ConfirmOpen to be false after confirming")
+	}
+	for _, s := range database.GetSprints() {
+		if s.UUID == initialSprintUUID {
+			t.Fatalf("expected sprint %s to be deleted from database", initialSprintUUID)
+		}
+	}
+}
+
 
 

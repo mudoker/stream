@@ -174,3 +174,64 @@ func (m *Model) MoveShelfSection(dir int) {
 		}
 	}
 }
+
+// GetActiveShelfSection returns the currently focused shelf section based on SelectedTaskUUID.
+func (m *Model) GetActiveShelfSection() (ShelfSection, bool) {
+	shelfData := m.GetShelfData()
+	if len(shelfData.Sections) == 0 {
+		return ShelfSection{}, false
+	}
+
+	// 1. If SelectedTaskUUID belongs to a section, return that section
+	if m.SelectedTaskUUID != "" {
+		for _, sec := range shelfData.Sections {
+			for _, task := range sec.Tasks {
+				if task.UUID == m.SelectedTaskUUID {
+					return sec, true
+				}
+			}
+		}
+	}
+
+	// 2. Otherwise return the first section that has tasks
+	for _, sec := range shelfData.Sections {
+		if len(sec.Tasks) > 0 {
+			return sec, true
+		}
+	}
+
+	// 3. Fallback to the first section
+	return shelfData.Sections[0], true
+}
+
+func (m *Model) InitiateClearShelfSection(sec ShelfSection) {
+	m.ConfirmShelfSection = sec
+	m.ConfirmOpen = true
+	m.ConfirmSelectedIndex = 0
+	m.ConfirmFocusArea = 0
+	m.ConfirmActionType = "clear_shelf_section"
+}
+
+func (m *Model) ConfirmClearShelfSection() {
+	sec := m.ConfirmShelfSection
+	if m.DB != nil {
+		for _, task := range sec.Tasks {
+			m.DB.DeleteTask(task.UUID)
+		}
+	}
+	m.refreshTasks()
+
+	// Re-adjust selection to the first available task on the shelf
+	shelf := m.GetCurrentShelfTasks()
+	if len(shelf) > 0 {
+		m.SelectedTaskUUID = shelf[0].UUID
+	} else {
+		m.SelectedTaskUUID = ""
+	}
+
+	m.ConfirmOpen = false
+	m.ConfirmActionType = ""
+	m.ConfirmShelfSection = ShelfSection{}
+	m.StatusMsg = fmt.Sprintf("Cleared %d tasks from %s.", len(sec.Tasks), sec.Type)
+}
+

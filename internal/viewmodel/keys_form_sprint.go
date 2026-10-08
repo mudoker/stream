@@ -83,7 +83,7 @@ func (m *Model) submitSprintForm() {
 
 	endDate, err := time.Parse("2006-01-02", endStr)
 	if err != nil || !endDate.After(startDate) {
-		endDate = startDate.AddDate(0, 0, 14)
+		endDate = startDate.AddDate(0, 0, 13)
 	}
 
 	recCount, _ := strconv.Atoi(recStr)

@@ -57,7 +57,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		m.Form.TitleInput.Focus()
 		return true, nil
 	case "I":
-		if m.CurrentView == SprintView {
+		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
 			m.CurrentMode = ModeSprintForm
 			defaultName := fmt.Sprintf("Sprint %d", len(m.Sprints)+1)
 			m.SprintForm = NewSprintForm(defaultName)
@@ -66,7 +66,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		}
 		return false, nil
 	case "E":
-		if m.CurrentView == SprintView {
+		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
 			activeSprint, ok := m.GetActiveSprint()
 			if ok {
 				m.CurrentMode = ModeSprintForm
@@ -77,19 +77,28 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		}
 		return false, nil
 	case "D":
-		if m.CurrentView == SprintView {
+		if m.TodoShelfFocus {
+			sec, ok := m.GetActiveShelfSection()
+			if ok && len(sec.Tasks) > 0 {
+				m.InitiateClearShelfSection(sec)
+				return true, nil
+			} else if ok {
+				m.StatusMsg = fmt.Sprintf("No tasks to clear in %s.", sec.Type)
+				return true, nil
+			} else {
+				m.StatusMsg = "No active shelf section to clear."
+				return true, nil
+			}
+		} else if m.CurrentView == SprintView && !m.SidebarFocus {
 			activeSprint, ok := m.GetActiveSprint()
 			if ok {
-				m.DB.DeleteSprint(activeSprint.UUID)
-				m.refreshSprints()
-				m.refreshTasks()
-				m.StatusMsg = fmt.Sprintf("Sprint '%s' deleted.", activeSprint.Name)
+				m.InitiateDeleteSprint(activeSprint)
 				return true, nil
 			}
 		}
 		return false, nil
 	case "g":
-		if m.CurrentView == SprintView {
+		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
 			activeSprint, ok := m.GetActiveSprint()
 			if ok {
 				m.CurrentMode = ModeSprintForm
@@ -169,7 +178,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		task, exists := m.GetActiveTask()
 		if exists {
 			m.startEditMode(task)
-		} else if m.CurrentView == SprintView {
+		} else if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
 			activeSprint, ok := m.GetActiveSprint()
 			if ok {
 				m.CurrentMode = ModeSprintForm

@@ -111,6 +111,8 @@ type Model struct {
 
 	ConfirmOpen bool
 	ConfirmTask model.Task
+	ConfirmSprint model.Sprint
+	ConfirmShelfSection ShelfSection
 	PendingEditTask model.Task
 	PendingTaskToSubmit model.Task
 	PendingNewTags      []string

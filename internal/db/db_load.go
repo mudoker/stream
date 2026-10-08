@@ -73,7 +73,7 @@ func (db *JSONDB) load() error {
 	if len(db.sprints) == 0 {
 		now := time.Now()
 		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-		end := start.AddDate(0, 0, 14)
+		end := start.AddDate(0, 0, 13)
 		defaultSprint := model.Sprint{
 			UUID:          uuid.New().String(),
 			WorkspaceUUID: defaultWSUUID,

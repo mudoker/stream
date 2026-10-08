@@ -233,6 +233,43 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			m.ConfirmFocusArea,
 			t,
 		)
+	case "delete_sprint":
+		sprintName := m.ConfirmSprint.Name
+		if sprintName == "" {
+			sprintName = "Active Sprint"
+		}
+		return components.RenderBaseConfirmModal(
+			"🗑️  DELETE SPRINT",
+			[]string{
+				"Are you sure you want to delete sprint:",
+				fmt.Sprintf("  \"%s\"?", sprintName),
+				"",
+				"Tasks in this sprint will be returned to the backlog.",
+			},
+			[]string{"Yes, Delete Sprint", "No, Cancel"},
+			m.ConfirmSelectedIndex,
+			0, // Option 0 is destructive
+			m.ConfirmFocusArea,
+			t,
+		)
+	case "clear_shelf_section":
+		sec := m.ConfirmShelfSection
+		title := fmt.Sprintf("🗑️  CLEAR %s", sec.Type)
+		taskCount := len(sec.Tasks)
+		return components.RenderBaseConfirmModal(
+			title,
+			[]string{
+				fmt.Sprintf("Are you sure you want to clear all %d tasks in:", taskCount),
+				fmt.Sprintf("  %s?", sec.Title),
+				"",
+				"This action will permanently delete these tasks.",
+			},
+			[]string{fmt.Sprintf("Yes, Clear (%d tasks)", taskCount), "No, Cancel"},
+			m.ConfirmSelectedIndex,
+			0, // Option 0 is destructive
+			m.ConfirmFocusArea,
+			t,
+		)
 	case "delete_recurring":
 		return components.RenderBaseConfirmModal(
 			"♻️  DELETE RECURRING TASK",

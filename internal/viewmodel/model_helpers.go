@@ -11,6 +11,7 @@ import (
 
 	"stream/internal/db"
 	"stream/internal/model"
+	"stream/internal/viewmodel/common"
 	"stream/internal/viewmodel/tasks"
 	"stream/internal/viewmodel/timer"
 
@@ -103,6 +104,28 @@ func (m *Model) GetActiveSprint() (model.Sprint, bool) {
 		return m.Sprints[0], true
 	}
 	return model.Sprint{}, false
+}
+
+func (m *Model) DeleteSprint(uuid string) {
+	if m.DB != nil {
+		m.DB.DeleteSprint(uuid)
+	}
+}
+
+func (m *Model) RefreshSprints() {
+	m.refreshSprints()
+}
+
+func (m *Model) SetConfirmSprint(sprint model.Sprint) {
+	m.ConfirmSprint = sprint
+}
+
+func (m *Model) GetConfirmSprint() model.Sprint {
+	return m.ConfirmSprint
+}
+
+func (m *Model) InitiateDeleteSprint(sprint model.Sprint) {
+	common.InitiateDeleteSprint(m, sprint)
 }
 
 func (m *Model) cycleFocus() {

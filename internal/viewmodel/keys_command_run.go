@@ -75,10 +75,7 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 	case "sprint-delete":
 		activeSprint, ok := m.GetActiveSprint()
 		if ok {
-			m.DB.DeleteSprint(activeSprint.UUID)
-			m.refreshSprints()
-			m.refreshTasks()
-			m.StatusMsg = fmt.Sprintf("Sprint '%s' deleted.", activeSprint.Name)
+			m.InitiateDeleteSprint(activeSprint)
 		} else {
 			m.StatusMsg = "No active sprint found to delete."
 		}

@@ -12,12 +12,16 @@ type ModelContext interface {
 	UpdateTask(task model.Task)
 	DeleteTask(uuid string)
 	RefreshTasks()
+	DeleteSprint(uuid string)
+	RefreshSprints()
 	SetStatusMsg(msg string)
 	SetConfirmOpen(open bool)
 	SetConfirmActionType(actionType string)
 	SetConfirmTask(task model.Task)
+	SetConfirmSprint(sprint model.Sprint)
 	SetConfirmSelectedIndex(idx int)
 	GetConfirmTask() model.Task
+	GetConfirmSprint() model.Sprint
 	GetConfirmSelectedIndex() int
 	GetConfirmFocusArea() int
 	SetConfirmFocusArea(area int)

@@ -169,6 +169,24 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				} else {
 					common.DeleteAllOccurrences(m, m.ConfirmTask, m.Tasks)
 				}
+			case "delete_sprint":
+				if m.ConfirmSelectedIndex == 0 {
+					common.ConfirmDeleteSprint(m, m.ConfirmSprint)
+				} else {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.ConfirmSprint = model.Sprint{}
+					m.StatusMsg = "Sprint deletion canceled."
+				}
+			case "clear_shelf_section":
+				if m.ConfirmSelectedIndex == 0 {
+					m.ConfirmClearShelfSection()
+				} else {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.ConfirmShelfSection = ShelfSection{}
+					m.StatusMsg = "Clear section canceled."
+				}
 			case "edit_recurring":
 				if m.ConfirmSelectedIndex == 0 {
 					m.DB.UpdateTask(m.PendingEditTask)
@@ -469,6 +487,16 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				m.ConfirmActionType = ""
 				m.FactoryResetCountdown = 0
 				m.StatusMsg = "Factory reset cancelled."
+			} else if m.ConfirmActionType == "delete_sprint" {
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.ConfirmSprint = model.Sprint{}
+				m.StatusMsg = "Sprint deletion canceled."
+			} else if m.ConfirmActionType == "clear_shelf_section" {
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.ConfirmShelfSection = ShelfSection{}
+				m.StatusMsg = "Clear section canceled."
 			} else {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""

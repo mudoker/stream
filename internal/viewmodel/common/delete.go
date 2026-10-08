@@ -57,3 +57,22 @@ func InitiateDeleteTask(ctx ModelContext, task model.Task) {
 		ctx.SetConfirmActionType("delete")
 	}
 }
+
+func InitiateDeleteSprint(ctx ModelContext, sprint model.Sprint) {
+	ctx.SetConfirmSprint(sprint)
+	ctx.SetConfirmOpen(true)
+	ctx.SetConfirmSelectedIndex(0)
+	ctx.SetConfirmFocusArea(0)
+	ctx.SetConfirmActionType("delete_sprint")
+}
+
+func ConfirmDeleteSprint(ctx ModelContext, sprint model.Sprint) {
+	ctx.DeleteSprint(sprint.UUID)
+	ctx.RefreshSprints()
+	ctx.RefreshTasks()
+	ctx.SetConfirmOpen(false)
+	ctx.SetConfirmActionType("")
+	ctx.SetConfirmSprint(model.Sprint{})
+	ctx.SetStatusMsg(fmt.Sprintf("Sprint '%s' deleted.", sprint.Name))
+}
+

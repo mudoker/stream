@@ -487,33 +487,37 @@ func (m *Model) handleSprintNav(key string) {
 			m.StatusMsg = fmt.Sprintf("Switched to %s swimlane.", sprintLaneName(newLaneIdx))
 		}
 	case "s", "]":
-		if len(m.Sprints) > 1 {
-			idx := -1
-			for i, s := range m.Sprints {
-				if s.UUID == m.ActiveSprintUUID {
-					idx = i
-					break
+		if !m.TodoShelfFocus && !m.SidebarFocus {
+			if len(m.Sprints) > 1 {
+				idx := -1
+				for i, s := range m.Sprints {
+					if s.UUID == m.ActiveSprintUUID {
+						idx = i
+						break
+					}
 				}
-			}
-			if idx != -1 {
-				nextIdx := (idx + 1) % len(m.Sprints)
-				m.ActiveSprintUUID = m.Sprints[nextIdx].UUID
-				m.StatusMsg = fmt.Sprintf("Switched to sprint '%s'.", m.Sprints[nextIdx].Name)
+				if idx != -1 {
+					nextIdx := (idx + 1) % len(m.Sprints)
+					m.ActiveSprintUUID = m.Sprints[nextIdx].UUID
+					m.StatusMsg = fmt.Sprintf("Switched to sprint '%s'.", m.Sprints[nextIdx].Name)
+				}
 			}
 		}
 	case "S", "[":
-		if len(m.Sprints) > 1 {
-			idx := -1
-			for i, s := range m.Sprints {
-				if s.UUID == m.ActiveSprintUUID {
-					idx = i
-					break
+		if !m.TodoShelfFocus && !m.SidebarFocus {
+			if len(m.Sprints) > 1 {
+				idx := -1
+				for i, s := range m.Sprints {
+					if s.UUID == m.ActiveSprintUUID {
+						idx = i
+						break
+					}
 				}
-			}
-			if idx != -1 {
-				prevIdx := (idx - 1 + len(m.Sprints)) % len(m.Sprints)
-				m.ActiveSprintUUID = m.Sprints[prevIdx].UUID
-				m.StatusMsg = fmt.Sprintf("Switched to sprint '%s'.", m.Sprints[prevIdx].Name)
+				if idx != -1 {
+					prevIdx := (idx - 1 + len(m.Sprints)) % len(m.Sprints)
+					m.ActiveSprintUUID = m.Sprints[prevIdx].UUID
+					m.StatusMsg = fmt.Sprintf("Switched to sprint '%s'.", m.Sprints[prevIdx].Name)
+				}
 			}
 		}
 	}

@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"stream/internal/model"
-	"stream/internal/viewmodel"
 	"stream/internal/view/components"
 	"stream/internal/view/theme"
+	"stream/internal/viewmodel"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestGetTodoShelfTasksSorting(t *testing.T) {
@@ -740,5 +742,82 @@ func TestGlobalBacklogMoveShelfSectionJK(t *testing.T) {
 		t.Errorf("expected K to jump backwards to gb-comp-1, got %s", m.SelectedTaskUUID)
 	}
 }
+
+func TestClearShelfSectionWithConfirmation(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	task1 := model.Task{
+		UUID:           "task-back-1",
+		Title:          "Backlog Task 1",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	task2 := model.Task{
+		UUID:           "task-back-2",
+		Title:          "Backlog Task 2",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	taskComp := model.Task{
+		UUID:           "task-done-1",
+		Title:          "Done Task 1",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateCompleted,
+	}
+
+	database.AddTask(task1)
+	database.AddTask(task2)
+	database.AddTask(taskComp)
+
+	m := viewmodel.NewModel(database, nil)
+	m.CurrentView = viewmodel.DayView
+	m.TodoShelfFocus = true
+	m.SidebarFocus = false
+	m.SelectedTaskUUID = "task-back-1" // Focused on BACKLOG section
+
+	// 1. Press Shift+D while focused on BACKLOG section
+	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	if !m.ConfirmOpen {
+		t.Fatal("expected ConfirmOpen to be true when pressing Shift+D on shelf section")
+	}
+	if m.ConfirmActionType != "clear_shelf_section" {
+		t.Fatalf("expected ConfirmActionType to be 'clear_shelf_section', got '%s'", m.ConfirmActionType)
+	}
+	if m.ConfirmShelfSection.Type != viewmodel.SectionBacklog {
+		t.Fatalf("expected ConfirmShelfSection.Type to be BACKLOG, got %s", m.ConfirmShelfSection.Type)
+	}
+	if len(m.ConfirmShelfSection.Tasks) != 2 {
+		t.Fatalf("expected 2 tasks to be cleared in BACKLOG, got %d", len(m.ConfirmShelfSection.Tasks))
+	}
+
+	// 2. Canceling with 'n' should preserve all tasks
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	if m.ConfirmOpen {
+		t.Fatal("expected ConfirmOpen to be false after cancel")
+	}
+	if len(database.GetTasks()) != 3 {
+		t.Fatalf("expected 3 tasks to remain in database, got %d", len(database.GetTasks()))
+	}
+
+	// 3. Confirming with 'y' should delete the tasks in the BACKLOG section but keep COMPLETED task
+	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("D")})
+	if !m.ConfirmOpen {
+		t.Fatal("expected ConfirmOpen to be true on second Shift+D")
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	if m.ConfirmOpen {
+		t.Fatal("expected ConfirmOpen to be false after confirm")
+	}
+
+	tasksAfter := database.GetTasks()
+	if len(tasksAfter) != 1 {
+		t.Fatalf("expected only 1 task remaining after clearing BACKLOG, got %d", len(tasksAfter))
+	}
+	if tasksAfter[0].UUID != "task-done-1" {
+		t.Fatalf("expected remaining task to be task-done-1, got %s", tasksAfter[0].UUID)
+	}
+}
+
 
 

@@ -67,7 +67,7 @@ func (db *JSONDB) AddSprint(s model.Sprint) error {
 	s.UpdatedAt = now
 
 	if s.EndDate.IsZero() || s.EndDate.Before(s.StartDate) {
-		s.EndDate = s.StartDate.AddDate(0, 0, 14)
+		s.EndDate = s.StartDate.AddDate(0, 0, 13)
 	}
 
 	db.sprints[s.UUID] = s
@@ -118,11 +118,11 @@ func (db *JSONDB) GenerateRecurringSprints(baseSprint model.Sprint, count int) (
 
 	gapDays := int(baseSprint.EndDate.Sub(baseSprint.StartDate).Hours() / 24)
 	if gapDays <= 0 {
-		gapDays = 14
+		gapDays = 13
 	}
 
 	var generated []model.Sprint
-	currStart := baseSprint.EndDate
+	currStart := baseSprint.EndDate.AddDate(0, 0, 1)
 	for i := 1; i <= count; i++ {
 		currEnd := currStart.AddDate(0, 0, gapDays)
 		sprintNum := len(db.sprints) + 1
@@ -137,7 +137,7 @@ func (db *JSONDB) GenerateRecurringSprints(baseSprint model.Sprint, count int) (
 		}
 		db.sprints[s.UUID] = s
 		generated = append(generated, s)
-		currStart = currEnd
+		currStart = currEnd.AddDate(0, 0, 1)
 	}
 
 	if err := db.saveSprints(); err != nil {

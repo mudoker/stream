@@ -178,6 +178,44 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					m.ConfirmSprint = model.Sprint{}
 					m.StatusMsg = "Sprint deletion canceled."
 				}
+			case "create_task_from_feature":
+				if m.ConfirmSelectedIndex == 0 {
+					feat := m.ConfirmTask
+					taskID := GenerateWorkItemID(model.WorkItemTask, m.Tasks)
+					newTask := model.Task{
+						UUID:            uuid.New().String(),
+						ID:              taskID,
+						WorkspaceUUID:   feat.WorkspaceUUID,
+						Title:           feat.Title,
+						Description:     feat.Description,
+						Priority:        feat.Priority,
+						StoryPoints:     feat.StoryPoints,
+						SchedulingType:  model.Floating,
+						LifecycleState:  model.StateReady,
+						AddedToToday:    true,
+						LinkedFeatureID: feat.ID,
+						Tags:            feat.Tags,
+						CreatedAt:       time.Now(),
+						UpdatedAt:       time.Now(),
+					}
+					if newTask.WorkspaceUUID == "" {
+						newTask.WorkspaceUUID = m.ActiveWorkspaceUUID
+					}
+					m.DB.AddTask(newTask)
+					m.refreshTasks()
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.ConfirmTask = model.Task{}
+					m.SelectedTaskUUID = newTask.UUID
+					m.StatusMsg = fmt.Sprintf("Created task '%s' linked to %s and added to Today Shelf.", newTask.Title, feat.ID)
+					return true, nil
+				} else {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.ConfirmTask = model.Task{}
+					m.StatusMsg = "Task creation canceled."
+					return true, nil
+				}
 			case "clear_shelf_section":
 				if m.ConfirmSelectedIndex == 0 {
 					m.ConfirmClearShelfSection()

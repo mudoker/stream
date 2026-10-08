@@ -252,6 +252,30 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			m.ConfirmFocusArea,
 			t,
 		)
+	case "create_task_from_feature":
+		featName := m.ConfirmTask.Title
+		if m.ConfirmTask.ID != "" {
+			featName = fmt.Sprintf("[%s] %s", m.ConfirmTask.ID, m.ConfirmTask.Title)
+		}
+		itemTypeName := "Feature"
+		if m.ConfirmTask.WorkItemType != "" {
+			itemTypeName = string(m.ConfirmTask.WorkItemType)
+		}
+		return components.RenderBaseConfirmModal(
+			"⚡ CREATE TASK FOR "+strings.ToUpper(itemTypeName),
+			[]string{
+				fmt.Sprintf("Create a corresponding task for %s:", strings.ToLower(itemTypeName)),
+				fmt.Sprintf("  \"%s\"?", featName),
+				"",
+				"The task will be automatically linked to this "+strings.ToLower(itemTypeName),
+				"and added to your Today Shelf.",
+			},
+			[]string{"Yes, Create Task (Add to Today)", "Cancel"},
+			m.ConfirmSelectedIndex,
+			-1,
+			m.ConfirmFocusArea,
+			t,
+		)
 	case "clear_shelf_section":
 		sec := m.ConfirmShelfSection
 		title := fmt.Sprintf("🗑️  CLEAR %s", sec.Type)

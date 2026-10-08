@@ -982,5 +982,120 @@ func TestBlockedByLevelIsolation(t *testing.T) {
 	}
 }
 
+func TestCreateTaskFromFeatureShortcut(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	sprint := sprints[0]
+
+	feat := model.Task{
+		UUID:          uuid.New().String(),
+		ID:            "FEAT-42",
+		WorkItemType:  model.WorkItemFeature,
+		Title:         "Stripe Billing Integration",
+		Description:   "Support webhooks and card checkout",
+		Priority:      model.P0,
+		StoryPoints:   8,
+		SprintUUID:    sprint.UUID,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateBacklog,
+	}
+	database.AddTask(feat)
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+	m.SprintSwimlaneIdx = 0
+	m.SelectedTaskUUID = feat.UUID
+	m.SidebarFocus = false
+	m.TodoShelfFocus = false
+
+	// 1. Press 'p' on focused feature
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+
+	if !m.ConfirmOpen {
+		t.Fatalf("expected ConfirmOpen to be true after pressing 'p'")
+	}
+	if m.ConfirmActionType != "create_task_from_feature" {
+		t.Fatalf("expected ConfirmActionType 'create_task_from_feature', got '%s'", m.ConfirmActionType)
+	}
+	if m.ConfirmTask.UUID != feat.UUID {
+		t.Fatalf("expected ConfirmTask UUID to match feature UUID")
+	}
+
+	// Verify modal rendering
+	th := theme.NewTheme()
+	renderedModal := modals.RenderConfirmModal(&m, th)
+	if !strings.Contains(renderedModal, "CREATE TASK FOR FEATURE") {
+		t.Fatalf("expected modal to contain 'CREATE TASK FOR FEATURE', got:\n%s", renderedModal)
+	}
+	if !strings.Contains(renderedModal, "FEAT-42") {
+		t.Fatalf("expected modal to contain 'FEAT-42', got:\n%s", renderedModal)
+	}
+
+	// 2. Confirm creation with 'y' (or Enter)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+
+	if m.ConfirmOpen {
+		t.Fatalf("expected ConfirmOpen to be false after confirming")
+	}
+
+	// 3. Verify created task in database
+	allTasks := database.GetTasks()
+	var createdTask *model.Task
+	for _, tsk := range allTasks {
+		if tsk.LinkedFeatureID == "FEAT-42" {
+			tCopy := tsk
+			createdTask = &tCopy
+			break
+		}
+	}
+
+	if createdTask == nil {
+		t.Fatalf("expected task linked to FEAT-42 to be created in DB")
+	}
+	if createdTask.Title != "Stripe Billing Integration" {
+		t.Errorf("expected Title 'Stripe Billing Integration', got '%s'", createdTask.Title)
+	}
+	if createdTask.Priority != model.P0 {
+		t.Errorf("expected Priority P0, got %s", createdTask.Priority)
+	}
+	if !createdTask.AddedToToday {
+		t.Errorf("expected AddedToToday to be true")
+	}
+	if createdTask.SchedulingType != model.Floating {
+		t.Errorf("expected Floating scheduling type, got %s", createdTask.SchedulingType)
+	}
+	if !strings.HasPrefix(createdTask.ID, "TASK-") {
+		t.Errorf("expected ID prefix 'TASK-', got '%s'", createdTask.ID)
+	}
+
+	// 4. Verify it appears on Today Shelf in Global Backlog
+	shelfData := m.GetShelfData()
+	var todaySec *viewmodel.ShelfSection
+	for _, sec := range shelfData.Sections {
+		if sec.Type == viewmodel.SectionToday {
+			sCopy := sec
+			todaySec = &sCopy
+			break
+		}
+	}
+	if todaySec == nil {
+		t.Fatalf("expected SectionToday to be present in Global Backlog")
+	}
+	foundInToday := false
+	for _, tsk := range todaySec.Tasks {
+		if tsk.UUID == createdTask.UUID {
+			foundInToday = true
+			break
+		}
+	}
+	if !foundInToday {
+		t.Fatalf("expected created task to appear in Global Backlog Today Shelf section")
+	}
+}
+
+
 
 

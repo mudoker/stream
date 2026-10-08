@@ -62,6 +62,29 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		m.PopulateFormAvailableFeaturesAndBlockers()
 		m.Form.TitleInput.Focus()
 		return true, nil
+	case "p":
+		task, exists := m.GetActiveTask()
+		if exists {
+			isFeatureLevel := task.WorkItemType == model.WorkItemFeature ||
+				task.WorkItemType == model.WorkItemDefect ||
+				task.WorkItemType == model.WorkItemImprovement ||
+				(m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus) ||
+				task.SprintUUID != ""
+			if isFeatureLevel {
+				m.ConfirmTask = task
+				m.ConfirmOpen = true
+				m.ConfirmActionType = "create_task_from_feature"
+				m.ConfirmSelectedIndex = 0
+				m.ConfirmFocusArea = 0
+				return true, nil
+			} else {
+				m.StatusMsg = "Select a feature or defect to create a corresponding task."
+				return true, nil
+			}
+		} else {
+			m.StatusMsg = "No feature or defect selected."
+			return true, nil
+		}
 	case "I":
 		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
 			m.CurrentMode = ModeSprintForm

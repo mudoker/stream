@@ -185,7 +185,7 @@ func TestSprintViewNavigationAndSwimlanes(t *testing.T) {
 	database.AddTask(globalTask)
 
 	m := viewmodel.NewModel(database, nil)
-	m.Layout = viewmodel.ComputeLayout(180, 45)
+	m.Layout = viewmodel.ComputeLayout(230, 45)
 	v := view.NewView(&m)
 
 	// Switch to Sprint View via key '3' (Month=2, Sprint=3, Week=4, Day=5)
@@ -771,7 +771,7 @@ func TestSprintViewFullHorizontalFill(t *testing.T) {
 	defer cleanup()
 
 	m := viewmodel.NewModel(database, nil)
-	m.Layout = viewmodel.ComputeLayout(200, 40)
+	m.Layout = viewmodel.ComputeLayout(230, 40)
 	m.CurrentView = viewmodel.SprintView
 
 	th := theme.NewTheme()
@@ -1412,8 +1412,48 @@ func TestSprintCardRedesignAndBlockedSubcard(t *testing.T) {
 	}
 }
 
+func TestSprintCardDescriptionAndExpandedWidth(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
 
+	sprints := database.GetSprints()
+	sprint := sprints[0]
 
+	feat := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "FEA-2",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Implement Payment Gateway",
+		Description:    "Integrate Stripe SDK for checkout",
+		Priority:       model.P1,
+		StoryPoints:    3,
+		SprintUUID:     sprint.UUID,
+		LifecycleState: model.StateBacklog, // Defined
+		SchedulingType: model.Floating,
+		Tags:           []string{"stripe", "payments"},
+	}
+	database.AddTask(feat)
 
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+	m.Layout.TimelineW = 160
 
+	th := theme.NewTheme()
+	rendered := pages.RenderSprintView(&m, th, 30)
 
+	// Should contain title
+	if !strings.Contains(rendered, "[FEA-2] Implement") {
+		t.Errorf("expected title in card, got:\n%s", rendered)
+	}
+
+	// Should contain description on its own line
+	if !strings.Contains(rendered, "Integrate Stripe SDK") {
+		t.Errorf("expected description in card, got:\n%s", rendered)
+	}
+
+	// Should contain priority, SP and tags on meta line
+	if !strings.Contains(rendered, "P1 • 3 SP • # stripe") {
+		t.Errorf("expected metadata line with priority, SP, tags in card, got:\n%s", rendered)
+	}
+}

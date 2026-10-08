@@ -108,11 +108,11 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 
 	// ── 2. Swimlane Columns with Horizontal Scrolling ──────────────────
 	availW := workspaceW - 2
-	if availW < 20 {
-		availW = 20
+	minColW := 28
+	if availW < minColW {
+		availW = minColW
 	}
 	numCols := 5
-	minColW := 20 // 1.25x wider minimum swimlane width
 
 	visibleCols := (availW + 1) / (minColW + 1)
 	if visibleCols < 1 {
@@ -439,7 +439,24 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 	topLine := idStyle.Render(idBadge) + titleStyle.Render(title)
 
-	// Line 2: Priority, Story Points, Tags / Description
+	var cardLines []string
+	cardLines = append(cardLines, topLine)
+
+	// Line 2 (optional): Description rendered right below title
+	if strings.TrimSpace(task.Description) != "" {
+		desc := strings.TrimSpace(task.Description)
+		descStr := "  " + desc
+		if lipgloss.Width(descStr) > innerW {
+			runes := []rune(descStr)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > innerW {
+				runes = runes[:len(runes)-1]
+			}
+			descStr = string(runes) + "…"
+		}
+		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(descStr))
+	}
+
+	// Line 3: Priority, Story Points, Tags
 	var metaParts []string
 	metaParts = append(metaParts, string(task.Priority))
 	if task.StoryPoints > 0 {
@@ -447,8 +464,6 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 	if len(task.Tags) > 0 {
 		metaParts = append(metaParts, "# "+strings.Join(task.Tags, ", "))
-	} else if strings.TrimSpace(task.Description) != "" {
-		metaParts = append(metaParts, strings.TrimSpace(task.Description))
 	}
 	metaStr := "  " + strings.Join(metaParts, " • ")
 	if lipgloss.Width(metaStr) > innerW {
@@ -459,9 +474,7 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		metaStr = string(runes) + "…"
 	}
 	metaLine := lipgloss.NewStyle().Foreground(t.Muted).Render(metaStr)
-
-	var cardLines []string
-	cardLines = append(cardLines, topLine, metaLine)
+	cardLines = append(cardLines, metaLine)
 
 	// If linked to another feature and not blocked
 	if task.LinkedFeatureID != "" && task.BlockedBy == "" {

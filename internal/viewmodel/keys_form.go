@@ -59,7 +59,11 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.SPIdx = (m.Form.SPIdx - 1 + len(SPOptions)) % len(SPOptions)
 			return m, nil
 		case 4:
-			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx - 1 + len(TaskTypeOptions)) % len(TaskTypeOptions)
+			numTypes := len(TaskTypeOptions)
+			if m.CurrentView == SprintView {
+				numTypes = 4 // Only Feature, Defect, Improvement, Task in Sprint View
+			}
+			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx - 1 + numTypes) % numTypes
 			m.PopulateFormAvailableFeaturesAndBlockers()
 			return m, nil
 		case 11:
@@ -98,7 +102,11 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.SPIdx = (m.Form.SPIdx + 1) % len(SPOptions)
 			return m, nil
 		case 4:
-			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % len(TaskTypeOptions)
+			numTypes := len(TaskTypeOptions)
+			if m.CurrentView == SprintView {
+				numTypes = 4 // Only Feature, Defect, Improvement, Task in Sprint View
+			}
+			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % numTypes
 			m.PopulateFormAvailableFeaturesAndBlockers()
 			return m, nil
 		case 9:
@@ -142,7 +150,11 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.SPIdx = (m.Form.SPIdx + 1) % len(SPOptions)
 			return m, nil
 		case 4:
-			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % len(TaskTypeOptions)
+			numTypes := len(TaskTypeOptions)
+			if m.CurrentView == SprintView {
+				numTypes = 4 // Only Feature, Defect, Improvement, Task in Sprint View
+			}
+			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % numTypes
 			m.PopulateFormAvailableFeaturesAndBlockers()
 			return m, nil
 		case 11:
@@ -297,6 +309,11 @@ func (m *Model) SubmitForm() {
 
 	spVal := SPOptions[m.Form.SPIdx]
 	taskType := m.Form.TaskTypeIdx
+
+	if m.CurrentView == SprintView && taskType > 3 {
+		m.StatusMsg = "Habits, reminders, and events cannot be created in Sprint View."
+		return
+	}
 
 	var isEdit = m.IsEditing
 	var existingTask model.Task

@@ -1096,6 +1096,129 @@ func TestCreateTaskFromFeatureShortcut(t *testing.T) {
 	}
 }
 
+func TestSprintViewWorkItemCommands(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	sprint := sprints[0]
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+
+	// 1. Run :feature command
+	_, _ = m.RunCommand("feature User Profile Redesign")
+	tasks := database.GetTasks()
+	var createdFeat *model.Task
+	for _, tk := range tasks {
+		if tk.Title == "User Profile Redesign" {
+			tCopy := tk
+			createdFeat = &tCopy
+			break
+		}
+	}
+	if createdFeat == nil {
+		t.Fatalf("expected feature 'User Profile Redesign' to be created")
+	}
+	if createdFeat.WorkItemType != model.WorkItemFeature || createdFeat.SprintUUID != sprint.UUID {
+		t.Errorf("expected Feature in sprint, got type=%s sprint=%s", createdFeat.WorkItemType, createdFeat.SprintUUID)
+	}
+
+	// 2. Run :defect command
+	_, _ = m.RunCommand("defect SQL Injection in search")
+	tasks = database.GetTasks()
+	var createdDefect *model.Task
+	for _, tk := range tasks {
+		if tk.Title == "SQL Injection in search" {
+			tCopy := tk
+			createdDefect = &tCopy
+			break
+		}
+	}
+	if createdDefect == nil {
+		t.Fatalf("expected defect 'SQL Injection in search' to be created")
+	}
+	if createdDefect.WorkItemType != model.WorkItemDefect || createdDefect.SprintUUID != sprint.UUID {
+		t.Errorf("expected Defect in sprint, got type=%s sprint=%s", createdDefect.WorkItemType, createdDefect.SprintUUID)
+	}
+
+	// 3. Run :improvement command
+	_, _ = m.RunCommand("improvement Cache query results")
+	tasks = database.GetTasks()
+	var createdImp *model.Task
+	for _, tk := range tasks {
+		if tk.Title == "Cache query results" {
+			tCopy := tk
+			createdImp = &tCopy
+			break
+		}
+	}
+	if createdImp == nil {
+		t.Fatalf("expected improvement 'Cache query results' to be created")
+	}
+	if createdImp.WorkItemType != model.WorkItemImprovement || createdImp.SprintUUID != sprint.UUID {
+		t.Errorf("expected Improvement in sprint, got type=%s sprint=%s", createdImp.WorkItemType, createdImp.SprintUUID)
+	}
+}
+
+func TestSprintViewDisallowHabitReminderEvent(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	sprint := sprints[0]
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+
+	// 1. :habit command on Sprint View should be rejected
+	_, _ = m.RunCommand("habit Meditate")
+	if !strings.Contains(m.StatusMsg, "cannot be created in Sprint View") {
+		t.Errorf("expected habit rejection message on Sprint View, got: %q", m.StatusMsg)
+	}
+
+	// 2. Form type cycling on Sprint View should only cycle 0..3 (Feature, Defect, Improvement, Task)
+	m.CurrentMode = viewmodel.ModeForm
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.ActiveField = 4 // Type field
+	m.Form.TaskTypeIdx = 0 // Feature
+
+	// Cycle right 4 times: 0 -> 1 -> 2 -> 3 -> 0 (should never hit 4=Reminder, 5=Habit, 6=Event)
+	m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if m.Form.TaskTypeIdx != 1 {
+		t.Errorf("expected Defect (1), got %d", m.Form.TaskTypeIdx)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if m.Form.TaskTypeIdx != 2 {
+		t.Errorf("expected Improvement (2), got %d", m.Form.TaskTypeIdx)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if m.Form.TaskTypeIdx != 3 {
+		t.Errorf("expected Task (3), got %d", m.Form.TaskTypeIdx)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if m.Form.TaskTypeIdx != 0 {
+		t.Errorf("expected cycle back to Feature (0), got %d", m.Form.TaskTypeIdx)
+	}
+
+	// Cycle left: 0 -> 3 (Task)
+	m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	if m.Form.TaskTypeIdx != 3 {
+		t.Errorf("expected cycle left to Task (3), got %d", m.Form.TaskTypeIdx)
+	}
+
+	// 3. Submitting habit/reminder/event on Sprint View must be rejected
+	m.Form.TaskTypeIdx = 5 // Habit (forced)
+	m.Form.TitleInput.SetValue("Daily Run")
+	m.SubmitForm()
+	if !strings.Contains(m.StatusMsg, "cannot be created in Sprint View") {
+		t.Errorf("expected form submit rejection for habit in Sprint View, got: %q", m.StatusMsg)
+	}
+}
+
+
 
 
 

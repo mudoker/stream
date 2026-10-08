@@ -108,9 +108,54 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		m.HelpScrollOffset = 0
 		m.StatusMsg = "Help opened. Press Esc/? to exit."
 
-	case "create", "todo", "habit":
+	case "feature", "defect", "improvement":
+		if len(parts) < 2 {
+			m.StatusMsg = fmt.Sprintf("Syntax: %s <title>", cmdName)
+			return m, nil
+		}
+		activeSprint, ok := m.GetActiveSprint()
+		if !ok {
+			m.StatusMsg = "No active sprint found. Create a sprint first."
+			return m, nil
+		}
+		title := strings.Join(parts[1:], " ")
+		var wiType model.WorkItemType
+		switch cmdName {
+		case "feature":
+			wiType = model.WorkItemFeature
+		case "defect":
+			wiType = model.WorkItemDefect
+		case "improvement":
+			wiType = model.WorkItemImprovement
+		}
+		newID := GenerateWorkItemID(wiType, m.Tasks)
+		newItem := model.Task{
+			UUID:           uuid.New().String(),
+			ID:             newID,
+			WorkspaceUUID:  m.ActiveWorkspaceUUID,
+			Title:          title,
+			WorkItemType:   wiType,
+			Priority:       model.P2,
+			StoryPoints:    3,
+			SprintUUID:     activeSprint.UUID,
+			SchedulingType: model.Floating,
+			LifecycleState: model.StateBacklog,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
+		}
+		m.DB.AddTask(newItem)
+		m.refreshTasks()
+		m.SelectedTaskUUID = newItem.UUID
+		m.StatusMsg = fmt.Sprintf("%s '[%s] %s' created in sprint '%s'.", wiType, newID, title, activeSprint.Name)
+		return m, nil
+
+	case "create", "todo", "task", "habit":
 		if len(parts) < 2 {
 			m.StatusMsg = fmt.Sprintf("Syntax: %s <task title>", cmdName)
+			return m, nil
+		}
+		if cmdName == "habit" && m.CurrentView == SprintView {
+			m.StatusMsg = "Habits cannot be created in Sprint View."
 			return m, nil
 		}
 		title := strings.Join(parts[1:], " ")
@@ -124,6 +169,10 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			LifecycleState: model.StateReady,
 		}
 		if cmdName == "create" {
+			if m.CurrentView == SprintView {
+				m.StatusMsg = "Anchored timed tasks cannot be created in Sprint View. Use ':todo' or ':task'."
+				return m, nil
+			}
 			now := time.Now()
 			start := time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), 9, 0, 0, 0, now.Location())
 			end := start.Add(1 * time.Hour)

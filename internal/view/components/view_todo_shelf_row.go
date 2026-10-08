@@ -32,118 +32,177 @@ func renderShelfTaskRow(m *viewmodel.Model, t theme.Theme, task model.Task, inne
 		chk = "☑"
 	}
 
-	title := theme.SentenceCase(task.Title)
-	maxTitleW := innerW - 6
-	if len([]rune(title)) > maxTitleW {
-		if maxTitleW > 2 {
-			title = string([]rune(title)[:maxTitleW-1]) + "…"
-		} else {
-			title = string([]rune(title)[:maxTitleW])
-		}
-	}
-
 	prefix := "  "
 	if isSelected {
 		prefix = "▶ "
 	}
-	titleLine := fmt.Sprintf("%s%s %s", prefix, chk, title)
-
-	var details []string
+	idBadge := ""
 	if task.ID != "" {
-		details = append(details, task.ID)
+		idBadge = fmt.Sprintf("[%s] ", task.ID)
 	}
-	details = append(details, string(task.Priority))
+
+	lead := prefix + chk + " " + idBadge
+	leadW := lipgloss.Width(lead)
+	title := theme.SentenceCase(task.Title)
+	maxTitleW := innerW - leadW
+	if maxTitleW < 3 {
+		maxTitleW = 3
+	}
+	if lipgloss.Width(title) > maxTitleW {
+		runes := []rune(title)
+		for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxTitleW {
+			runes = runes[:len(runes)-1]
+		}
+		title = string(runes) + "…"
+	}
+	titleLine := lead + title
+
+	// Line 2: Priority, Points/Duration, Schedule Status
+	var metaParts []string
+	metaParts = append(metaParts, string(task.Priority))
 	if task.StoryPoints > 0 {
-		details = append(details, fmt.Sprintf("%d SP", task.StoryPoints))
+		metaParts = append(metaParts, fmt.Sprintf("%d SP", task.StoryPoints))
 	} else if task.SchedulingType == model.Floating && task.EstimatedDurationMins > 0 {
-		details = append(details, fmt.Sprintf("%dm remaining", task.EstimatedDurationMins))
+		metaParts = append(metaParts, fmt.Sprintf("%dm", task.EstimatedDurationMins))
 	}
+
 	if task.SchedulingType == model.Reminder {
 		remDays := formatRemainingDays(task.TimeWindow.Start)
 		if task.TimeWindow.Start.Second() == 1 {
-			details = append(details, fmt.Sprintf("due (%s)", remDays))
+			metaParts = append(metaParts, fmt.Sprintf("due (%s)", remDays))
 		} else {
-			details = append(details, fmt.Sprintf("due %s (%s)", task.TimeWindow.Start.Format("15:04"), remDays))
+			metaParts = append(metaParts, fmt.Sprintf("due %s (%s)", task.TimeWindow.Start.Format("15:04"), remDays))
 		}
 	} else if task.SchedulingType == model.Floating {
 		if task.AddedToToday {
-			details = append(details, "⚡ Today")
+			metaParts = append(metaParts, "Today")
 		} else {
-			details = append(details, "Unassigned")
+			metaParts = append(metaParts, "Unassigned")
 		}
 	}
-	if task.LinkedFeatureID != "" {
-		details = append(details, "🔗 "+task.LinkedFeatureID)
+
+	metaStr := strings.Join(metaParts, " • ")
+	maxMetaW := innerW - 4
+	if maxMetaW < 3 {
+		maxMetaW = 3
 	}
+	if lipgloss.Width(metaStr) > maxMetaW {
+		runes := []rune(metaStr)
+		for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxMetaW {
+			runes = runes[:len(runes)-1]
+		}
+		metaStr = string(runes) + "…"
+	}
+	metaLine := "    " + metaStr
+
+	// Line 3 (optional): Blocked status or Linked Feature
+	var linkLine string
 	if task.BlockedBy != "" {
-		details = append(details, "⛔ "+task.BlockedBy)
-	}
-	if len(task.Tags) > 0 {
-		details = append(details, strings.Join(task.Tags, ", "))
-	}
-	detailStr := strings.Join(details, " • ")
-	maxDetailW := innerW - 5
-	if len([]rune(detailStr)) > maxDetailW {
-		if maxDetailW > 2 {
-			detailStr = string([]rune(detailStr)[:maxDetailW-1]) + "…"
-		} else {
-			detailStr = string([]rune(detailStr)[:maxDetailW])
+		blockedStr := "⛔ Blocked by " + task.BlockedBy
+		maxLinkW := innerW - 4
+		if maxLinkW < 3 {
+			maxLinkW = 3
 		}
-	}
-	detailLine := "     " + detailStr
-
-	if isSelected {
-		titleLineLen := lipgloss.Width(titleLine)
-		if titleLineLen < innerW {
-			titleLine += strings.Repeat(" ", innerW-titleLineLen)
-		}
-		if detailStr != "" {
-			detailLineLen := lipgloss.Width(detailLine)
-			if detailLineLen < innerW {
-				detailLine += strings.Repeat(" ", innerW-detailLineLen)
+		if lipgloss.Width(blockedStr) > maxLinkW {
+			runes := []rune(blockedStr)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxLinkW {
+				runes = runes[:len(runes)-1]
 			}
+			blockedStr = string(runes) + "…"
 		}
+		linkLine = "    " + blockedStr
+	} else if task.LinkedFeatureID != "" {
+		linkedStr := "Link: " + task.LinkedFeatureID
+		maxLinkW := innerW - 4
+		if maxLinkW < 3 {
+			maxLinkW = 3
+		}
+		if lipgloss.Width(linkedStr) > maxLinkW {
+			runes := []rune(linkedStr)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxLinkW {
+				runes = runes[:len(runes)-1]
+			}
+			linkedStr = string(runes) + "…"
+		}
+		linkLine = "    " + linkedStr
 	}
 
-	var titleStyle, detailStyle lipgloss.Style
+	// Line 4 (optional): Tags
+	var tagLine string
+	if len(task.Tags) > 0 {
+		tagStr := "# " + strings.Join(task.Tags, ", ")
+		maxTagW := innerW - 4
+		if maxTagW < 3 {
+			maxTagW = 3
+		}
+		if lipgloss.Width(tagStr) > maxTagW {
+			runes := []rune(tagStr)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxTagW {
+				runes = runes[:len(runes)-1]
+			}
+			tagStr = string(runes) + "…"
+		}
+		tagLine = "    " + tagStr
+	}
+
+	// Line 5 (optional): Description (when selected)
+	var descLine string
+	if isSelected && strings.TrimSpace(task.Description) != "" {
+		desc := strings.TrimSpace(task.Description)
+		maxDescW := innerW - 4
+		if maxDescW < 3 {
+			maxDescW = 3
+		}
+		if lipgloss.Width(desc) > maxDescW {
+			runes := []rune(desc)
+			for len(runes) > 0 && lipgloss.Width(string(runes)+"…") > maxDescW {
+				runes = runes[:len(runes)-1]
+			}
+			desc = string(runes) + "…"
+		}
+		descLine = "    " + desc
+	}
+
+	var titleStyle, metaStyle lipgloss.Style
 	if isSelected {
 		titleStyle = lipgloss.NewStyle().
 			Foreground(t.FocusPurple).
 			Bold(true)
-		detailStyle = lipgloss.NewStyle().
+		metaStyle = lipgloss.NewStyle().
 			Foreground(t.FocusPurple)
 	} else if isDone {
 		titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#88b08b")).Bold(true)
-		detailStyle = lipgloss.NewStyle().Foreground(t.Muted)
+		metaStyle = lipgloss.NewStyle().Foreground(t.Muted)
 	} else {
 		titleStyle = lipgloss.NewStyle().Foreground(t.PriorityColor(task.Priority))
-		detailStyle = lipgloss.NewStyle().Foreground(t.Muted)
+		metaStyle = lipgloss.NewStyle().Foreground(t.Muted)
 	}
 
 	var itemRows []string
 	itemRows = append(itemRows, titleStyle.Render(titleLine))
-	if detailStr != "" {
-		itemRows = append(itemRows, detailStyle.Render(detailLine))
+	if metaStr != "" {
+		itemRows = append(itemRows, metaStyle.Render(metaLine))
 	}
-
-	if isSelected && task.Description != "" {
-		desc := task.Description
-		maxDescW := innerW - 5
-		if len([]rune(desc)) > maxDescW {
-			if maxDescW > 2 {
-				desc = string([]rune(desc)[:maxDescW-1]) + "…"
-			} else {
-				desc = string([]rune(desc)[:maxDescW])
-			}
+	if linkLine != "" {
+		var lStyle lipgloss.Style
+		if isSelected {
+			lStyle = lipgloss.NewStyle().Foreground(t.FocusPurple)
+		} else if task.BlockedBy != "" {
+			lStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#f38ba8"))
+		} else {
+			lStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#89b4fa"))
 		}
-		descLine := "     " + desc
-		descLineLen := lipgloss.Width(descLine)
-		if descLineLen < innerW {
-			descLine += strings.Repeat(" ", innerW-descLineLen)
+		itemRows = append(itemRows, lStyle.Render(linkLine))
+	}
+	if tagLine != "" {
+		tagStyle := lipgloss.NewStyle().Foreground(t.Muted)
+		if isSelected {
+			tagStyle = lipgloss.NewStyle().Foreground(t.FocusPurple)
 		}
-		descStyle := lipgloss.NewStyle().
-			Foreground(t.Muted).
-			Italic(true)
+		itemRows = append(itemRows, tagStyle.Render(tagLine))
+	}
+	if descLine != "" {
+		descStyle := lipgloss.NewStyle().Foreground(t.Muted).Italic(true)
 		itemRows = append(itemRows, descStyle.Render(descLine))
 	}
 

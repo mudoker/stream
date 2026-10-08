@@ -889,3 +889,48 @@ func TestOverlayDialogDimsBackground(t *testing.T) {
 		t.Errorf("Expected rendered canvas with modal to differ from normal canvas")
 	}
 }
+
+func TestTodoShelfTaskMultiLineRendering(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	task := model.Task{
+		UUID:            "test-shelf-task",
+		ID:              "TSK-1",
+		Title:           "S-PAYG TSR Implementation",
+		Priority:        model.P1,
+		StoryPoints:     2,
+		SchedulingType:  model.Floating,
+		AddedToToday:    true,
+		LinkedFeatureID: "FEAT-3",
+		LifecycleState:  model.StateReady,
+		Tags:            []string{"payments"},
+	}
+	database.AddTask(task)
+	m := viewmodel.NewModel(database, nil)
+	m.Layout = viewmodel.ComputeLayout(120, 30)
+	m.CurrentView = viewmodel.DayView
+	m.TodoShelfFocus = true
+	m.SelectedTaskUUID = task.UUID
+
+	th := theme.NewTheme()
+	rendered := components.RenderTodoShelf(&m, th, 30)
+
+	// Verify multi-line breakdown without awkward emoji or wrapping overflow
+	if !strings.Contains(rendered, "[TSK-1] S-PAYG") {
+		t.Errorf("Expected title line with [TSK-1] badge, got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "P1 • 2 SP • Tod") {
+		t.Errorf("Expected clean metadata line with 'P1 • 2 SP • Tod', got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "Link: FEAT-3") {
+		t.Errorf("Expected link line 'Link: FEAT-3', got:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "# payments") {
+		t.Errorf("Expected tag line '# payments', got:\n%s", rendered)
+	}
+	if strings.Contains(rendered, "⚡") {
+		t.Errorf("Expected no spark emoji in shelf task card, got:\n%s", rendered)
+	}
+}
+

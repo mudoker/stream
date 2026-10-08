@@ -77,7 +77,6 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	usedLeft := lipgloss.Width(prefix) + lipgloss.Width(titleStyled)
 	usedRight := lipgloss.Width(navHint)
 
-	// Conditionally include metrics if width allows
 	var leftSide string
 	if workspaceW-2-usedLeft-usedRight > lipgloss.Width(metricsStyled)+4 {
 		leftSide = prefix + titleStyled + "  " + metricsStyled
@@ -91,15 +90,38 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 		padW = 1
 	}
 	headerLine := leftSide + strings.Repeat(" ", padW) + navHint
-
 	sep := lipgloss.NewStyle().Foreground(sepColor).Render(strings.Repeat("─", workspaceW-2))
 
-	// ── 2. Swimlane Columns ──────────────────────────────────────────────
+	// ── 2. Swimlane Columns with Horizontal Scrolling ──────────────────
 	contentW := workspaceW - 4
 	numCols := 5
-	colWidth := (contentW - (numCols-1)*2) / numCols
-	if colWidth < 10 {
-		colWidth = 10
+	minColW := 22 // Comfortable swimlane width before horizontal scrolling kicks in
+
+	totalNeededW := numCols*minColW + (numCols-1)*1
+	colWidth := minColW
+	if contentW >= totalNeededW {
+		// All 5 columns fit; expand to fill width proportionally
+		colWidth = (contentW - (numCols-1)*1) / numCols
+	}
+
+	visibleCols := (contentW + 1) / (colWidth + 1)
+	if visibleCols < 1 {
+		visibleCols = 1
+	}
+	if visibleCols > numCols {
+		visibleCols = numCols
+	}
+
+	// Auto-scroll horizontal offset
+	m.AutoScrollSprintLane()
+	startCol := m.SprintScrollColOffset
+	endCol := startCol + visibleCols
+	if endCol > numCols {
+		endCol = numCols
+		startCol = endCol - visibleCols
+		if startCol < 0 {
+			startCol = 0
+		}
 	}
 
 	laneHeight := appContentHeight - 4
@@ -124,7 +146,8 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 	}
 
 	var renderedColumns []string
-	for idx, lane := range swimlanes {
+	for idx := startCol; idx < endCol; idx++ {
+		lane := swimlanes[idx]
 		isLaneActive := isSprintFocused && m.SprintSwimlaneIdx == idx
 
 		laneSP := 0
@@ -132,7 +155,6 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 			laneSP += task.StoryPoints
 		}
 
-		// Responsive single-line column header without background
 		headerTitle := formatSprintHeader(lane.icon, lane.name, lane.shortName, len(lane.tasks), laneSP, colWidth)
 
 		var headerStyle lipgloss.Style
@@ -157,20 +179,78 @@ func RenderSprintView(m *viewmodel.Model, t theme.Theme, appContentHeight int) s
 		colSep := lipgloss.NewStyle().Foreground(colSepColor).Render(strings.Repeat("─", colWidth))
 
 		// Column Cards
-		var cardRows []string
-		cardRows = append(cardRows, colHeader, colSep, "")
+		var allCardLines []string
+		selectedCardStart := -1
+		selectedCardEnd := -1
 
 		if len(lane.tasks) == 0 {
 			emptyMsg := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Width(colWidth).Align(lipgloss.Center).Render("(No tasks)")
-			cardRows = append(cardRows, emptyMsg)
+			allCardLines = append(allCardLines, emptyMsg)
 		} else {
 			for _, task := range lane.tasks {
 				isSelected := isLaneActive && task.UUID == m.SelectedTaskUUID
-				cardRows = append(cardRows, renderSprintCard(m, t, task, colWidth, isSelected)...)
+				if isSelected {
+					selectedCardStart = len(allCardLines)
+				}
+				cardLines := renderSprintCard(m, t, task, colWidth, isSelected)
+				allCardLines = append(allCardLines, cardLines...)
+				if isSelected {
+					selectedCardEnd = len(allCardLines)
+				}
+				allCardLines = append(allCardLines, "") // card spacing
 			}
 		}
 
-		colContent := strings.Join(cardRows, "\n")
+		// Vertical scrolling for lane content
+		maxCardsVisibleH := laneHeight - 3
+		if maxCardsVisibleH < 4 {
+			maxCardsVisibleH = 4
+		}
+
+		laneOffset := 0
+		if isLaneActive && selectedCardStart != -1 {
+			if selectedCardEnd > laneOffset+maxCardsVisibleH {
+				laneOffset = selectedCardEnd - maxCardsVisibleH
+			}
+			if selectedCardStart < laneOffset {
+				laneOffset = selectedCardStart
+			}
+		}
+		if laneOffset > len(allCardLines)-maxCardsVisibleH {
+			laneOffset = len(allCardLines) - maxCardsVisibleH
+		}
+		if laneOffset < 0 {
+			laneOffset = 0
+		}
+
+		var visibleCardLines []string
+		if laneOffset > 0 {
+			visibleCardLines = append(visibleCardLines, lipgloss.NewStyle().Foreground(t.Muted).Render("  ▲ scroll"))
+		} else {
+			visibleCardLines = append(visibleCardLines, "")
+		}
+
+		sliceEnd := laneOffset + maxCardsVisibleH - 1
+		if sliceEnd > len(allCardLines) {
+			sliceEnd = len(allCardLines)
+		}
+		if laneOffset < len(allCardLines) {
+			visibleCardLines = append(visibleCardLines, allCardLines[laneOffset:sliceEnd]...)
+		}
+
+		for len(visibleCardLines) < maxCardsVisibleH {
+			visibleCardLines = append(visibleCardLines, "")
+		}
+
+		if sliceEnd < len(allCardLines) {
+			visibleCardLines = append(visibleCardLines, lipgloss.NewStyle().Foreground(t.Muted).Render("  ▼ scroll"))
+		}
+
+		var columnRows []string
+		columnRows = append(columnRows, colHeader, colSep)
+		columnRows = append(columnRows, visibleCardLines...)
+
+		colContent := strings.Join(columnRows, "\n")
 		colBox := lipgloss.NewStyle().
 			Width(colWidth).
 			Height(laneHeight).
@@ -245,6 +325,37 @@ func formatSprintHeader(icon, name, shortName string, count int, sp int, maxW in
 	return icon
 }
 
+func getTaskDurationMinutes(task model.Task) int {
+	if !task.TimeWindow.Start.IsZero() && !task.TimeWindow.End.IsZero() && task.TimeWindow.End.After(task.TimeWindow.Start) {
+		mins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+		if mins > 0 {
+			return mins
+		}
+	}
+	if task.EstimatedDurationMins > 0 {
+		return task.EstimatedDurationMins
+	}
+	if task.StoryPoints > 0 {
+		return task.StoryPoints * 30
+	}
+	return 30
+}
+
+func formatDurationBadge(mins int) string {
+	if mins <= 0 {
+		return ""
+	}
+	if mins < 60 {
+		return fmt.Sprintf("󱑂 %dm", mins)
+	}
+	h := mins / 60
+	remM := mins % 60
+	if remM == 0 {
+		return fmt.Sprintf("󱑂 %dh", h)
+	}
+	return fmt.Sprintf("󱑂 %dh%dm", h, remM)
+}
+
 func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW int, isSelected bool) []string {
 	innerW := colW - 2
 	if innerW < 10 {
@@ -268,11 +379,17 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		cursor = "▶ "
 	}
 
-	// Line 1: Priority + SP + Today badge
+	durMins := getTaskDurationMinutes(task)
+	durBadge := formatDurationBadge(durMins)
+
+	// Line 1: Priority + SP + Duration badge + Today badge
 	var badges []string
 	badges = append(badges, string(task.Priority))
 	if task.StoryPoints > 0 {
 		badges = append(badges, fmt.Sprintf("%d SP", task.StoryPoints))
+	}
+	if durBadge != "" {
+		badges = append(badges, durBadge)
 	}
 	if task.AddedToToday {
 		badges = append(badges, "⚡ Today")
@@ -298,8 +415,20 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 	titleLine := "  " + chk + " " + title
 
-	// Line 3: Tags or description
-	var bottomLine string
+	// Line 3: Time Window (if scheduled/anchored)
+	var timeLine string
+	if !task.TimeWindow.Start.IsZero() && !task.TimeWindow.End.IsZero() {
+		timeLine = fmt.Sprintf("  🕒 %s - %s",
+			task.TimeWindow.Start.Format("15:04"),
+			task.TimeWindow.End.Format("15:04"),
+		)
+		if len([]rune(timeLine)) > innerW {
+			timeLine = string([]rune(timeLine)[:innerW])
+		}
+	}
+
+	// Line 4: Tags or description
+	var tagLine string
 	if len(task.Tags) > 0 {
 		tagStr := strings.Join(task.Tags, ", ")
 		maxTagW := innerW - 4
@@ -310,9 +439,24 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 				tagStr = string([]rune(tagStr)[:maxTagW])
 			}
 		}
-		bottomLine = "  🏷 " + tagStr
+		tagLine = "  🏷 " + tagStr
 	}
 
+	var descLine string
+	if strings.TrimSpace(task.Description) != "" {
+		desc := strings.TrimSpace(task.Description)
+		maxDescW := innerW - 4
+		if len([]rune(desc)) > maxDescW {
+			if maxDescW > 2 {
+				desc = string([]rune(desc)[:maxDescW-1]) + "…"
+			} else {
+				desc = string([]rune(desc)[:maxDescW])
+			}
+		}
+		descLine = "  " + desc
+	}
+
+	// Card content rows
 	var cardLines []string
 	topStyle := lipgloss.NewStyle().Foreground(pColor).Bold(true)
 	if isSelected {
@@ -326,8 +470,32 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 	}
 	cardLines = append(cardLines, titleStyle.Render(titleLine))
 
-	if bottomLine != "" {
-		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(bottomLine))
+	if timeLine != "" {
+		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(timeLine))
+	}
+	if descLine != "" && durMins >= 45 {
+		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(descLine))
+	}
+	if tagLine != "" {
+		cardLines = append(cardLines, lipgloss.NewStyle().Foreground(t.Muted).Render(tagLine))
+	}
+
+	// Dynamic height proportional to task duration:
+	// <= 30m: 3 content rows
+	// 45-60m: 4 content rows
+	// 90-120m: 5-6 content rows
+	// > 120m: 7-8 content rows
+	targetContentHeight := 3
+	if durMins > 30 && durMins <= 60 {
+		targetContentHeight = 4
+	} else if durMins > 60 && durMins <= 120 {
+		targetContentHeight = 5
+	} else if durMins > 120 {
+		targetContentHeight = 6
+	}
+
+	for len(cardLines) < targetContentHeight {
+		cardLines = append(cardLines, "")
 	}
 
 	content := strings.Join(cardLines, "\n")
@@ -338,5 +506,5 @@ func renderSprintCard(m *viewmodel.Model, t theme.Theme, task model.Task, colW i
 		Padding(0, 0).
 		Render(content)
 
-	return []string{cardBox}
+	return strings.Split(cardBox, "\n")
 }

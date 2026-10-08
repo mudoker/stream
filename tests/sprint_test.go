@@ -180,6 +180,7 @@ func TestSprintViewNavigationAndSwimlanes(t *testing.T) {
 	database.AddTask(globalTask)
 
 	m := viewmodel.NewModel(database, nil)
+	m.Layout = viewmodel.ComputeLayout(180, 45)
 	v := view.NewView(&m)
 
 	// Switch to Sprint View via key '3' (Month=2, Sprint=3, Week=4, Day=5)
@@ -233,79 +234,87 @@ func TestSprintViewNavigationAndSwimlanes(t *testing.T) {
 	}
 }
 
-func TestSprintTaskMoveAcrossSwimlanes(t *testing.T) {
+func TestSprintSwimlaneSwitchingWithHL(t *testing.T) {
 	database, cleanup := setupTestSprintDB(t)
 	defer cleanup()
 
 	sprints := database.GetSprints()
 	activeSprint := sprints[0]
 
-	task := model.Task{
-		UUID:           uuid.New().String(),
+	task1 := model.Task{
+		UUID:           "task-def",
 		SprintUUID:     activeSprint.UUID,
-		Title:          "Moveable Task",
-		Priority:       model.P1,
-		StoryPoints:    3,
+		Title:          "Task in Defined",
 		SchedulingType: model.Floating,
 		LifecycleState: model.StateBacklog, // Defined
 	}
-	database.AddTask(task)
+	task2 := model.Task{
+		UUID:           "task-prog",
+		SprintUUID:     activeSprint.UUID,
+		Title:          "Task in Progress",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateActive, // In Progress
+	}
+	database.AddTask(task1)
+	database.AddTask(task2)
 
 	m := viewmodel.NewModel(database, nil)
 	m.CurrentView = viewmodel.SprintView
 	m.SprintSwimlaneIdx = 0
-	m.SelectedTaskUUID = task.UUID
+	m.SelectedTaskUUID = task1.UUID
 	m.SidebarFocus = false
 	m.TodoShelfFocus = false
 
-	// Move right to 'In Progress' using 'L' (1)
+	// Switch right to swimlane 1 (In Progress) using 'L'
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
-	updatedTask, _ := database.GetTask(task.UUID)
-	if updatedTask.LifecycleState != model.StateActive {
-		t.Fatalf("expected StateActive, got %s", updatedTask.LifecycleState)
-	}
 	if m.SprintSwimlaneIdx != 1 {
 		t.Fatalf("expected swimlane 1 (In Progress), got %d", m.SprintSwimlaneIdx)
 	}
-
-	// Move right to 'Review' using 'L' (2)
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
-	updatedTask, _ = database.GetTask(task.UUID)
-	if updatedTask.LifecycleState != model.StateReview {
-		t.Fatalf("expected StateReview, got %s", updatedTask.LifecycleState)
+	if m.SelectedTaskUUID != "task-prog" {
+		t.Fatalf("expected selection to be task-prog, got %s", m.SelectedTaskUUID)
 	}
+
+	// Switch right to swimlane 2 (Review) using 'L'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
 	if m.SprintSwimlaneIdx != 2 {
 		t.Fatalf("expected swimlane 2 (Review), got %d", m.SprintSwimlaneIdx)
 	}
 
-	// Move right to 'Testing' using 'L' (3)
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
-	updatedTask, _ = database.GetTask(task.UUID)
-	if updatedTask.LifecycleState != model.StateTesting {
-		t.Fatalf("expected StateTesting, got %s", updatedTask.LifecycleState)
-	}
-	if m.SprintSwimlaneIdx != 3 {
-		t.Fatalf("expected swimlane 3 (Testing), got %d", m.SprintSwimlaneIdx)
-	}
-
-	// Move right to 'Completed' using 'L' (4)
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")})
-	updatedTask, _ = database.GetTask(task.UUID)
-	if updatedTask.LifecycleState != model.StateCompleted {
-		t.Fatalf("expected StateCompleted, got %s", updatedTask.LifecycleState)
-	}
-	if m.SprintSwimlaneIdx != 4 {
-		t.Fatalf("expected swimlane 4 (Completed), got %d", m.SprintSwimlaneIdx)
-	}
-
-	// Move left back to 'Testing' using 'H' (3)
+	// Switch left back to swimlane 1 using 'H'
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("H")})
-	updatedTask, _ = database.GetTask(task.UUID)
-	if updatedTask.LifecycleState != model.StateTesting {
-		t.Fatalf("expected StateTesting, got %s", updatedTask.LifecycleState)
+	if m.SprintSwimlaneIdx != 1 {
+		t.Fatalf("expected swimlane 1 (In Progress), got %d", m.SprintSwimlaneIdx)
 	}
-	if m.SprintSwimlaneIdx != 3 {
-		t.Fatalf("expected swimlane 3 (Testing), got %d", m.SprintSwimlaneIdx)
+	if m.SelectedTaskUUID != "task-prog" {
+		t.Fatalf("expected selection to be task-prog, got %s", m.SelectedTaskUUID)
+	}
+
+	// Switch left back to swimlane 0 using 'H'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("H")})
+	if m.SprintSwimlaneIdx != 0 {
+		t.Fatalf("expected swimlane 0 (Defined), got %d", m.SprintSwimlaneIdx)
+	}
+	if m.SelectedTaskUUID != "task-def" {
+		t.Fatalf("expected selection to be task-def, got %s", m.SelectedTaskUUID)
+	}
+}
+
+func TestSidebarFocusIsolation(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	m := viewmodel.NewModel(database, nil)
+	m.CurrentView = viewmodel.MonthView
+	initialDay := m.SelectedDay
+	m.SidebarFocus = true // Focused on left sidebar tab!
+
+	// Press 'h' and 'l' while sidebar is focused
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+
+	// Selected day on month grid must NOT have changed!
+	if !m.SelectedDay.Equal(initialDay) {
+		t.Fatalf("expected selected day to remain %v when sidebar is focused, got %v", initialDay, m.SelectedDay)
 	}
 }
 
@@ -581,6 +590,83 @@ func TestHabitsAndEventsExcludedFromSprint(t *testing.T) {
 		if tsk.SchedulingType == model.Habit || tsk.SchedulingType == model.Event || tsk.SchedulingType == model.Reminder {
 			t.Fatalf("Sprint swimlanes must not contain habits or events. Found: %+v", tsk)
 		}
+	}
+}
+
+func TestSprintHorizontalScrollingAndTaskNavigation(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	activeSprint := sprints[0]
+
+	task1 := model.Task{
+		UUID:           "task-def-1",
+		SprintUUID:     activeSprint.UUID,
+		Title:          "Defined Task 1",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateBacklog,
+	}
+	task2 := model.Task{
+		UUID:           "task-def-2",
+		SprintUUID:     activeSprint.UUID,
+		Title:          "Defined Task 2",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateBacklog,
+	}
+	task3 := model.Task{
+		UUID:           "task-prog-1",
+		SprintUUID:     activeSprint.UUID,
+		Title:          "Progress Task 1",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateActive,
+	}
+
+	database.AddTask(task1)
+	database.AddTask(task2)
+	database.AddTask(task3)
+
+	m := viewmodel.NewModel(database, nil)
+	m.Layout = viewmodel.ComputeLayout(80, 24) // Narrow terminal width triggering horizontal scroll
+	m.CurrentView = viewmodel.SprintView
+	m.SprintSwimlaneIdx = 0
+	m.SelectedTaskUUID = task1.UUID
+	m.SidebarFocus = false
+	m.TodoShelfFocus = false
+
+	// Navigate down with 'j' in lane 0
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	if m.SelectedTaskUUID != "task-def-2" {
+		t.Fatalf("expected task-def-2, got %s", m.SelectedTaskUUID)
+	}
+
+	// Navigate up with 'k' in lane 0
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	if m.SelectedTaskUUID != "task-def-1" {
+		t.Fatalf("expected task-def-1, got %s", m.SelectedTaskUUID)
+	}
+
+	// Navigate right with 'l' across swimlanes (from lane 0 to lane 1)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")})
+	if m.SprintSwimlaneIdx != 1 {
+		t.Fatalf("expected swimlane 1, got %d", m.SprintSwimlaneIdx)
+	}
+	if m.SelectedTaskUUID != "task-prog-1" {
+		t.Fatalf("expected task-prog-1, got %s", m.SelectedTaskUUID)
+	}
+
+	// Jump across multiple swimlanes using 'L' to last column
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}) // 2
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}) // 3
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("L")}) // 4 (COMPLETED)
+	if m.SprintSwimlaneIdx != 4 {
+		t.Fatalf("expected swimlane 4 (Completed), got %d", m.SprintSwimlaneIdx)
+	}
+
+	// In narrow terminal (workspaceW ~56, contentW ~52, visibleCols = 2), SprintScrollColOffset must adjust
+	m.AutoScrollSprintLane()
+	if m.SprintScrollColOffset < 2 {
+		t.Fatalf("expected horizontal scroll offset >= 2 for lane 4 in narrow view, got %d", m.SprintScrollColOffset)
 	}
 }
 

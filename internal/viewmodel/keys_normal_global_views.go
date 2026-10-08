@@ -10,31 +10,37 @@ func (m *Model) handleGlobalViewsAndNavigation(key string) (bool, tea.Cmd) {
 		m.CurrentView = DashboardView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
+		m.SprintScrollColOffset = 0
 		return true, nil
 	case "2":
 		m.CurrentView = MonthView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
+		m.SprintScrollColOffset = 0
 		return true, nil
 	case "3":
 		m.CurrentView = SprintView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
+		m.SprintScrollColOffset = 0
 		return true, nil
 	case "4":
 		m.CurrentView = WeekView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
+		m.SprintScrollColOffset = 0
 		return true, nil
 	case "5":
 		m.CurrentView = DayView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
+		m.SprintScrollColOffset = 0
 		return true, nil
 	case "6":
 		m.CurrentView = AnalyticsView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
+		m.SprintScrollColOffset = 0
 		return true, nil
 
 	case "tab":

@@ -141,7 +141,7 @@ func (m *Model) cycleFocus() {
 		} else {
 			m.SidebarFocus = false
 			m.TodoShelfFocus = true
-			shelf := m.GetTodoShelfTasks()
+			shelf := m.GetCurrentShelfTasks()
 			if len(shelf) > 0 {
 				found := false
 				if m.LastTodoShelfTaskUUID != "" {
@@ -191,6 +191,7 @@ func (m *Model) moveSidebarView(delta int) {
 		m.CurrentView = viewsOrder[nextIdx]
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
+		m.SprintScrollColOffset = 0
 	}
 }
 

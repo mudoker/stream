@@ -314,12 +314,16 @@ func (m *Model) handleDayNav(key string) {
 			m.AutoScrollToSelectedTask()
 		}
 	case "J":
-		if !m.TodoShelfFocus {
+		if m.TodoShelfFocus {
+			m.MoveShelfSection(1)
+		} else {
 			m.TimelineHour = (m.TimelineHour + 1) % 24
 			m.selectFirstTaskInCurrentHour()
 		}
 	case "K":
-		if !m.TodoShelfFocus {
+		if m.TodoShelfFocus {
+			m.MoveShelfSection(-1)
+		} else {
 			m.TimelineHour = (m.TimelineHour - 1 + 24) % 24
 			m.selectFirstTaskInCurrentHour()
 		}
@@ -346,24 +350,56 @@ func (m *Model) handleSprintNav(key string) {
 	switch key {
 	case "h", "left":
 		if !m.TodoShelfFocus {
-			m.SprintSwimlaneIdx--
-			if m.SprintSwimlaneIdx < 0 {
-				m.SprintSwimlaneIdx = 0
-			}
+			// Navigate horizontally to the left swimlane
 			curLane := lanes[m.SprintSwimlaneIdx]
-			if len(curLane) > 0 {
-				m.SelectedTaskUUID = curLane[0].UUID
+			curIdx := 0
+			for i, t := range curLane {
+				if t.UUID == m.SelectedTaskUUID {
+					curIdx = i
+					break
+				}
+			}
+			newLaneIdx := m.SprintSwimlaneIdx - 1
+			if newLaneIdx < 0 {
+				newLaneIdx = 4
+			}
+			m.SprintSwimlaneIdx = newLaneIdx
+			m.AutoScrollSprintLane()
+			newLane := lanes[newLaneIdx]
+			if len(newLane) > 0 {
+				if curIdx >= len(newLane) {
+					curIdx = len(newLane) - 1
+				}
+				m.SelectedTaskUUID = newLane[curIdx].UUID
+			} else {
+				m.SelectedTaskUUID = ""
 			}
 		}
 	case "l", "right":
 		if !m.TodoShelfFocus {
-			m.SprintSwimlaneIdx++
-			if m.SprintSwimlaneIdx > 4 {
-				m.SprintSwimlaneIdx = 4
-			}
+			// Navigate horizontally to the right swimlane
 			curLane := lanes[m.SprintSwimlaneIdx]
-			if len(curLane) > 0 {
-				m.SelectedTaskUUID = curLane[0].UUID
+			curIdx := 0
+			for i, t := range curLane {
+				if t.UUID == m.SelectedTaskUUID {
+					curIdx = i
+					break
+				}
+			}
+			newLaneIdx := m.SprintSwimlaneIdx + 1
+			if newLaneIdx > 4 {
+				newLaneIdx = 0
+			}
+			m.SprintSwimlaneIdx = newLaneIdx
+			m.AutoScrollSprintLane()
+			newLane := lanes[newLaneIdx]
+			if len(newLane) > 0 {
+				if curIdx >= len(newLane) {
+					curIdx = len(newLane) - 1
+				}
+				m.SelectedTaskUUID = newLane[curIdx].UUID
+			} else {
+				m.SelectedTaskUUID = ""
 			}
 		}
 	case "j", "down":
@@ -408,57 +444,47 @@ func (m *Model) handleSprintNav(key string) {
 				}
 			}
 		}
+	case "J":
+		if m.TodoShelfFocus {
+			m.MoveShelfSection(1)
+		}
+	case "K":
+		if m.TodoShelfFocus {
+			m.MoveShelfSection(-1)
+		}
 	case "H":
 		if !m.TodoShelfFocus {
-			task, exists := m.GetActiveTask()
-			if exists && task.SprintUUID == activeSprint.UUID {
-				curIdx := m.SprintSwimlaneIdx
-				if curIdx > 0 {
-					newIdx := curIdx - 1
-					m.SprintSwimlaneIdx = newIdx
-					switch newIdx {
-					case 0:
-						task.LifecycleState = model.StateBacklog
-					case 1:
-						task.LifecycleState = model.StateActive
-					case 2:
-						task.LifecycleState = model.StateReview
-					case 3:
-						task.LifecycleState = model.StateTesting
-					}
-					task.UpdatedAt = time.Now()
-					m.DB.UpdateTask(task)
-					m.refreshTasks()
-					m.SelectedTaskUUID = task.UUID
-					m.StatusMsg = fmt.Sprintf("Moved task '%s' to %s.", task.Title, sprintLaneName(newIdx))
-				}
+			// Switch active swimlane to the left
+			newLaneIdx := m.SprintSwimlaneIdx - 1
+			if newLaneIdx < 0 {
+				newLaneIdx = 4
 			}
+			m.SprintSwimlaneIdx = newLaneIdx
+			m.AutoScrollSprintLane()
+			curLane := lanes[m.SprintSwimlaneIdx]
+			if len(curLane) > 0 {
+				m.SelectedTaskUUID = curLane[0].UUID
+			} else {
+				m.SelectedTaskUUID = ""
+			}
+			m.StatusMsg = fmt.Sprintf("Switched to %s swimlane.", sprintLaneName(newLaneIdx))
 		}
 	case "L":
 		if !m.TodoShelfFocus {
-			task, exists := m.GetActiveTask()
-			if exists && task.SprintUUID == activeSprint.UUID {
-				curIdx := m.SprintSwimlaneIdx
-				if curIdx < 4 {
-					newIdx := curIdx + 1
-					m.SprintSwimlaneIdx = newIdx
-					switch newIdx {
-					case 1:
-						task.LifecycleState = model.StateActive
-					case 2:
-						task.LifecycleState = model.StateReview
-					case 3:
-						task.LifecycleState = model.StateTesting
-					case 4:
-						task.LifecycleState = model.StateCompleted
-					}
-					task.UpdatedAt = time.Now()
-					m.DB.UpdateTask(task)
-					m.refreshTasks()
-					m.SelectedTaskUUID = task.UUID
-					m.StatusMsg = fmt.Sprintf("Moved task '%s' to %s.", task.Title, sprintLaneName(newIdx))
-				}
+			// Switch active swimlane to the right
+			newLaneIdx := m.SprintSwimlaneIdx + 1
+			if newLaneIdx > 4 {
+				newLaneIdx = 0
 			}
+			m.SprintSwimlaneIdx = newLaneIdx
+			m.AutoScrollSprintLane()
+			curLane := lanes[m.SprintSwimlaneIdx]
+			if len(curLane) > 0 {
+				m.SelectedTaskUUID = curLane[0].UUID
+			} else {
+				m.SelectedTaskUUID = ""
+			}
+			m.StatusMsg = fmt.Sprintf("Switched to %s swimlane.", sprintLaneName(newLaneIdx))
 		}
 	case "s", "]":
 		if len(m.Sprints) > 1 {
@@ -507,6 +533,41 @@ func sprintLaneName(idx int) string {
 		return "Completed"
 	default:
 		return "Defined"
+	}
+}
+
+func (m *Model) AutoScrollSprintLane() {
+	numCols := 5
+	colW := 28
+	contentW := m.Layout.TimelineW - 4
+	if contentW < 20 {
+		contentW = 20
+	}
+
+	visibleCols := (contentW + 1) / (colW + 1)
+	if visibleCols < 1 {
+		visibleCols = 1
+	}
+	if visibleCols > numCols {
+		visibleCols = numCols
+	}
+
+	maxOffset := numCols - visibleCols
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+
+	if m.SprintSwimlaneIdx < m.SprintScrollColOffset {
+		m.SprintScrollColOffset = m.SprintSwimlaneIdx
+	} else if m.SprintSwimlaneIdx >= m.SprintScrollColOffset+visibleCols {
+		m.SprintScrollColOffset = m.SprintSwimlaneIdx - visibleCols + 1
+	}
+
+	if m.SprintScrollColOffset > maxOffset {
+		m.SprintScrollColOffset = maxOffset
+	}
+	if m.SprintScrollColOffset < 0 {
+		m.SprintScrollColOffset = 0
 	}
 }
 

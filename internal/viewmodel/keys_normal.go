@@ -13,6 +13,12 @@ func (m *Model) HandleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if handled, cmd := m.handleSidebarNormalKeys(key); handled {
 			return m, cmd
 		}
+		// Global commands (1-6, ?, :) allowed from sidebar
+		if handled, cmd := m.handleGlobalViewsAndNavigation(key); handled {
+			return m, cmd
+		}
+		// Isolate sidebar focus: do NOT leak unhandled keys (like h, l, x, etc.) to background views
+		return m, nil
 	}
 
 	// Try global views and navigation keys
@@ -44,14 +50,18 @@ func (m *Model) HandleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleSidebarNormalKeys(key string) (bool, tea.Cmd) {
 	switch key {
-	case "j":
+	case "j", "down":
 		m.moveSidebarView(1)
 		return true, nil
-	case "k":
+	case "k", "up":
 		m.moveSidebarView(-1)
 		return true, nil
 	case "tab":
 		m.cycleFocus()
+		return true, nil
+	case "enter", "space":
+		// Enter/space confirms selection and focuses view content
+		m.SidebarFocus = false
 		return true, nil
 	}
 	return false, nil

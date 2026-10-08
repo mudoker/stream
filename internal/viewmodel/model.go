@@ -90,10 +90,11 @@ type Model struct {
 	IsEditingWorkspace   bool
 	EditingWorkspaceUUID string
 
-	Sprints           []model.Sprint
-	ActiveSprintUUID  string
-	SprintForm        SprintForm
-	SprintSwimlaneIdx int // 0: Defined, 1: In Progress, 2: Review, 3: Testing, 4: Completed
+	Sprints               []model.Sprint
+	ActiveSprintUUID      string
+	SprintForm            SprintForm
+	SprintSwimlaneIdx     int // 0: Defined, 1: In Progress, 2: Review, 3: Testing, 4: Completed
+	SprintScrollColOffset int // Horizontal viewport offset for wide swimlanes
 
 	PromptOpen        bool
 	PromptTask        model.Task

@@ -9,6 +9,7 @@ import (
 type ShelfSectionType string
 
 const (
+	SectionToday     ShelfSectionType = "TODAY"
 	SectionReminders ShelfSectionType = "REMINDERS"
 	SectionHabits    ShelfSectionType = "HABITS"
 	SectionBacklog   ShelfSectionType = "BACKLOG"
@@ -49,12 +50,42 @@ func (m *Model) GetShelfData() ShelfData {
 
 	shelfTasks := m.GetCurrentShelfTasks()
 
+	var todayTasks []model.Task
+	todayUUIDs := make(map[string]bool)
+
+	if isGlobal {
+		activeSprint, hasSprint := m.GetActiveSprint()
+		if hasSprint {
+			activeFeatIDs := make(map[string]bool)
+			for _, t := range m.Tasks {
+				if t.SprintUUID == activeSprint.UUID && t.ID != "" {
+					activeFeatIDs[t.ID] = true
+				}
+			}
+			for _, t := range m.Tasks {
+				if m.ActiveWorkspaceUUID != "ALL_WORKSPACES" && t.WorkspaceUUID != m.ActiveWorkspaceUUID {
+					continue
+				}
+				if t.AddedToToday && t.LifecycleState != model.StateCompleted {
+					if (t.LinkedFeatureID != "" && activeFeatIDs[t.LinkedFeatureID]) || t.SprintUUID == activeSprint.UUID {
+						todayTasks = append(todayTasks, t)
+						todayUUIDs[t.UUID] = true
+					}
+				}
+			}
+		}
+	}
+
 	var reminders []model.Task
 	var habits []model.Task
 	var backlog []model.Task
 	var completed []model.Task
 
 	for _, task := range shelfTasks {
+		if todayUUIDs[task.UUID] {
+			continue
+		}
+
 		isDone := false
 		if task.SchedulingType == model.Habit {
 			dateStr := m.SelectedDay.Format("2006-01-02")
@@ -80,7 +111,14 @@ func (m *Model) GetShelfData() ShelfData {
 	}
 
 	var sections []ShelfSection
-	if !isGlobal {
+	if isGlobal {
+		sections = append(sections, ShelfSection{
+			Type:  SectionToday,
+			Title: fmt.Sprintf("⚡ TODAY SHELF (%d)", len(todayTasks)),
+			Icon:  "⚡",
+			Tasks: todayTasks,
+		})
+	} else {
 		sections = append(sections, ShelfSection{
 			Type:  SectionReminders,
 			Title: fmt.Sprintf("⏰ REMINDERS (%d)", len(reminders)),

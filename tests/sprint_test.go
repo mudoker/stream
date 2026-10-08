@@ -843,5 +843,144 @@ func TestSprintViewWorkItemCardRendering(t *testing.T) {
 	}
 }
 
+func TestGlobalBacklogTodayShelf(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	if len(sprints) == 0 {
+		t.Fatal("expected at least one sprint")
+	}
+	sprint := sprints[0]
+
+	// 1. Feature in active sprint
+	feat := model.Task{
+		UUID:          uuid.New().String(),
+		ID:            "FEAT-1",
+		WorkItemType:  model.WorkItemFeature,
+		Title:         "API Auth",
+		Priority:      model.P1,
+		SprintUUID:    sprint.UUID,
+		LifecycleState: model.StateReady,
+		SchedulingType: model.Floating,
+	}
+	database.AddTask(feat)
+
+	// 2. Task linked to FEAT-1 with AddedToToday = true
+	todayTask := model.Task{
+		UUID:            uuid.New().String(),
+		ID:              "TASK-1",
+		Title:           "Write JWT middleware",
+		Priority:        model.P1,
+		LinkedFeatureID: "FEAT-1",
+		AddedToToday:    true,
+		LifecycleState:  model.StateReady,
+		SchedulingType:  model.Floating,
+	}
+	database.AddTask(todayTask)
+
+	// 3. Regular backlog task (not added to today)
+	backlogTask := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "TASK-2",
+		Title:          "Write docs",
+		Priority:       model.P2,
+		AddedToToday:   false,
+		LifecycleState: model.StateReady,
+		SchedulingType: model.Floating,
+	}
+	database.AddTask(backlogTask)
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+
+	shelfData := m.GetShelfData()
+	if !shelfData.IsGlobalBacklog {
+		t.Fatalf("expected IsGlobalBacklog to be true on SprintView")
+	}
+
+	// Should have TODAY SHELF section
+	var todaySec *viewmodel.ShelfSection
+	for _, sec := range shelfData.Sections {
+		if sec.Type == viewmodel.SectionToday {
+			sCopy := sec
+			todaySec = &sCopy
+			break
+		}
+	}
+	if todaySec == nil {
+		t.Fatalf("expected TODAY SHELF section in Global Backlog")
+	}
+	if len(todaySec.Tasks) != 1 || todaySec.Tasks[0].UUID != todayTask.UUID {
+		t.Fatalf("expected todayTask in TODAY SHELF section, got %+v", todaySec.Tasks)
+	}
+}
+
+func TestBlockedByLevelIsolation(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	sprint := sprints[0]
+
+	feat1 := model.Task{
+		UUID:          uuid.New().String(),
+		ID:            "FEAT-1",
+		WorkItemType:  model.WorkItemFeature,
+		Title:         "Feature 1",
+		SprintUUID:    sprint.UUID,
+		SchedulingType: model.Floating,
+	}
+	def1 := model.Task{
+		UUID:          uuid.New().String(),
+		ID:            "DEF-1",
+		WorkItemType:  model.WorkItemDefect,
+		Title:         "Defect 1",
+		SprintUUID:    sprint.UUID,
+		SchedulingType: model.Floating,
+	}
+	task1 := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "TASK-1",
+		Title:          "Task 1",
+		SchedulingType: model.Floating,
+	}
+	database.AddTask(feat1)
+	database.AddTask(def1)
+	database.AddTask(task1)
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+
+	// 1. Feature Form (TaskTypeIdx = 0) -> Blockers must only be Features/Defects (FEAT-1, DEF-1)
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TaskTypeIdx = 0 // Feature
+	m.PopulateFormAvailableFeaturesAndBlockers()
+
+	for _, b := range m.Form.AvailableBlockers {
+		if b.WorkItemType != model.WorkItemFeature && b.WorkItemType != model.WorkItemDefect && b.WorkItemType != model.WorkItemImprovement {
+			t.Fatalf("expected feature blockers to only be feature-level, got: %+v", b)
+		}
+	}
+	if len(m.Form.AvailableBlockers) != 2 {
+		t.Fatalf("expected 2 feature-level blockers (FEAT-1, DEF-1), got %d", len(m.Form.AvailableBlockers))
+	}
+
+	// 2. Task Form (TaskTypeIdx = 3) -> Blockers must only be Tasks (TASK-1)
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TaskTypeIdx = 3 // Task
+	m.PopulateFormAvailableFeaturesAndBlockers()
+
+	for _, b := range m.Form.AvailableBlockers {
+		if b.WorkItemType != "" && b.WorkItemType != model.WorkItemTask {
+			t.Fatalf("expected task blockers to only be task-level, got: %+v", b)
+		}
+	}
+	if len(m.Form.AvailableBlockers) != 1 || m.Form.AvailableBlockers[0].ID != "TASK-1" {
+		t.Fatalf("expected 1 task blocker (TASK-1), got %+v", m.Form.AvailableBlockers)
+	}
+}
+
 
 

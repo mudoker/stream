@@ -16,19 +16,20 @@ type TaskForm struct {
 	Title                 string
 	Description           string
 	PriorityIdx           int // 0: P0, 1: P1, 2: P2, 3: P3
-	SPIdx                 int // index in []int{1, 2, 3, 5, 8, 13}
-	TaskTypeIdx           int // 0: Task, 1: Reminder, 2: Habit, 3: Event
+	SPIdx                 int // index in []int{0, 1, 2, 3, 5, 8, 13}
+	TaskTypeIdx           int // 0: Feature, 1: Defect, 2: Improvement, 3: Task, 4: Reminder, 5: Habit, 6: Event
 	IsAnchoredIdx         int // 0: No, 1: Yes
 	IsAllDayIdx           int // 0: No, 1: Yes
 	LinkSprintIdx         int // 0: No, 1: Yes
-	IsFeatureMode         bool
-	WorkItemTypeIdx       int // 0: Feature, 1: Defect, 2: Improvement, 3: Task
+	AddToTodayIdx         int // 0: No, 1: Yes
 	LinkedFeatureIdx      int // 0: None, 1..N: index into AvailableFeatures
 	AvailableFeatures     []model.Task
+	BlockedByIdx          int // 0: None, 1..N: index into AvailableBlockers
+	AvailableBlockers     []model.Task
 	StartHour             int
 	StartMin              int
 	DurationMins          int
-	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days, 14: Start Date, 15: End Date, 16: Is Anchored, 17: Is All Day, 18: Link to Sprint, 19: Work Item Type, 20: Link to Feature
+	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days, 14: Start Date, 15: End Date, 16: Is Anchored, 17: Is All Day, 18: Link to Sprint, 20: Link to Feature, 21: Blocked By, 22: Add to Today
 	TitleInput            textinput.Model
 	DescInput             textinput.Model
 	StartTimeInput        textinput.Model
@@ -49,15 +50,6 @@ type TaskForm struct {
 
 func NewTaskForm() TaskForm {
 	return NewTaskFormWithDate(time.Now())
-}
-
-func NewFeatureForm() TaskForm {
-	form := NewTaskFormWithDate(time.Now())
-	form.IsFeatureMode = true
-	form.TitleInput.Placeholder = "Implement user authentication..."
-	form.DescInput.Placeholder = "Add OAuth2 and session token handling..."
-	form.LinkSprintIdx = 1
-	return form
 }
 
 // smartDefaultTime returns the current time rounded up to the next 30-minute mark.
@@ -126,13 +118,13 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 	form := TaskForm{
 		PriorityIdx:           2,
 		SPIdx:                 2,
-		TaskTypeIdx:           0,
+		TaskTypeIdx:           3, // default: Task
 		IsAnchoredIdx:         0,
 		IsAllDayIdx:           0,
 		LinkSprintIdx:         0,
-		IsFeatureMode:         false,
-		WorkItemTypeIdx:       0,
+		AddToTodayIdx:         0,
 		LinkedFeatureIdx:      0,
+		BlockedByIdx:          0,
 		StartHour:             baseDate.Hour(),
 		StartMin:              baseDate.Minute(),
 		DurationMins:          60,
@@ -159,64 +151,67 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 }
 
 func (f TaskForm) VisibleFields() []int {
-	if f.IsFeatureMode {
-		// Feature / Defect mode on Sprint View: Title, Description, Work Item Type, Priority, Story Points, Tags, Submit
-		return []int{0, 1, 19, 2, 3, 9, 10}
-	}
-
 	var fields []int
-	fields = append(fields, 0, 1, 2)
-	// Story Points (3) only visible for Task (0)
-	if f.TaskTypeIdx == 0 {
-		fields = append(fields, 3)
-	}
-	fields = append(fields, 4)
+	fields = append(fields, 0, 1, 4, 2) // Title, Description, Type, Priority
 
-	// Is Anchored (16) only visible for Task (0)
-	if f.TaskTypeIdx == 0 {
-		fields = append(fields, 16)
+	// Feature (0), Defect (1), Improvement (2)
+	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 2 {
+		fields = append(fields, 3, 21, 9, 10) // Story Points, Blocked By, Tags, Submit
+		return fields
 	}
 
-	if f.TaskTypeIdx == 0 {
+	// Task (3)
+	if f.TaskTypeIdx == 3 {
+		fields = append(fields, 3, 16) // Story Points, Is Anchored
 		if f.IsAnchoredIdx == 1 {
-			fields = append(fields, 5, 6)
+			fields = append(fields, 5, 6) // Start Time, Duration
 		} else {
-			fields = append(fields, 6)
+			fields = append(fields, 6) // Est Duration
 		}
-	} else if f.TaskTypeIdx == 1 {
-		// Reminder: Due Date (5), Due Time (6)
-		fields = append(fields, 5, 6)
-	} else if f.TaskTypeIdx == 2 {
-		// Habit: Start Time (5), Duration (6), Location (7), Commute buffer (8)
+		fields = append(fields, 22, 20, 21, 11) // Add to Today, Link to Feature, Blocked By, Is Recurring
+		if f.IsRecurringIdx == 1 {
+			fields = append(fields, 12, 13)
+		}
+		fields = append(fields, 9, 10)
+		return fields
+	}
+
+	// Reminder (4)
+	if f.TaskTypeIdx == 4 {
+		fields = append(fields, 5, 6, 11)
+		if f.IsRecurringIdx == 1 {
+			fields = append(fields, 12, 13)
+		}
+		fields = append(fields, 9, 10)
+		return fields
+	}
+
+	// Habit (5)
+	if f.TaskTypeIdx == 5 {
 		fields = append(fields, 5, 6, 7)
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
 			fields = append(fields, 8)
 		}
-	} else if f.TaskTypeIdx == 3 {
-		// Event: Start Date (14), Is All Day (17), Start Time (5), Duration (6), Location (7)
-		if f.IsAllDayIdx == 1 {
-			fields = append(fields, 14, 17, 7)
-		} else {
-			fields = append(fields, 14, 17, 5, 6, 7)
+		fields = append(fields, 12, 13, 9, 10)
+		return fields
+	}
+
+	// Event (6)
+	if f.TaskTypeIdx == 6 {
+		fields = append(fields, 14, 17)
+		if f.IsAllDayIdx == 0 {
+			fields = append(fields, 5, 6)
 		}
+		fields = append(fields, 7)
 		if strings.TrimSpace(f.LocationInput.Value()) != "" {
 			fields = append(fields, 8)
 		}
-	}
-
-	// Link to Feature (20) visible for Task (0)
-	if f.TaskTypeIdx == 0 {
-		fields = append(fields, 20)
-	}
-
-	if f.TaskTypeIdx == 2 {
-		// Habit is always recurring
-		fields = append(fields, 12, 13)
-	} else if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 3 {
 		fields = append(fields, 11)
 		if f.IsRecurringIdx == 1 {
 			fields = append(fields, 12, 13)
 		}
+		fields = append(fields, 9, 10)
+		return fields
 	}
 
 	fields = append(fields, 9, 10)

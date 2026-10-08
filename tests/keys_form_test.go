@@ -137,7 +137,7 @@ func TestHabitCreationFormSubmit(t *testing.T) {
 	m.Form.DescInput.SetValue("8 glasses a day")
 	m.Form.PriorityIdx = 2 // Medium
 	m.Form.SPIdx = 2       // 2 SP
-	m.Form.TaskTypeIdx = 2 // Habit
+	m.Form.TaskTypeIdx = 5 // Habit
 	m.Form.TagsInput.SetValue("health, daily")
 	m.Form.RecurringDaysInput.SetValue("Mon, Tue, Wed, Thu, Fri, Sat, Sun")
 
@@ -227,7 +227,7 @@ func TestReminderCreationFormSubmit(t *testing.T) {
 	m.Form.DescInput.SetValue("Weekly call")
 	m.Form.PriorityIdx = 1 // High
 	m.Form.SPIdx = 3       // 3 SP
-	m.Form.TaskTypeIdx = 1 // Reminder
+	m.Form.TaskTypeIdx = 4 // Reminder
 	m.Form.StartTimeInput.SetValue("") // empty due time
 	m.Form.DueDateInput.SetValue("2026-06-12")
 
@@ -258,7 +258,7 @@ func TestReminderCreationFormSubmit(t *testing.T) {
 	m.Form.DescInput.SetValue("Checkup")
 	m.Form.PriorityIdx = 0 // Critical
 	m.Form.SPIdx = 4       // 5 SP
-	m.Form.TaskTypeIdx = 1 // Reminder
+	m.Form.TaskTypeIdx = 4 // Reminder
 	m.Form.StartTimeInput.SetValue("14:30")
 	m.Form.DueDateInput.SetValue("2026-06-15")
 
@@ -316,7 +316,7 @@ func TestRecurringTaskLifecycle(t *testing.T) {
 	m.Form.DescInput.SetValue("Push day")
 	m.Form.PriorityIdx = 1 // High
 	m.Form.SPIdx = 2       // 2 SP
-	m.Form.TaskTypeIdx = 0 // Task
+	m.Form.TaskTypeIdx = 3 // Task
 	m.Form.IsAnchoredIdx = 1 // Yes (Anchored)
 	m.Form.IsRecurringIdx = 1 // Yes
 	m.Form.RecurringEndDateInput.SetValue("2026-06-20")
@@ -502,7 +502,7 @@ func TestRecurringCapping(t *testing.T) {
 	m.Form.DescInput.SetValue("Health")
 	m.Form.PriorityIdx = 1
 	m.Form.SPIdx = 2
-	m.Form.TaskTypeIdx = 0 // Task
+	m.Form.TaskTypeIdx = 3 // Task
 	m.Form.IsAnchoredIdx = 1 // Yes (Anchored)
 	m.Form.IsRecurringIdx = 1
 	// Set end date to 1 year in the future (2027-06-14)
@@ -577,8 +577,8 @@ func TestInteractiveDaysSelectAndStoryPointsSkip(t *testing.T) {
 	}
 
 	// 3. Verify Story Points skipping for Habit and Event
-	// Start with type Anchored (0): Story Points (3) should be visible
-	m.Form.TaskTypeIdx = 0
+	// Start with type Task (3): Story Points (3) should be visible
+	m.Form.TaskTypeIdx = 3
 	m.Form.IsAnchoredIdx = 1
 	visible := m.Form.VisibleFields()
 	hasSP := false
@@ -591,8 +591,8 @@ func TestInteractiveDaysSelectAndStoryPointsSkip(t *testing.T) {
 		t.Errorf("expected Story Points (3) to be visible for Anchored task")
 	}
 
-	// Change type to Habit (3)
-	m.Form.TaskTypeIdx = 2
+	// Change type to Habit (5)
+	m.Form.TaskTypeIdx = 5
 	visible = m.Form.VisibleFields()
 	hasSP = false
 	for _, val := range visible {
@@ -604,8 +604,8 @@ func TestInteractiveDaysSelectAndStoryPointsSkip(t *testing.T) {
 		t.Errorf("expected Story Points (3) to be hidden for Habit")
 	}
 
-	// Change type to Event (4)
-	m.Form.TaskTypeIdx = 3
+	// Change type to Event (6)
+	m.Form.TaskTypeIdx = 6
 	visible = m.Form.VisibleFields()
 	hasSP = false
 	for _, val := range visible {
@@ -632,7 +632,7 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 	m := viewmodel.NewModel(database, syncEngine)
 	m.Form = viewmodel.NewTaskForm()
 	m.Form.TitleInput.SetValue("Daily Workout")
-	m.Form.TaskTypeIdx = 2 // Habit
+	m.Form.TaskTypeIdx = 5 // Habit
 	m.Form.StartTimeInput.SetValue("08:30")
 	m.Form.DurationInput.SetValue("45")
 	m.Form.RecurringDaysInput.SetValue("Mon")
@@ -667,7 +667,7 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 	// Test de-anchored habit creation
 	m.Form = viewmodel.NewTaskForm()
 	m.Form.TitleInput.SetValue("Drink Water Float")
-	m.Form.TaskTypeIdx = 2 // Habit
+	m.Form.TaskTypeIdx = 5 // Habit
 	m.Form.StartTimeInput.SetValue("") // Clear start time
 	m.Form.DurationInput.SetValue("30")
 	m.Form.RecurringDaysInput.SetValue("Mon")
@@ -703,7 +703,7 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 	m.Form = viewmodel.NewTaskForm()
 	m.Form.TitleInput.SetValue("Drink Water Anchored")
 	m.Form.DescInput.SetValue("Stay hydrated")
-	m.Form.TaskTypeIdx = 2 // Habit
+	m.Form.TaskTypeIdx = 5 // Habit
 	m.Form.StartTimeInput.SetValue("14:15")
 	m.Form.DurationInput.SetValue("15")
 	m.IsEditing = true
@@ -742,7 +742,7 @@ func TestHabitStartAndDurationHandling(t *testing.T) {
 	// Test editing a habit (de-anchoring it)
 	m.Form = viewmodel.NewTaskForm()
 	m.Form.TitleInput.SetValue("Drink Water Float Again")
-	m.Form.TaskTypeIdx = 2 // Habit
+	m.Form.TaskTypeIdx = 5 // Habit
 	m.Form.StartTimeInput.SetValue("") // Clear start time
 	m.Form.DurationInput.SetValue("20")
 	m.IsEditing = true
@@ -870,7 +870,7 @@ func TestFloatingTaskFormCreation(t *testing.T) {
 	m.Form.DescInput.SetValue("Tidy up")
 	m.Form.PriorityIdx = 3 // Low
 	m.Form.SPIdx = 1       // 1 SP
-	m.Form.TaskTypeIdx = 0 // Task
+	m.Form.TaskTypeIdx = 3 // Task
 	m.Form.IsAnchoredIdx = 0 // No (Floating)
 	m.Form.DurationInput.SetValue("45")
 
@@ -968,9 +968,9 @@ func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
 
 	// 3. Create Feature on Sprint View
 	m.CurrentMode = viewmodel.ModeForm
-	m.Form = viewmodel.NewFeatureForm()
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TaskTypeIdx = 0 // Feature
 	m.Form.TitleInput.SetValue("User Auth Module")
-	m.Form.WorkItemTypeIdx = 0 // Feature
 	m.SubmitForm()
 
 	tasks := database.GetTasks()
@@ -998,7 +998,8 @@ func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
 	// 4. Create Task linked to Feature
 	m.CurrentMode = viewmodel.ModeForm
 	m.Form = viewmodel.NewTaskForm()
-	m.PopulateFormAvailableFeatures()
+	m.Form.TaskTypeIdx = 3 // Task
+	m.PopulateFormAvailableFeaturesAndBlockers()
 	m.Form.TitleInput.SetValue("Implement Login endpoint")
 	m.Form.LinkedFeatureIdx = 1 // Link to FEAT-1
 	m.SubmitForm()
@@ -1021,7 +1022,8 @@ func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
 
 	// 5. Test Modal Rendering for Feature Form
 	th := theme.NewTheme()
-	featForm := viewmodel.NewFeatureForm()
+	featForm := viewmodel.NewTaskForm()
+	featForm.TaskTypeIdx = 0
 	m.Form = featForm
 	renderedFeat := modals.RenderFormModal(&m, th)
 	if !strings.Contains(renderedFeat, "Create Feature") {
@@ -1033,8 +1035,9 @@ func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
 
 	// 6. Test Modal Rendering for Task Form
 	taskForm := viewmodel.NewTaskForm()
+	taskForm.TaskTypeIdx = 3
 	m.Form = taskForm
-	m.PopulateFormAvailableFeatures()
+	m.PopulateFormAvailableFeaturesAndBlockers()
 	renderedTask := modals.RenderFormModal(&m, th)
 	if !strings.Contains(renderedTask, "Create Task") {
 		t.Fatalf("expected modal to contain 'Create Task', got: %s", renderedTask)

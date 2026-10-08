@@ -100,6 +100,7 @@ type Task struct {
 	ID                    string           `json:"id,omitempty"` // Concise ID, e.g. "FEAT-1", "DEF-2"
 	WorkItemType          WorkItemType     `json:"work_item_type,omitempty"`
 	LinkedFeatureID       string           `json:"linked_feature_id,omitempty"` // ID of linked feature
+	BlockedBy             string           `json:"blocked_by,omitempty"`        // Concise ID of blocker
 	WorkspaceUUID         string           `json:"workspace_uuid,omitempty"`
 	SprintUUID            string           `json:"sprint_uuid,omitempty"`
 	AddedToToday          bool             `json:"added_to_today,omitempty"`

@@ -18,14 +18,13 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 	const innerW = 52
 
 	var fields []string
-	headerText := "Create Task"
-	if f.IsFeatureMode {
-		headerText = "Create Feature"
-		if m.IsEditing {
-			headerText = "Edit Feature"
-		}
-	} else if m.IsEditing {
-		headerText = "Edit Task"
+	typeName := "Task"
+	if f.TaskTypeIdx >= 0 && f.TaskTypeIdx < len(viewmodel.TaskTypeOptions) {
+		typeName = viewmodel.TaskTypeOptions[f.TaskTypeIdx]
+	}
+	headerText := "Create " + typeName
+	if m.IsEditing {
+		headerText = "Edit " + typeName
 	}
 	title := lipgloss.NewStyle().Foreground(t.Accent).Bold(true).Render(headerText)
 	fields = append(fields, title)
@@ -56,9 +55,6 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Title", f.TitleInput.View(), f.ActiveField == 0, t))
 		case 1:
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Description", f.DescInput.View(), f.ActiveField == 1, t))
-		case 19:
-			wiTypeStr := viewmodel.WorkItemTypeOptions[f.WorkItemTypeIdx]
-			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Type", wiTypeStr, f.ActiveField == 19, t))
 		case 2:
 			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Priority", priorityValStr, f.ActiveField == 2, t))
 		case 3:
@@ -78,15 +74,15 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 			}
 			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "All Day", allDayOptStr, f.ActiveField == 17, t))
 		case 5:
-			if f.TaskTypeIdx == 1 {
+			if f.TaskTypeIdx == 4 { // Reminder
 				fields = append(fields, components.RenderFormField(nextFieldNum(), "Due Date", f.DueDateInput.View(), f.ActiveField == 5, t))
 			} else {
 				fields = append(fields, components.RenderFormField(nextFieldNum(), "Start Time", f.StartTimeInput.View(), f.ActiveField == 5, t))
 			}
 		case 6:
-			if f.TaskTypeIdx == 0 && f.IsAnchoredIdx == 0 {
+			if f.TaskTypeIdx == 3 && f.IsAnchoredIdx == 0 {
 				fields = append(fields, components.RenderFormField(nextFieldNum(), "Est. Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
-			} else if f.TaskTypeIdx == 1 {
+			} else if f.TaskTypeIdx == 4 { // Reminder
 				fields = append(fields, components.RenderFormField(nextFieldNum(), "Due Time", f.StartTimeInput.View(), f.ActiveField == 6, t))
 			} else {
 				fields = append(fields, components.RenderFormField(nextFieldNum(), "Duration (min)", f.DurationInput.View(), f.ActiveField == 6, t))
@@ -104,6 +100,19 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 				featOptStr = fmt.Sprintf("[%s] %s", feat.ID, feat.Title)
 			}
 			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Link to Feature", featOptStr, f.ActiveField == 20, t))
+		case 21:
+			blkOptStr := "None"
+			if f.BlockedByIdx > 0 && f.BlockedByIdx <= len(f.AvailableBlockers) {
+				blk := f.AvailableBlockers[f.BlockedByIdx-1]
+				blkOptStr = fmt.Sprintf("[%s] %s", blk.ID, blk.Title)
+			}
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Blocked By", blkOptStr, f.ActiveField == 21, t))
+		case 22:
+			todayOptStr := "No"
+			if f.AddToTodayIdx == 1 {
+				todayOptStr = "Yes"
+			}
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Today Shelf", todayOptStr, f.ActiveField == 22, t))
 		case 11:
 			recOptStr := "No"
 			if f.IsRecurringIdx == 1 {

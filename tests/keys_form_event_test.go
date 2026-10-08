@@ -27,7 +27,7 @@ func TestEventTaskFormCreation(t *testing.T) {
 	m.Form.TitleInput.SetValue("Launch Event")
 	m.Form.DescInput.SetValue("Google I/O keynote")
 	m.Form.PriorityIdx = 1 // High priority
-	m.Form.TaskTypeIdx = 3 // Event task type
+	m.Form.TaskTypeIdx = 6 // Event task type
 	m.Form.StartTimeInput.SetValue("10:00")
 	m.Form.DurationInput.SetValue("120")
 	m.Form.LocationInput.SetValue("Mountain View")
@@ -82,7 +82,7 @@ func TestEventTaskFormCreationNoLocation(t *testing.T) {
 	m.Form.TitleInput.SetValue("Remote Sync")
 	m.Form.DescInput.SetValue("Zoom meeting")
 	m.Form.PriorityIdx = 1
-	m.Form.TaskTypeIdx = 3 // Event task type
+	m.Form.TaskTypeIdx = 6 // Event task type
 	m.Form.StartTimeInput.SetValue("14:00")
 	m.Form.DurationInput.SetValue("60")
 	m.Form.LocationInput.SetValue("") // empty location
@@ -136,7 +136,7 @@ func TestEventTaskFormCreationStartEndDates(t *testing.T) {
 	m.Form.TitleInput.SetValue("Single-day Event")
 	m.Form.DescInput.SetValue("Hackathon weekend")
 	m.Form.PriorityIdx = 1
-	m.Form.TaskTypeIdx = 3 // Event
+	m.Form.TaskTypeIdx = 6 // Event
 	m.Form.StartDateInput.SetValue("2026-06-20")
 	m.Form.StartTimeInput.SetValue("09:00")
 	m.Form.DurationInput.SetValue("180") // 3 hours duration
@@ -186,7 +186,7 @@ func TestHabitFormCreationWithLocationAndBuffer(t *testing.T) {
 	m.Form.TitleInput.SetValue("Run in Park")
 	m.Form.DescInput.SetValue("Morning cardio")
 	m.Form.PriorityIdx = 2
-	m.Form.TaskTypeIdx = 2 // Habit task type
+	m.Form.TaskTypeIdx = 5 // Habit task type
 	m.Form.StartTimeInput.SetValue("07:00")
 	m.Form.DurationInput.SetValue("45")
 	m.Form.LocationInput.SetValue("Central Park")
@@ -258,7 +258,7 @@ func TestAllDayEventTaskFormCreation(t *testing.T) {
 	m.Form.TitleInput.SetValue("Hackathon Day")
 	m.Form.DescInput.SetValue("24h building cool stuff")
 	m.Form.PriorityIdx = 0 // P0
-	m.Form.TaskTypeIdx = 3 // Event task type
+	m.Form.TaskTypeIdx = 6 // Event task type
 	m.Form.IsAllDayIdx = 1 // All Day = Yes
 	m.Form.LocationInput.SetValue("Office")
 

@@ -53,12 +53,13 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		return true, nil
 	case "i":
 		m.CurrentMode = ModeForm
+		m.Form = NewTaskFormWithDate(m.SelectedDay)
 		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
-			m.Form = NewFeatureForm()
+			m.Form.TaskTypeIdx = 0 // Feature
 		} else {
-			m.Form = NewTaskFormWithDate(m.SelectedDay)
+			m.Form.TaskTypeIdx = 3 // Task
 		}
-		m.PopulateFormAvailableFeatures()
+		m.PopulateFormAvailableFeaturesAndBlockers()
 		m.Form.TitleInput.Focus()
 		return true, nil
 	case "I":

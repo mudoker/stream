@@ -67,7 +67,9 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 
 		if len(sec.Tasks) == 0 {
 			emptyMsg := fmt.Sprintf("  No %s tasks", strings.ToLower(string(sec.Type)))
-			if sec.Type == viewmodel.SectionReminders {
+			if sec.Type == viewmodel.SectionToday {
+				emptyMsg = "  No today tasks"
+			} else if sec.Type == viewmodel.SectionReminders {
 				emptyMsg = "  No reminders"
 			} else if sec.Type == viewmodel.SectionHabits {
 				emptyMsg = "  No habits"

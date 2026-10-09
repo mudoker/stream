@@ -276,6 +276,26 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 			m.ConfirmFocusArea,
 			t,
 		)
+	case "anchor_task_to_today":
+		taskTitle := m.ConfirmTask.Title
+		if m.ConfirmTask.ID != "" {
+			taskTitle = fmt.Sprintf("[%s] %s", m.ConfirmTask.ID, m.ConfirmTask.Title)
+		}
+		return components.RenderBaseConfirmModal(
+			"ANCHOR TASK TO TODAY",
+			[]string{
+				"Do you want to anchor this task to today's schedule?",
+				fmt.Sprintf("  \"%s\"", taskTitle),
+				"",
+				"On confirm, this task will be scheduled on today's timeline",
+				"and moved to the Day View.",
+			},
+			[]string{"Anchor to Today", "Cancel"},
+			m.ConfirmSelectedIndex,
+			-1,
+			m.ConfirmFocusArea,
+			t,
+		)
 	case "clear_shelf_section":
 		sec := m.ConfirmShelfSection
 		title := fmt.Sprintf("🗑️  CLEAR %s", sec.Type)

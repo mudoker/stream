@@ -176,20 +176,34 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 				habits = append(habits, t)
 			}
 		} else if t.SchedulingType == model.Floating || t.AddedToToday {
-			// Day view shelf: only show tasks linked to that day
-			// 1. Explicitly added to today
-			// 2. InitiateDate matches selectedDay
-			// 3. Fallback: CreatedAt matches selectedDay if InitiateDate is zero
-			// 4. Fallback for tests/legacy without dates: both InitiateDate and CreatedAt are zero
+			// Sprint items (features, defects, improvements, or items in a sprint with defined/in-progress status)
+			// belong to the sprint Kanban swimlanes and should NOT appear in the day backlog shelf unless explicitly AddedToToday.
+			if (t.SprintUUID != "" || t.WorkItemType == model.WorkItemFeature || t.WorkItemType == model.WorkItemDefect || t.WorkItemType == model.WorkItemImprovement) && !t.AddedToToday {
+				continue
+			}
+			// Day view shelf: show undone floating tasks scheduled on or before selectedDay (carried over to subsequent days).
 			var isForDay bool
-			if t.AddedToToday && sameDay(time.Now(), selectedDay) {
-				isForDay = true
-			} else if !t.InitiateDate.IsZero() {
-				isForDay = sameDay(t.InitiateDate, selectedDay)
+			var taskDate time.Time
+			if !t.InitiateDate.IsZero() {
+				taskDate = t.InitiateDate
 			} else if !t.CreatedAt.IsZero() {
-				isForDay = sameDay(t.CreatedAt, selectedDay)
-			} else {
+				taskDate = t.CreatedAt
+			}
+
+			if taskDate.IsZero() {
 				isForDay = true
+			} else {
+				y1, m1, d1 := taskDate.Local().Date()
+				tCal := time.Date(y1, m1, d1, 0, 0, 0, 0, taskDate.Location())
+
+				y2, m2, d2 := selectedDay.Local().Date()
+				sCal := time.Date(y2, m2, d2, 0, 0, 0, 0, selectedDay.Location())
+
+				if tCal.Equal(sCal) || tCal.Before(sCal) {
+					isForDay = true
+				} else if t.AddedToToday && (sameDay(time.Now(), selectedDay) || selectedDay.After(time.Now())) {
+					isForDay = true
+				}
 			}
 
 			if isForDay {

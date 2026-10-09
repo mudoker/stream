@@ -147,33 +147,47 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		task, exists := m.GetActiveTask()
 		if exists {
 			if m.CurrentView == SprintView {
-				activeSprint, ok := m.GetActiveSprint()
-				if !ok {
-					m.StatusMsg = "No active sprint found."
-					return true, nil
-				}
-				if m.TodoShelfFocus {
-					if task.SchedulingType == model.Habit || task.SchedulingType == model.Event || task.SchedulingType == model.Reminder {
-						m.StatusMsg = "Habits and events are not tasks and cannot be anchored to a sprint."
+				isFeatureLevel := task.WorkItemType == model.WorkItemFeature ||
+					task.WorkItemType == model.WorkItemDefect ||
+					task.WorkItemType == model.WorkItemImprovement
+
+				if isFeatureLevel {
+					activeSprint, ok := m.GetActiveSprint()
+					if !ok {
+						m.StatusMsg = "No active sprint found."
 						return true, nil
 					}
-					// Anchor task to active sprint
-					task.SprintUUID = activeSprint.UUID
-					if task.LifecycleState == "" || task.LifecycleState == model.StateCompleted {
-						task.LifecycleState = model.StateBacklog
+					if m.TodoShelfFocus {
+						// Anchor feature/defect to active sprint
+						task.SprintUUID = activeSprint.UUID
+						if task.LifecycleState == "" || task.LifecycleState == model.StateCompleted {
+							task.LifecycleState = model.StateBacklog
+						}
+						task.UpdatedAt = time.Now()
+						m.DB.UpdateTask(task)
+						m.refreshTasks()
+						m.StatusMsg = fmt.Sprintf("%s '%s' anchored to sprint '%s'.", task.WorkItemType, task.Title, activeSprint.Name)
+						return true, nil
+					} else {
+						// Deanchor feature/defect from active sprint
+						task.SprintUUID = ""
+						task.UpdatedAt = time.Now()
+						m.DB.UpdateTask(task)
+						m.refreshTasks()
+						m.StatusMsg = fmt.Sprintf("%s '%s' deanchored back to global backlog.", task.WorkItemType, task.Title)
+						return true, nil
 					}
-					task.UpdatedAt = time.Now()
-					m.DB.UpdateTask(task)
-					m.refreshTasks()
-					m.StatusMsg = fmt.Sprintf("Task '%s' anchored to sprint '%s'.", task.Title, activeSprint.Name)
-					return true, nil
 				} else {
-					// Deanchor task from active sprint
-					task.SprintUUID = ""
-					task.UpdatedAt = time.Now()
-					m.DB.UpdateTask(task)
-					m.refreshTasks()
-					m.StatusMsg = fmt.Sprintf("Task '%s' deanchored back to global backlog.", task.Title)
+					// Standard task in Sprint View: ask to anchor to Today's timeline
+					if task.SchedulingType == model.Habit || task.SchedulingType == model.Event || task.SchedulingType == model.Reminder {
+						m.StatusMsg = "Habits, reminders, and events cannot be anchored to sprint or day timeline from sprint view."
+						return true, nil
+					}
+					m.ConfirmTask = task
+					m.ConfirmOpen = true
+					m.ConfirmActionType = "anchor_task_to_today"
+					m.ConfirmSelectedIndex = 0
+					m.ConfirmFocusArea = 0
 					return true, nil
 				}
 			}

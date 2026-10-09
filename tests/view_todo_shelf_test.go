@@ -5,12 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"stream/internal/db"
 	"stream/internal/model"
 	"stream/internal/view/components"
 	"stream/internal/view/theme"
 	"stream/internal/viewmodel"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/google/uuid"
 )
 
 func TestGetTodoShelfTasksSorting(t *testing.T) {
@@ -818,6 +820,218 @@ func TestClearShelfSectionWithConfirmation(t *testing.T) {
 		t.Fatalf("expected remaining task to be task-done-1, got %s", tasksAfter[0].UUID)
 	}
 }
+
+func TestUndoneTasksCarryOverToNextDay(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to init db: %v", err)
+	}
+
+	now := time.Now()
+	day1 := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	day2 := day1.AddDate(0, 0, 1)
+	day3 := day1.AddDate(0, 0, 2)
+
+	task1 := model.Task{
+		UUID:           "task-day1-undone",
+		Title:          "Undone Day 1 Task",
+		InitiateDate:   day1,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	task2 := model.Task{
+		UUID:           "task-day3-future",
+		Title:          "Future Day 3 Task",
+		InitiateDate:   day3,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	database.AddTask(task1)
+	database.AddTask(task2)
+
+	m := viewmodel.NewModel(database, nil)
+
+	// Day 1: task1 should appear on shelf, task2 should not
+	m.SelectedDay = day1
+	shelfDay1 := m.GetTodoShelfTasks()
+	hasTask1 := false
+	hasTask2 := false
+	for _, tk := range shelfDay1 {
+		if tk.UUID == "task-day1-undone" {
+			hasTask1 = true
+		}
+		if tk.UUID == "task-day3-future" {
+			hasTask2 = true
+		}
+	}
+	if !hasTask1 || hasTask2 {
+		t.Fatalf("Day 1: expected task1=true, task2=false, got task1=%v, task2=%v", hasTask1, hasTask2)
+	}
+
+	// Day 2: task1 was not done on Day 1, so it MUST carry onto Day 2
+	m.SelectedDay = day2
+	shelfDay2 := m.GetTodoShelfTasks()
+	hasTask1 = false
+	hasTask2 = false
+	for _, tk := range shelfDay2 {
+		if tk.UUID == "task-day1-undone" {
+			hasTask1 = true
+		}
+		if tk.UUID == "task-day3-future" {
+			hasTask2 = true
+		}
+	}
+	if !hasTask1 {
+		t.Fatalf("Day 2: expected undone task1 to carry over onto Day 2 shelf")
+	}
+	if hasTask2 {
+		t.Fatalf("Day 2: did not expect future task2 on Day 2 shelf")
+	}
+
+	// Day 3: both task1 (carried over) and task2 (initiated on Day 3) should appear
+	m.SelectedDay = day3
+	shelfDay3 := m.GetTodoShelfTasks()
+	hasTask1 = false
+	hasTask2 = false
+	for _, tk := range shelfDay3 {
+		if tk.UUID == "task-day1-undone" {
+			hasTask1 = true
+		}
+		if tk.UUID == "task-day3-future" {
+			hasTask2 = true
+		}
+	}
+	if !hasTask1 || !hasTask2 {
+		t.Fatalf("Day 3: expected both task1 (carried over) and task2 on Day 3 shelf, got task1=%v, task2=%v", hasTask1, hasTask2)
+	}
+
+	// Now mark task1 completed on Day 3
+	task1.LifecycleState = model.StateCompleted
+	task1.UpdatedAt = day3
+	database.UpdateTask(task1)
+	m.RefreshTasks()
+
+	// On Day 3: task1 appears in COMPLETED section
+	shelfDay3Completed := m.GetTodoShelfTasks()
+	hasTask1Completed := false
+	for _, tk := range shelfDay3Completed {
+		if tk.UUID == "task-day1-undone" && tk.LifecycleState == model.StateCompleted {
+			hasTask1Completed = true
+		}
+	}
+	if !hasTask1Completed {
+		t.Fatalf("Day 3: expected completed task1 in Completed section")
+	}
+
+	// On Day 4: completed task1 should NOT carry over
+	day4 := day1.AddDate(0, 0, 3)
+	m.SelectedDay = day4
+	shelfDay4 := m.GetTodoShelfTasks()
+	hasTask1OnDay4 := false
+	for _, tk := range shelfDay4 {
+		if tk.UUID == "task-day1-undone" {
+			hasTask1OnDay4 = true
+		}
+	}
+	if hasTask1OnDay4 {
+		t.Fatalf("Day 4: completed task1 should not carry over onto Day 4 shelf")
+	}
+}
+
+func TestSprintFeaturesWithStatusExcludedFromDayTodoShelfBacklog(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	sprint := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Sprint 1",
+		StartDate: today,
+		EndDate:   today.AddDate(0, 0, 13),
+	}
+	database.AddSprint(sprint)
+
+	// 1. Feature in sprint with status READY (Defined) - should NOT show in Day Backlog
+	feat1 := model.Task{
+		UUID:           "feat-1",
+		ID:             "FEAT-1",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Commercialise Kratos",
+		SprintUUID:     sprint.UUID,
+		LifecycleState: model.StateReady,
+		SchedulingType: model.Floating,
+		InitiateDate:   today,
+	}
+
+	// 2. Feature in sprint with AddedToToday = true - SHOULD show on Today Shelf
+	feat2 := model.Task{
+		UUID:           "feat-2",
+		ID:             "FEAT-2",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Added To Today Feature",
+		SprintUUID:     sprint.UUID,
+		LifecycleState: model.StateReady,
+		SchedulingType: model.Floating,
+		AddedToToday:   true,
+		InitiateDate:   today,
+	}
+
+	// 3. Regular Task without sprint / status - SHOULD show in Day Backlog
+	regularTask := model.Task{
+		UUID:           "task-regular",
+		Title:          "Regular Task",
+		SchedulingType: model.Floating,
+		InitiateDate:   today,
+	}
+
+	database.AddTask(feat1)
+	database.AddTask(feat2)
+	database.AddTask(regularTask)
+
+	m := viewmodel.NewModel(database, nil)
+	m.CurrentView = viewmodel.DayView
+	m.SelectedDay = today
+
+	shelfData := m.GetShelfData()
+
+	var backlogSection viewmodel.ShelfSection
+	for _, sec := range shelfData.Sections {
+		if sec.Type == viewmodel.SectionBacklog {
+			backlogSection = sec
+			break
+		}
+	}
+
+	hasFeat1 := false
+	hasFeat2 := false
+	hasRegularTask := false
+
+	for _, tk := range backlogSection.Tasks {
+		if tk.UUID == "feat-1" {
+			hasFeat1 = true
+		}
+		if tk.UUID == "feat-2" {
+			hasFeat2 = true
+		}
+		if tk.UUID == "task-regular" {
+			hasRegularTask = true
+		}
+	}
+
+	if hasFeat1 {
+		t.Fatalf("FEAT-1 with status READY in sprint should NOT be in Day View Backlog")
+	}
+	if !hasFeat2 {
+		t.Fatalf("FEAT-2 with AddedToToday=true should be in Day View shelf")
+	}
+	if !hasRegularTask {
+		t.Fatalf("Regular task without sprint status should be in Day View Backlog")
+	}
+}
+
 
 
 

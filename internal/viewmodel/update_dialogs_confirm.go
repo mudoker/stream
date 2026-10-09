@@ -186,6 +186,59 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					m.StatusMsg = "Task creation canceled."
 					return true, nil
 				}
+			case "anchor_task_to_today":
+				if m.ConfirmSelectedIndex == 0 {
+					t := m.ConfirmTask
+					now := time.Now()
+					durMins := t.EstimatedDurationMins
+					if durMins <= 0 {
+						durMins = t.StoryPoints * 45
+						if durMins <= 0 {
+							durMins = 60
+						}
+					}
+					min := (now.Minute() / 15) * 15
+					startTime := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), min, 0, 0, now.Location())
+					dur := time.Duration(durMins) * time.Minute
+
+					t.SchedulingType = model.Anchored
+					t.LifecycleState = model.StateScheduled
+					t.SprintUUID = ""
+					t.AddedToToday = false
+					t.TimeWindow = model.TimeWindow{
+						Start: startTime,
+						End:   startTime.Add(dur),
+					}
+					t.UpdatedAt = time.Now()
+
+					if m.DB != nil {
+						m.DB.UpdateTask(t)
+						m.refreshTasks()
+					} else {
+						m.updateTaskInMemory(t)
+					}
+
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.ConfirmTask = model.Task{}
+					m.CurrentView = DayView
+					m.SelectedDay = now
+					m.SelectedTaskUUID = t.UUID
+					m.TimelineHour = startTime.Hour()
+					m.ScrollOffset = 0
+					m.SidebarFocus = false
+					m.TodoShelfFocus = false
+					m.AutoScrollToSelectedTask()
+					m.triggerGCalPush(t)
+					m.StatusMsg = fmt.Sprintf("Task '%s' anchored to today's timeline at %s.", t.Title, startTime.Format("15:04"))
+					return true, nil
+				} else {
+					m.ConfirmOpen = false
+					m.ConfirmActionType = ""
+					m.ConfirmTask = model.Task{}
+					m.StatusMsg = "Anchoring canceled."
+					return true, nil
+				}
 			case "clear_shelf_section":
 				if m.ConfirmSelectedIndex == 0 {
 					m.ConfirmClearShelfSection()

@@ -194,7 +194,8 @@ func TestSyncEngine_ManualPull_Success(t *testing.T) {
 		UUID:           "local-task-2",
 		WorkspaceUUID:  "ws-1",
 		Title:          "Local Event 2",
-		SchedulingType: model.Anchored,
+		SchedulingType: model.Event,
+		Source:         model.SourceGCal,
 		TimeWindow: model.TimeWindow{
 			Start: time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC),
 			End:   time.Date(2026, 6, 11, 13, 0, 0, 0, time.UTC),
@@ -204,6 +205,22 @@ func TestSyncEngine_ManualPull_Success(t *testing.T) {
 		},
 	}
 	_ = localDB.AddTaskNoLedger(task2)
+
+	taskAnchored := model.Task{
+		UUID:           "local-anchored-task",
+		WorkspaceUUID:  "ws-1",
+		Title:          "Crucial Anchored Task",
+		SchedulingType: model.Anchored,
+		Source:         model.SourceStream,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 6, 11, 15, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 6, 11, 16, 0, 0, 0, time.UTC),
+		},
+		GCalMetadata: model.GCalMetadata{
+			EventID: "event-id-anchored-cancelled",
+		},
+	}
+	_ = localDB.AddTaskNoLedger(taskAnchored)
 
 	var logged []string
 	engine, err := NewSyncEngine(localDB, func(s string) {
@@ -217,10 +234,11 @@ func TestSyncEngine_ManualPull_Success(t *testing.T) {
 	transport := &mockTransport{
 		roundTrip: func(req *http.Request) (*http.Response, error) {
 			if req.Method == "GET" && strings.Contains(req.URL.Path, "/calendars/primary/events") {
-				// We return three events:
+				// We return events:
 				// 1. event-id-1: updated title
-				// 2. event-id-2: status is cancelled (should delete local-task-2)
-				// 3. event-id-3: new event (should create new local task)
+				// 2. event-id-2: status is cancelled (should delete GCal event local-task-2)
+				// 3. event-id-anchored-cancelled: status cancelled (should deanchor, NOT delete local-anchored-task)
+				// 4. event-id-3: new event (should create new local task)
 				respBody := `{
 					"items": [
 						{
@@ -241,6 +259,10 @@ func TestSyncEngine_ManualPull_Success(t *testing.T) {
 						},
 						{
 							"id": "event-id-2",
+							"status": "cancelled"
+						},
+						{
+							"id": "event-id-anchored-cancelled",
 							"status": "cancelled"
 						},
 						{
@@ -292,10 +314,18 @@ func TestSyncEngine_ManualPull_Success(t *testing.T) {
 		}
 	}
 
-	// Check local-task-2 deleted
+	// Check GCal event local-task-2 deleted
 	_, ok = localDB.GetTask("local-task-2")
 	if ok {
 		t.Errorf("expected local-task-2 to be deleted by pull")
+	}
+
+	// Check anchored task is NOT deleted, but safely deanchored to Floating
+	tAnc, ok := localDB.GetTask("local-anchored-task")
+	if !ok {
+		t.Errorf("expected local-anchored-task to NOT be deleted by pull")
+	} else if tAnc.SchedulingType != model.Floating {
+		t.Errorf("expected local-anchored-task to be deanchored to Floating, got %v", tAnc.SchedulingType)
 	}
 
 	// Check remote-uuid-3 created
@@ -1137,6 +1167,123 @@ func TestTokenPersisterOnRefresh(t *testing.T) {
 		t.Errorf("expected credentials.json to be saved with new token")
 	}
 }
+
+func TestCompactLedger_DeleteCreateTransition(t *testing.T) {
+	entries := []db.LedgerEntry{
+		{
+			ID:       "e1",
+			Op:       "DELETE",
+			TaskUUID: "task-1",
+			Task: model.Task{
+				UUID:         "task-1",
+				Title:        "Original Title",
+				GCalMetadata: model.GCalMetadata{EventID: "evt-1"},
+			},
+		},
+		{
+			ID:       "e2",
+			Op:       "CREATE",
+			TaskUUID: "task-1",
+			Task: model.Task{
+				UUID:           "task-1",
+				Title:          "Re-anchored Title",
+				SchedulingType: model.Anchored,
+				GCalMetadata:   model.GCalMetadata{EventID: "evt-1"},
+			},
+		},
+	}
+
+	compacted := compactLedger(entries)
+	if len(compacted) != 1 {
+		t.Fatalf("expected 1 compacted operation, got %d", len(compacted))
+	}
+	if compacted[0].Op != "UPDATE" {
+		t.Errorf("expected compacted op to be UPDATE, got %s", compacted[0].Op)
+	}
+	if compacted[0].Task.Title != "Re-anchored Title" {
+		t.Errorf("expected task title to be Re-anchored Title, got %s", compacted[0].Task.Title)
+	}
+	if len(compacted[0].SourceEntryIDs) != 2 {
+		t.Errorf("expected 2 source entry IDs, got %d", len(compacted[0].SourceEntryIDs))
+	}
+}
+
+func TestPullRemoteUpdates_PreserveLifecycleState(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	localDB, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create db: %v", err)
+	}
+
+	ws := model.Workspace{UUID: "ws-1", Name: "Default"}
+	_ = localDB.AddWorkspace(ws)
+
+	activeTask := model.Task{
+		UUID:           "active-task-1",
+		WorkspaceUUID:  "ws-1",
+		Title:          "In-Progress Task",
+		LifecycleState: model.StateActive,
+		SchedulingType: model.Anchored,
+		Source:         model.SourceStream,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 6, 11, 11, 0, 0, 0, time.UTC),
+		},
+		GCalMetadata: model.GCalMetadata{
+			EventID: "gcal-evt-active",
+		},
+	}
+	_ = localDB.AddTaskNoLedger(activeTask)
+
+	engine, err := NewSyncEngine(localDB, nil, nil)
+	if err != nil {
+		t.Fatalf("NewSyncEngine failed: %v", err)
+	}
+
+	// Remote event returns without lifecycle_state in extendedProperties
+	transport := &mockTransport{
+		roundTrip: func(req *http.Request) (*http.Response, error) {
+			respBody := `{
+				"items": [
+					{
+						"id": "gcal-evt-active",
+						"summary": "In-Progress Task Updated on Remote",
+						"status": "confirmed",
+						"start": {"dateTime": "2026-06-11T10:00:00Z"},
+						"end": {"dateTime": "2026-06-11T11:00:00Z"}
+					}
+				]
+			}`
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(respBody)),
+				Header:     make(http.Header),
+			}, nil
+		},
+	}
+
+	client := &http.Client{Transport: transport}
+	srv, _ := calendar.NewService(context.Background(), option.WithHTTPClient(client))
+
+	err = engine.pullRemoteUpdates(srv)
+	if err != nil {
+		t.Fatalf("pullRemoteUpdates failed: %v", err)
+	}
+
+	updated, ok := localDB.GetTask("active-task-1")
+	if !ok {
+		t.Fatalf("expected task to exist")
+	}
+	if updated.LifecycleState != model.StateActive {
+		t.Errorf("expected LifecycleState to be preserved as ACTIVE, got %s", updated.LifecycleState)
+	}
+	if updated.Title != "In-Progress Task Updated on Remote" {
+		t.Errorf("expected Title to be updated, got %s", updated.Title)
+	}
+}
+
 
 
 

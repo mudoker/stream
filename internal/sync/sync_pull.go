@@ -138,11 +138,27 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 			}
 
 			if item.Status == "cancelled" {
-				if local, exists := localByGCalID[item.Id]; exists && model.IsGCalSyncable(local) {
-					// If local has pending unpushed edits, do not delete local task (push will recreate on remote)
-					if !pendingLocalEdits[local.UUID] {
+				if local, exists := localByGCalID[item.Id]; exists {
+					var remoteUpdated time.Time
+					if item.Updated != "" {
+						remoteUpdated, _ = time.Parse(time.RFC3339, item.Updated)
+					}
+					// If local has pending unpushed edits or local is strictly newer than remote cancellation, keep local
+					if pendingLocalEdits[local.UUID] || (!remoteUpdated.IsZero() && !local.UpdatedAt.IsZero() && local.UpdatedAt.After(remoteUpdated)) {
+						continue
+					}
+
+					// For imported GCal events, delete them from local DB
+					if local.Source == model.SourceGCal || local.SchedulingType == model.Event {
 						_ = s.localDB.DeleteTaskNoLedger(local.UUID)
 						delete(localByUUID, local.UUID)
+						delete(localByGCalID, item.Id)
+					} else {
+						// For Stream user tasks: NEVER delete user tasks! Safely de-anchor to Todo Shelf
+						local.SchedulingType = model.Floating
+						local.GCalMetadata = model.GCalMetadata{}
+						_ = s.localDB.UpdateTaskNoLedger(local)
+						localByUUID[local.UUID] = local
 						delete(localByGCalID, item.Id)
 					}
 				}
@@ -186,17 +202,14 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 
 			titleTimeKey := normalizeTitleTimeKey(item.Summary, start, end)
 
-			// Clean up ghost duplicate events on GCal for this stream UUID
+			// Track seen UUIDs and TitleTimes from GCal to avoid duplicate processing in the same pull
 			if uuidVal != "" {
 				if primID, alreadySeen := seenGCalUUIDs[uuidVal]; alreadySeen && primID != item.Id {
-					// Duplicate ghost event on GCal -> remove from GCal
-					_ = s.deleteRemoteEvent(srv, model.Task{GCalMetadata: model.GCalMetadata{EventID: item.Id}})
 					continue
 				}
 				seenGCalUUIDs[uuidVal] = item.Id
 			} else {
 				if primID, alreadySeen := seenGCalTitleTime[titleTimeKey]; alreadySeen && primID != item.Id {
-					// Duplicate exact event on GCal -> skip importing duplicates
 					continue
 				}
 				seenGCalTitleTime[titleTimeKey] = item.Id
@@ -217,8 +230,8 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 					exists = true
 				}
 			}
-			if !exists {
-				if t, ok := localByTitleTime[titleTimeKey]; ok {
+			if !exists && uuidVal == "" {
+				if t, ok := localByTitleTime[titleTimeKey]; ok && t.GCalMetadata.EventID == "" {
 					localTask = t
 					exists = true
 				}
@@ -259,6 +272,9 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 					}
 					if item.ExtendedProperties == nil || item.ExtendedProperties.Private == nil || item.ExtendedProperties.Private["story_points"] == "" {
 						spVal = localTask.StoryPoints
+					}
+					if localTask.LifecycleState != "" && (item.ExtendedProperties == nil || item.ExtendedProperties.Private == nil || item.ExtendedProperties.Private["lifecycle_state"] == "") {
+						stateVal = localTask.LifecycleState
 					}
 					if localTask.Source != "" {
 						sourceVal = localTask.Source

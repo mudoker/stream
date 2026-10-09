@@ -148,9 +148,17 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 			}
 		}
 		if matchedEvent == nil {
-			// Fallback: match by normalized title and time window
+			// Fallback: match by normalized title and time window only if remote event does not belong to another UUID
 			key := normalizeTitleTimeKey(t.Title, t.TimeWindow.Start, t.TimeWindow.End)
-			matchedEvent = gcalByTitleTime[key]
+			if ev, ok := gcalByTitleTime[key]; ok {
+				evUUID := ""
+				if ev.ExtendedProperties != nil && ev.ExtendedProperties.Private != nil {
+					evUUID = ev.ExtendedProperties.Private["uuid"]
+				}
+				if evUUID == "" || evUUID == t.UUID {
+					matchedEvent = ev
+				}
+			}
 		}
 
 		if matchedEvent != nil {

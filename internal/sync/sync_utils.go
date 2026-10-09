@@ -79,19 +79,26 @@ func compactLedger(entries []db.LedgerEntry) []CompactedOp {
 
 		case "DELETE":
 			switch entry.Op {
-			case "CREATE":
-				delete(taskIndex, entry.TaskUUID)
-				newOp := CompactedOp{
-					Op:             "CREATE",
-					TaskUUID:       entry.TaskUUID,
-					Task:           entry.Task,
-					SourceEntryIDs: []string{entry.ID},
+			case "CREATE", "UPDATE":
+				if curr.Task.GCalMetadata.EventID != "" || entry.Task.GCalMetadata.EventID != "" {
+					curr.Op = "UPDATE"
+					if entry.Task.GCalMetadata.EventID != "" {
+						curr.Task = entry.Task
+					} else {
+						curr.Task.Title = entry.Task.Title
+						curr.Task.Description = entry.Task.Description
+						curr.Task.Location = entry.Task.Location
+						curr.Task.TimeWindow = entry.Task.TimeWindow
+						curr.Task.Priority = entry.Task.Priority
+						curr.Task.StoryPoints = entry.Task.StoryPoints
+						curr.Task.LifecycleState = entry.Task.LifecycleState
+						curr.Task.SchedulingType = entry.Task.SchedulingType
+						curr.Task.IsAllDay = entry.Task.IsAllDay
+					}
+				} else {
+					curr.Op = "CREATE"
+					curr.Task = entry.Task
 				}
-				taskIndex[entry.TaskUUID] = len(result)
-				result = append(result, newOp)
-			case "UPDATE":
-				curr.Op = "UPDATE"
-				curr.Task = entry.Task
 			case "DELETE":
 				curr.Task = entry.Task
 			}

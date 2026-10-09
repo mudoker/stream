@@ -57,6 +57,47 @@ func TestRenderCardLayout(t *testing.T) {
 	}
 }
 
+func TestRenderCardLinkedFeatureAndBlockedBy(t *testing.T) {
+	th := theme.NewTheme()
+	m := &viewmodel.Model{
+		Tasks: []model.Task{
+			{
+				UUID:         "feat-uuid-1",
+				ID:           "FEA-1",
+				Title:        "Telegram Web App Integration",
+				WorkItemType: model.WorkItemFeature,
+			},
+		},
+	}
+
+	task := model.Task{
+		UUID:            "task-with-link",
+		Title:           "Create TWA from Kratos",
+		Priority:        model.P1,
+		SchedulingType:  model.Anchored,
+		StoryPoints:     2,
+		LinkedFeatureID: "FEA-1",
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 6, 19, 13, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 6, 19, 14, 0, 0, 0, time.UTC),
+		},
+		LifecycleState: model.StateReady,
+	}
+
+	card := components.RenderCard(m, th, task, 60, 8, false, false)
+	cleaned := cleanAnsi(card)
+
+	if !strings.Contains(cleaned, "Create TWA from Kratos") {
+		t.Errorf("Expected card to contain title, got:\n%s", cleaned)
+	}
+	if !strings.Contains(cleaned, "🔗 Link: FEA-1 (Telegram Web App Integration)") {
+		t.Errorf("Expected card to contain linked feature line, got:\n%s", cleaned)
+	}
+	if !strings.Contains(cleaned, "13:00 → 14:00") {
+		t.Errorf("Expected card to contain time range, got:\n%s", cleaned)
+	}
+}
+
 func TestRenderExecutionMetricsFormatter(t *testing.T) {
 	task := model.Task{
 		Title:          "Metrics Testing",

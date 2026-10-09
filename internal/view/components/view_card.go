@@ -130,6 +130,46 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 		wsLine = lipgloss.NewStyle().Foreground(t.Muted).Render(truncateStr(wsStr, contentAreaW))
 	}
 
+	var linkLine string
+	if task.LinkedFeatureID != "" {
+		var featTitle string
+		if m != nil {
+			for _, f := range m.Tasks {
+				if f.ID == task.LinkedFeatureID && f.ID != "" {
+					featTitle = f.Title
+					break
+				}
+			}
+		}
+		var linkStr string
+		if featTitle != "" {
+			linkStr = fmt.Sprintf("🔗 Link: %s (%s)", task.LinkedFeatureID, featTitle)
+		} else {
+			linkStr = fmt.Sprintf("🔗 Link: %s", task.LinkedFeatureID)
+		}
+		linkLine = lipgloss.NewStyle().Foreground(t.FocusPurple).Render(truncateStr(linkStr, contentAreaW))
+	}
+
+	var blockedLine string
+	if task.BlockedBy != "" {
+		var blkTitle string
+		if m != nil {
+			for _, b := range m.Tasks {
+				if b.ID == task.BlockedBy && b.ID != "" {
+					blkTitle = b.Title
+					break
+				}
+			}
+		}
+		var blkStr string
+		if blkTitle != "" {
+			blkStr = fmt.Sprintf("⛔ Blocked by %s (%s)", task.BlockedBy, blkTitle)
+		} else {
+			blkStr = fmt.Sprintf("⛔ Blocked by %s", task.BlockedBy)
+		}
+		blockedLine = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5555")).Render(truncateStr(blkStr, contentAreaW))
+	}
+
 	var locLine string
 	if task.SchedulingType == model.Event && task.Location != "" {
 		locStr := "📍 " + task.Location
@@ -155,13 +195,21 @@ func RenderCard(m *viewmodel.Model, t theme.Theme, task model.Task, w, h int, is
 	} else {
 		// Collect middle candidate lines in order of visual priority:
 		// 1. Workspace Name
-		// 2. Location
-		// 3. Recurring days
-		// 4. Tags
-		// 5. Scheduling Type
+		// 2. Blocked By
+		// 3. Linked Feature
+		// 4. Location
+		// 5. Recurring days
+		// 6. Tags
+		// 7. Scheduling Type
 		var middleCandidates []string
 		if wsLine != "" {
 			middleCandidates = append(middleCandidates, wsLine)
+		}
+		if blockedLine != "" {
+			middleCandidates = append(middleCandidates, blockedLine)
+		}
+		if linkLine != "" {
+			middleCandidates = append(middleCandidates, linkLine)
 		}
 		if locLine != "" {
 			middleCandidates = append(middleCandidates, locLine)
@@ -401,6 +449,18 @@ func getRecurringDaysStr(m *viewmodel.Model, task model.Task) string {
 }
 
 func getTaskTypeStr(task model.Task) string {
+	if task.WorkItemType != "" {
+		switch task.WorkItemType {
+		case model.WorkItemFeature:
+			return "✨ Feature"
+		case model.WorkItemDefect:
+			return "🐛 Defect"
+		case model.WorkItemImprovement:
+			return "⚡ Improvement"
+		case model.WorkItemTask:
+			return "📋 Task"
+		}
+	}
 	switch task.SchedulingType {
 	case model.Anchored, model.Floating:
 		return "📋 Task"

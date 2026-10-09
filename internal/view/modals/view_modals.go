@@ -122,8 +122,14 @@ func RenderDetailPanel(m *viewmodel.Model, t theme.Theme, height int) string {
 	if task.SchedulingType != model.Reminder {
 		sb.WriteString(fmt.Sprintf("Story Points  %d\n", task.StoryPoints))
 	}
-	sb.WriteString(fmt.Sprintf("Lifecycle     %s\n", task.LifecycleState))
-	sb.WriteString(fmt.Sprintf("Schedule      %s\n\n", task.SchedulingType))
+	sb.WriteString(fmt.Sprintf("Schedule      %s\n", task.SchedulingType))
+	if task.LinkedFeatureID != "" {
+		sb.WriteString(fmt.Sprintf("Linked Feat   %s\n", task.LinkedFeatureID))
+	}
+	if task.BlockedBy != "" {
+		sb.WriteString(fmt.Sprintf("Blocked By    %s\n", task.BlockedBy))
+	}
+	sb.WriteString("\n")
 
 	if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
 		if task.IsAllDay {
@@ -185,6 +191,25 @@ func RenderDetailModal(m *viewmodel.Model, t theme.Theme) string {
 		sb.WriteString(fmt.Sprintf("  %s  •  %d SP  •  %s\n", pBadge, task.StoryPoints, task.LifecycleState))
 	}
 	sb.WriteString(fmt.Sprintf("  Schedule: %s\n", task.SchedulingType))
+	if task.LinkedFeatureID != "" {
+		var featTitle string
+		if m != nil {
+			for _, f := range m.Tasks {
+				if f.ID == task.LinkedFeatureID && f.ID != "" {
+					featTitle = f.Title
+					break
+				}
+			}
+		}
+		if featTitle != "" {
+			sb.WriteString(fmt.Sprintf("  Linked Feat:  %s (%s)\n", task.LinkedFeatureID, featTitle))
+		} else {
+			sb.WriteString(fmt.Sprintf("  Linked Feat:  %s\n", task.LinkedFeatureID))
+		}
+	}
+	if task.BlockedBy != "" {
+		sb.WriteString(fmt.Sprintf("  Blocked By:   %s\n", task.BlockedBy))
+	}
 
 	if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
 		sb.WriteString("\n")

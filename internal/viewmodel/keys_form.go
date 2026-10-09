@@ -80,7 +80,8 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.IsAllDayIdx = (m.Form.IsAllDayIdx - 1 + 2) % 2
 			return m, nil
 		case 18:
-			m.Form.LinkSprintIdx = (m.Form.LinkSprintIdx - 1 + 2) % 2
+			totalSprintOpts := len(m.Form.AvailableSprints) + 1
+			m.Form.SprintIdx = (m.Form.SprintIdx - 1 + totalSprintOpts) % totalSprintOpts
 			return m, nil
 		case 20:
 			totalFeatOpts := len(m.Form.AvailableFeatures) + 1
@@ -131,7 +132,8 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.IsAllDayIdx = (m.Form.IsAllDayIdx + 1) % 2
 			return m, nil
 		case 18:
-			m.Form.LinkSprintIdx = (m.Form.LinkSprintIdx + 1) % 2
+			totalSprintOpts := len(m.Form.AvailableSprints) + 1
+			m.Form.SprintIdx = (m.Form.SprintIdx + 1) % totalSprintOpts
 			return m, nil
 		case 20:
 			totalFeatOpts := len(m.Form.AvailableFeatures) + 1
@@ -178,7 +180,8 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.IsAllDayIdx = (m.Form.IsAllDayIdx + 1) % 2
 			return m, nil
 		case 18:
-			m.Form.LinkSprintIdx = (m.Form.LinkSprintIdx + 1) % 2
+			totalSprintOpts := len(m.Form.AvailableSprints) + 1
+			m.Form.SprintIdx = (m.Form.SprintIdx + 1) % totalSprintOpts
 			return m, nil
 		case 20:
 			totalFeatOpts := len(m.Form.AvailableFeatures) + 1
@@ -422,8 +425,23 @@ func (m *Model) SubmitForm() {
 		} else {
 			newTask.ID = GenerateWorkItemID(itemType, m.Tasks)
 		}
-		if activeSprint, ok := m.GetActiveSprint(); ok {
-			newTask.SprintUUID = activeSprint.UUID
+		if len(m.Form.AvailableSprints) == 0 && len(m.Sprints) > 0 {
+			m.Form.AvailableSprints = m.Sprints
+			if !isEdit && m.Form.SprintIdx == 0 {
+				if activeSprint, ok := m.GetActiveSprint(); ok {
+					for i, s := range m.Form.AvailableSprints {
+						if s.UUID == activeSprint.UUID {
+							m.Form.SprintIdx = i + 1
+							break
+						}
+					}
+				}
+			}
+		}
+		if m.Form.SprintIdx > 0 && m.Form.SprintIdx <= len(m.Form.AvailableSprints) {
+			newTask.SprintUUID = m.Form.AvailableSprints[m.Form.SprintIdx-1].UUID
+		} else {
+			newTask.SprintUUID = ""
 		}
 		if m.Form.BlockedByIdx > 0 && m.Form.BlockedByIdx <= len(m.Form.AvailableBlockers) {
 			newTask.BlockedBy = m.Form.AvailableBlockers[m.Form.BlockedByIdx-1].ID
@@ -451,7 +469,6 @@ func (m *Model) SubmitForm() {
 		if !isEdit && newTask.ID == "" {
 			newTask.ID = GenerateWorkItemID(model.WorkItemTask, m.Tasks)
 		}
-		newTask.AddedToToday = (m.Form.AddToTodayIdx == 1)
 		if m.Form.LinkedFeatureIdx > 0 && m.Form.LinkedFeatureIdx <= len(m.Form.AvailableFeatures) {
 			newTask.LinkedFeatureID = m.Form.AvailableFeatures[m.Form.LinkedFeatureIdx-1].ID
 		} else {
@@ -462,9 +479,9 @@ func (m *Model) SubmitForm() {
 		} else {
 			newTask.BlockedBy = ""
 		}
-
 		if m.Form.IsAnchoredIdx == 1 {
 			newTask.SchedulingType = model.Anchored
+			newTask.AddedToToday = false
 			newTask.TimeWindow = model.TimeWindow{
 				Start: startTime,
 				End:   startTime.Add(time.Duration(duration) * time.Minute),
@@ -481,16 +498,16 @@ func (m *Model) SubmitForm() {
 			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
 				newTask.EstimatedDurationMins = d
 			}
-			switch m.Form.StatusIdx {
-			case 4:
+			if SameDay(baseDay, time.Now()) {
+				newTask.AddedToToday = true
+				newTask.InitiateDate = baseDay
+			} else {
+				newTask.AddedToToday = false
+				newTask.InitiateDate = baseDay
+			}
+			if isEdit && existingTask.LifecycleState == model.StateCompleted {
 				newTask.LifecycleState = model.StateCompleted
-			case 3:
-				newTask.LifecycleState = model.StateTesting
-			case 2:
-				newTask.LifecycleState = model.StateReview
-			case 1:
-				newTask.LifecycleState = model.StateActive
-			default:
+			} else {
 				newTask.LifecycleState = model.StateReady
 			}
 		}

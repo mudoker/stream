@@ -159,10 +159,14 @@ func (m *Model) startEditMode(task model.Task) {
 		}
 	}
 
+	m.Form.SprintIdx = 0
 	if task.SprintUUID != "" {
-		m.Form.LinkSprintIdx = 1
-	} else {
-		m.Form.LinkSprintIdx = 0
+		for idx, s := range m.Form.AvailableSprints {
+			if s.UUID == task.SprintUUID {
+				m.Form.SprintIdx = idx + 1
+				break
+			}
+		}
 	}
 
 	// Reset recurring form fields first

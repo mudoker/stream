@@ -106,10 +106,33 @@ func (m *Model) GetActiveSprint() (model.Sprint, bool) {
 	return model.Sprint{}, false
 }
 
+func (m *Model) isSprintActiveOrUpcoming(sprintUUID string) bool {
+	if sprintUUID == "" {
+		return false
+	}
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	for _, s := range m.Sprints {
+		if s.UUID == sprintUUID {
+			if s.UUID == m.ActiveSprintUUID {
+				return true
+			}
+			if !s.EndDate.Before(todayStart) || !s.StartDate.Before(todayStart) {
+				return true
+			}
+			return false
+		}
+	}
+	return false
+}
+
 func (m *Model) GetFeatures() []model.Task {
 	var feats []model.Task
 	for _, t := range m.Tasks {
-		if t.WorkItemType == model.WorkItemFeature || t.WorkItemType == model.WorkItemDefect || t.WorkItemType == model.WorkItemImprovement || (t.SprintUUID != "" && t.ID != "") {
+		if t.SprintUUID == "" || !m.isSprintActiveOrUpcoming(t.SprintUUID) {
+			continue
+		}
+		if t.WorkItemType == model.WorkItemFeature || t.WorkItemType == model.WorkItemDefect || t.WorkItemType == model.WorkItemImprovement || (t.ID != "" && t.WorkItemType != model.WorkItemTask) {
 			feats = append(feats, t)
 		}
 	}
@@ -118,6 +141,17 @@ func (m *Model) GetFeatures() []model.Task {
 
 func (m *Model) PopulateFormAvailableFeaturesAndBlockers() {
 	m.Form.AvailableFeatures = m.GetFeatures()
+	m.Form.AvailableSprints = m.Sprints
+	if !m.IsEditing && m.Form.SprintIdx == 0 {
+		if activeSprint, ok := m.GetActiveSprint(); ok {
+			for i, s := range m.Form.AvailableSprints {
+				if s.UUID == activeSprint.UUID {
+					m.Form.SprintIdx = i + 1
+					break
+				}
+			}
+		}
+	}
 
 	var blockers []model.Task
 	isFeatureLevel := m.Form.TaskTypeIdx <= 2
@@ -125,14 +159,17 @@ func (m *Model) PopulateFormAvailableFeaturesAndBlockers() {
 		if m.IsEditing && t.UUID == m.EditingTaskUUID {
 			continue
 		}
+		if t.SprintUUID == "" || !m.isSprintActiveOrUpcoming(t.SprintUUID) {
+			continue
+		}
 		if isFeatureLevel {
-			// Feature level items can only be blocked by other feature level items
-			if t.WorkItemType == model.WorkItemFeature || t.WorkItemType == model.WorkItemDefect || t.WorkItemType == model.WorkItemImprovement || t.SprintUUID != "" {
+			// Feature level items can only be blocked by other feature level items in active/upcoming sprints
+			if t.WorkItemType == model.WorkItemFeature || t.WorkItemType == model.WorkItemDefect || t.WorkItemType == model.WorkItemImprovement {
 				blockers = append(blockers, t)
 			}
 		} else {
-			// Task level items can only be blocked by other task level items
-			if t.WorkItemType == "" && t.SprintUUID == "" {
+			// Task level items can only be blocked by task-level items in active/upcoming sprints
+			if t.WorkItemType == "" || t.WorkItemType == model.WorkItemTask {
 				blockers = append(blockers, t)
 			}
 		}

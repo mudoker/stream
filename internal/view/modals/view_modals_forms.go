@@ -124,16 +124,11 @@ func RenderFormModal(m *viewmodel.Model, t theme.Theme) string {
 		case 13:
 			fields = append(fields, components.RenderDaysSelect(nextFieldNum(), "Recurring Days", f.RecurringDaysSelected[:], f.RecurringDaysSubIdx, f.ActiveField == 13, t))
 		case 18:
-			sprintOptStr := "No"
-			if f.LinkSprintIdx == 1 {
-				activeSprint, ok := m.GetActiveSprint()
-				if ok && activeSprint.Name != "" {
-					sprintOptStr = fmt.Sprintf("Yes (%s)", activeSprint.Name)
-				} else {
-					sprintOptStr = "Yes"
-				}
+			sprintOptStr := "None"
+			if f.SprintIdx > 0 && f.SprintIdx <= len(f.AvailableSprints) {
+				sprintOptStr = f.AvailableSprints[f.SprintIdx-1].Name
 			}
-			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Link to Sprint", sprintOptStr, f.ActiveField == 18, t))
+			fields = append(fields, components.RenderFormDropdown(nextFieldNum(), "Sprint", sprintOptStr, f.ActiveField == 18, t))
 		case 9:
 			fields = append(fields, components.RenderFormField(nextFieldNum(), "Tags (csv)", tagsView, f.ActiveField == 9, t))
 		case 23:

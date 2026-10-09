@@ -2,6 +2,7 @@ package tests
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -367,16 +368,18 @@ func TestSprintAnchorAndDeanchor(t *testing.T) {
 	sprints := database.GetSprints()
 	activeSprint := sprints[0]
 
-	globalTask := model.Task{
+	globalFeature := model.Task{
 		UUID:           uuid.New().String(),
+		ID:             "FEA-1",
+		WorkItemType:   model.WorkItemFeature,
 		SprintUUID:     "",
-		Title:          "Backlog Floating Task",
+		Title:          "Backlog Feature",
 		Priority:       model.P1,
 		StoryPoints:    3,
 		SchedulingType: model.Floating,
 		LifecycleState: model.StateBacklog,
 	}
-	database.AddTask(globalTask)
+	database.AddTask(globalFeature)
 
 	m := viewmodel.NewModel(database, nil)
 	m.CurrentView = viewmodel.SprintView
@@ -384,12 +387,12 @@ func TestSprintAnchorAndDeanchor(t *testing.T) {
 	// Focus on right tab (Global Backlog shelf)
 	m.TodoShelfFocus = true
 	m.SidebarFocus = false
-	m.SelectedTaskUUID = globalTask.UUID
+	m.SelectedTaskUUID = globalFeature.UUID
 
-	// Press 'a' to anchor to active sprint
+	// Press 'a' to anchor feature to active sprint
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
 
-	anchoredTask, _ := database.GetTask(globalTask.UUID)
+	anchoredTask, _ := database.GetTask(globalFeature.UUID)
 	if anchoredTask.SprintUUID != activeSprint.UUID {
 		t.Fatalf("expected SprintUUID %s, got %s", activeSprint.UUID, anchoredTask.SprintUUID)
 	}
@@ -397,13 +400,77 @@ func TestSprintAnchorAndDeanchor(t *testing.T) {
 	// Now focus on swimlanes and deanchor using 'a'
 	m.TodoShelfFocus = false
 	m.SprintSwimlaneIdx = 0
-	m.SelectedTaskUUID = globalTask.UUID
+	m.SelectedTaskUUID = globalFeature.UUID
 
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
 
-	deanchoredTask, _ := database.GetTask(globalTask.UUID)
+	deanchoredTask, _ := database.GetTask(globalFeature.UUID)
 	if deanchoredTask.SprintUUID != "" {
 		t.Fatalf("expected empty SprintUUID after deanchoring, got %s", deanchoredTask.SprintUUID)
+	}
+}
+
+func TestSprintTaskAnchorToTodayDialog(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	task := model.Task{
+		UUID:                  uuid.New().String(),
+		ID:                    "TASK-1",
+		WorkItemType:          model.WorkItemTask,
+		Title:                 "Database Optimization Task",
+		Priority:              model.P1,
+		StoryPoints:           2,
+		EstimatedDurationMins: 45,
+		SchedulingType:        model.Floating,
+		LifecycleState:        model.StateReady,
+	}
+	database.AddTask(task)
+
+	m := viewmodel.NewModel(database, nil)
+	m.CurrentView = viewmodel.SprintView
+	m.TodoShelfFocus = true
+	m.SelectedTaskUUID = task.UUID
+
+	// 1. Press 'a' on a standard task in Sprint View -> triggers anchor_task_to_today confirmation dialog
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+
+	if !m.ConfirmOpen {
+		t.Fatalf("expected ConfirmOpen to be true")
+	}
+	if m.ConfirmActionType != "anchor_task_to_today" {
+		t.Fatalf("expected ConfirmActionType 'anchor_task_to_today', got %s", m.ConfirmActionType)
+	}
+	if m.ConfirmTask.UUID != task.UUID {
+		t.Fatalf("expected ConfirmTask UUID %s, got %s", task.UUID, m.ConfirmTask.UUID)
+	}
+
+	// 2. Press Enter to confirm anchoring to today
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.ConfirmOpen {
+		t.Fatalf("expected ConfirmOpen to be false after confirmation")
+	}
+	if m.CurrentView != viewmodel.DayView {
+		t.Fatalf("expected view to switch to DayView, got %v", m.CurrentView)
+	}
+
+	updatedTask, ok := database.GetTask(task.UUID)
+	if !ok {
+		t.Fatalf("task not found in database")
+	}
+	if updatedTask.SchedulingType != model.Anchored {
+		t.Fatalf("expected SchedulingType Anchored, got %s", updatedTask.SchedulingType)
+	}
+	if updatedTask.SprintUUID != "" {
+		t.Fatalf("expected empty SprintUUID for anchored day task, got %s", updatedTask.SprintUUID)
+	}
+	if updatedTask.TimeWindow.Start.IsZero() || updatedTask.TimeWindow.End.IsZero() {
+		t.Fatalf("expected valid TimeWindow for anchored task")
+	}
+	dur := updatedTask.TimeWindow.End.Sub(updatedTask.TimeWindow.Start)
+	if dur != 45*time.Minute {
+		t.Fatalf("expected duration 45m, got %v", dur)
 	}
 }
 
@@ -492,17 +559,28 @@ func TestInitiateDateDayTimelineVsGlobalBacklog(t *testing.T) {
 		LifecycleState: model.StateBacklog,
 	}
 
+	taskYesterdayCompleted := model.Task{
+		UUID:           uuid.New().String(),
+		Title:          "Task Completed Yesterday",
+		InitiateDate:   yesterday,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateCompleted,
+		UpdatedAt:      yesterday,
+	}
+
 	database.AddTask(taskToday)
 	database.AddTask(taskYesterday)
+	database.AddTask(taskYesterdayCompleted)
 	database.AddTask(taskTomorrow)
 
 	m := viewmodel.NewModel(database, nil)
 	m.SelectedDay = today
 
-	// Day timeline TodoShelf should ONLY show taskToday
+	// Day timeline TodoShelf should show taskToday and undone taskYesterday (carried over), but NOT taskTomorrow or taskYesterdayCompleted
 	dayShelf := m.GetTodoShelfTasks()
 	hasToday := false
 	hasYesterday := false
+	hasYesterdayCompleted := false
 	hasTomorrow := false
 	for _, task := range dayShelf {
 		if task.UUID == taskToday.UUID {
@@ -511,12 +589,15 @@ func TestInitiateDateDayTimelineVsGlobalBacklog(t *testing.T) {
 		if task.UUID == taskYesterday.UUID {
 			hasYesterday = true
 		}
+		if task.UUID == taskYesterdayCompleted.UUID {
+			hasYesterdayCompleted = true
+		}
 		if task.UUID == taskTomorrow.UUID {
 			hasTomorrow = true
 		}
 	}
-	if !hasToday || hasYesterday || hasTomorrow {
-		t.Fatalf("Day timeline shelf should only contain tasks for today. Got today=%v, yesterday=%v, tomorrow=%v", hasToday, hasYesterday, hasTomorrow)
+	if !hasToday || !hasYesterday || hasYesterdayCompleted || hasTomorrow {
+		t.Fatalf("Day timeline shelf should contain today's task and undone yesterday task (carried over), but not completed yesterday or tomorrow. Got today=%v, yesterdayUndone=%v, yesterdayCompleted=%v, tomorrow=%v", hasToday, hasYesterday, hasYesterdayCompleted, hasTomorrow)
 	}
 
 	// Global Backlog should show ALL floating unassigned tasks
@@ -1084,6 +1165,7 @@ func TestBlockedByLevelIsolation(t *testing.T) {
 		UUID:           uuid.New().String(),
 		ID:             "TASK-1",
 		Title:          "Task 1",
+		SprintUUID:    sprint.UUID,
 		SchedulingType: model.Floating,
 	}
 	database.AddTask(feat1)
@@ -1506,3 +1588,311 @@ func TestSprintCardDescriptionAndExpandedWidth(t *testing.T) {
 		t.Errorf("expected metadata line with priority, SP, tags in card, got:\n%s", rendered)
 	}
 }
+
+func TestFeatureDefectSprintSelectionAndDefault(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	existingSprints := database.GetSprints()
+	if len(existingSprints) == 0 {
+		t.Fatalf("expected initial default sprint in DB")
+	}
+	sprint1 := existingSprints[0]
+
+	now := time.Now()
+	sprint2 := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Sprint 2",
+		StartDate: now.AddDate(0, 0, 14),
+		EndDate:   now.AddDate(0, 0, 28),
+	}
+	database.AddSprint(sprint2)
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint2.UUID
+	m.CurrentView = viewmodel.SprintView
+
+	// 1. Press 'i' to create Feature -> default sprint should be active sprint (Sprint 2)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	if m.Form.TaskTypeIdx != 0 {
+		t.Fatalf("expected Feature type 0, got %d", m.Form.TaskTypeIdx)
+	}
+	if len(m.Form.AvailableSprints) != 2 {
+		t.Fatalf("expected 2 available sprints, got %d", len(m.Form.AvailableSprints))
+	}
+	// Sprint 2 is 2nd in list, so SprintIdx should be 2
+	if m.Form.SprintIdx != 2 {
+		t.Fatalf("expected default SprintIdx 2 (Sprint 2), got %d", m.Form.SprintIdx)
+	}
+	m.Form.TitleInput.SetValue("Feature for Sprint 2")
+	m.SubmitForm()
+	m.CurrentMode = viewmodel.ModeNormal
+
+	// Verify created with Sprint 2 UUID
+	var feat2 model.Task
+	for _, tk := range database.GetTasks() {
+		if tk.Title == "Feature for Sprint 2" {
+			feat2 = tk
+			break
+		}
+	}
+	if feat2.SprintUUID != sprint2.UUID {
+		t.Fatalf("expected feat2 to have SprintUUID %s, got %s", sprint2.UUID, feat2.SprintUUID)
+	}
+
+	// 2. Create Defect and change Sprint to "None" (SprintIdx = 0)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	// Change type to Defect (right arrow or space on Type field)
+	m.Form.TaskTypeIdx = 1 // Defect
+	m.PopulateFormAvailableFeaturesAndBlockers()
+	// Set Sprint to None (0)
+	m.Form.SprintIdx = 0
+	m.Form.TitleInput.SetValue("Backlog Bug")
+	m.SubmitForm()
+	m.CurrentMode = viewmodel.ModeNormal
+
+	var bug model.Task
+	for _, tk := range database.GetTasks() {
+		if tk.Title == "Backlog Bug" {
+			bug = tk
+			break
+		}
+	}
+	if bug.SprintUUID != "" {
+		t.Fatalf("expected bug to have empty SprintUUID (Backlog), got %s", bug.SprintUUID)
+	}
+
+	// 3. Edit bug and assign to Sprint 1
+	m.StartEditMode(bug)
+	if m.Form.SprintIdx != 0 {
+		t.Fatalf("expected bug edit SprintIdx 0, got %d", m.Form.SprintIdx)
+	}
+	// Set to Sprint 1 (SprintIdx = 1)
+	m.Form.SprintIdx = 1
+	m.SubmitForm()
+	m.CurrentMode = viewmodel.ModeNormal
+
+	updatedBug, ok := database.GetTask(bug.UUID)
+	if !ok || updatedBug.SprintUUID != sprint1.UUID {
+		t.Fatalf("expected updated bug to have sprint1 UUID %s, got %s", sprint1.UUID, updatedBug.SprintUUID)
+	}
+}
+
+func TestFilterBlockersAndFeaturesActiveAndUpcomingOnly(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	// Sprints:
+	// 1. Past Sprint (Ended 10 days ago)
+	pastSprint := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Past Sprint",
+		StartDate: todayStart.AddDate(0, 0, -20),
+		EndDate:   todayStart.AddDate(0, 0, -6),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	// 2. Active Sprint (Today is within range)
+	activeSprint := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Active Sprint",
+		StartDate: todayStart.AddDate(0, 0, -2),
+		EndDate:   todayStart.AddDate(0, 0, 10),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	// 3. Upcoming Sprint (Starts next week)
+	upcomingSprint := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Upcoming Sprint",
+		StartDate: todayStart.AddDate(0, 0, 14),
+		EndDate:   todayStart.AddDate(0, 0, 28),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	database.AddSprint(pastSprint)
+	database.AddSprint(activeSprint)
+	database.AddSprint(upcomingSprint)
+
+	// Items:
+	// - Feature in past sprint (should NOT show)
+	pastFeat := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "FEAT-PAST",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Past Feature",
+		SprintUUID:     pastSprint.UUID,
+		SchedulingType: model.Floating,
+	}
+	// - Feature in active sprint (SHOULD show)
+	activeFeat := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "FEAT-ACTIVE",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Active Feature",
+		SprintUUID:     activeSprint.UUID,
+		SchedulingType: model.Floating,
+	}
+	// - Feature in upcoming sprint (SHOULD show)
+	upcomingFeat := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "FEAT-UPCOMING",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Upcoming Feature",
+		SprintUUID:     upcomingSprint.UUID,
+		SchedulingType: model.Floating,
+	}
+	// - Feature without sprint / backlog (should NOT show)
+	backlogFeat := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "FEAT-BACKLOG",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Backlog Feature",
+		SprintUUID:     "",
+		SchedulingType: model.Floating,
+	}
+
+	// - Task in past sprint (should NOT show)
+	pastTask := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "TSK-PAST",
+		WorkItemType:   model.WorkItemTask,
+		Title:          "Past Task",
+		SprintUUID:     pastSprint.UUID,
+		SchedulingType: model.Floating,
+	}
+	// - Task in active sprint (SHOULD show for task blocker)
+	activeTask := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "TSK-ACTIVE",
+		WorkItemType:   model.WorkItemTask,
+		Title:          "Active Task",
+		SprintUUID:     activeSprint.UUID,
+		SchedulingType: model.Floating,
+	}
+	// - Task without sprint (should NOT show)
+	backlogTask := model.Task{
+		UUID:           uuid.New().String(),
+		ID:             "TSK-BACKLOG",
+		WorkItemType:   model.WorkItemTask,
+		Title:          "Backlog Task",
+		SprintUUID:     "",
+		SchedulingType: model.Floating,
+	}
+
+	database.AddTask(pastFeat)
+	database.AddTask(activeFeat)
+	database.AddTask(upcomingFeat)
+	database.AddTask(backlogFeat)
+	database.AddTask(pastTask)
+	database.AddTask(activeTask)
+	database.AddTask(backlogTask)
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = activeSprint.UUID
+
+	// Check Link to Feature (GetFeatures)
+	feats := m.GetFeatures()
+	featIDs := make(map[string]bool)
+	for _, f := range feats {
+		featIDs[f.ID] = true
+	}
+	if !featIDs["FEAT-ACTIVE"] {
+		t.Fatalf("expected FEAT-ACTIVE in GetFeatures, got: %+v", feats)
+	}
+	if !featIDs["FEAT-UPCOMING"] {
+		t.Fatalf("expected FEAT-UPCOMING in GetFeatures, got: %+v", feats)
+	}
+	if featIDs["FEAT-PAST"] {
+		t.Fatalf("did NOT expect FEAT-PAST in GetFeatures")
+	}
+	if featIDs["FEAT-BACKLOG"] {
+		t.Fatalf("did NOT expect FEAT-BACKLOG in GetFeatures")
+	}
+
+	// Check Blockers for Feature Form
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TaskTypeIdx = 0 // Feature
+	m.PopulateFormAvailableFeaturesAndBlockers()
+	blockerIDs := make(map[string]bool)
+	for _, b := range m.Form.AvailableBlockers {
+		blockerIDs[b.ID] = true
+	}
+	if !blockerIDs["FEAT-ACTIVE"] || !blockerIDs["FEAT-UPCOMING"] {
+		t.Fatalf("expected active and upcoming features in feature blockers, got: %+v", m.Form.AvailableBlockers)
+	}
+	if blockerIDs["FEAT-PAST"] || blockerIDs["FEAT-BACKLOG"] || blockerIDs["TSK-ACTIVE"] {
+		t.Fatalf("unexpected items in feature blockers: %+v", m.Form.AvailableBlockers)
+	}
+
+	// Check Blockers for Task Form
+	m.Form = viewmodel.NewTaskForm()
+	m.Form.TaskTypeIdx = 3 // Task
+	m.PopulateFormAvailableFeaturesAndBlockers()
+	taskBlockerIDs := make(map[string]bool)
+	for _, b := range m.Form.AvailableBlockers {
+		taskBlockerIDs[b.ID] = true
+	}
+	if !taskBlockerIDs["TSK-ACTIVE"] {
+		t.Fatalf("expected TSK-ACTIVE in task blockers, got: %+v", m.Form.AvailableBlockers)
+	}
+	if taskBlockerIDs["TSK-PAST"] || taskBlockerIDs["TSK-BACKLOG"] || taskBlockerIDs["FEAT-ACTIVE"] {
+		t.Fatalf("unexpected items in task blockers: %+v", m.Form.AvailableBlockers)
+	}
+}
+
+func TestPurgeSquareBracketsOnDBLoad(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "stream-purge-test-*")
+	if err != nil {
+		t.Fatalf("could not create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	configDir := filepath.Join(tempDir, ".config", "stream")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+
+	dataPath := filepath.Join(configDir, "data.json")
+	rawTasks := `[
+		{
+			"uuid": "test-uuid-1",
+			"id": "[FEAT-10]",
+			"title": "Purge Test 1",
+			"scheduling_type": "FLOATING",
+			"linked_feature_id": "[FEAT-5]",
+			"blocked_by": "[DEF-2]"
+		}
+	]`
+	if err := os.WriteFile(dataPath, []byte(rawTasks), 0644); err != nil {
+		t.Fatalf("failed to write raw data file: %v", err)
+	}
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", origHome)
+
+	testDB, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to init db: %v", err)
+	}
+
+	task, ok := testDB.GetTask("test-uuid-1")
+	if !ok {
+		t.Fatalf("expected task to be loaded")
+	}
+	if task.ID != "FEAT-10" {
+		t.Fatalf("expected ID to be stripped of brackets 'FEAT-10', got '%s'", task.ID)
+	}
+	if task.LinkedFeatureID != "FEAT-5" {
+		t.Fatalf("expected LinkedFeatureID 'FEAT-5', got '%s'", task.LinkedFeatureID)
+	}
+	if task.BlockedBy != "DEF-2" {
+		t.Fatalf("expected BlockedBy 'DEF-2', got '%s'", task.BlockedBy)
+	}
+}
+

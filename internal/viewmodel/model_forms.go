@@ -19,6 +19,8 @@ type TaskForm struct {
 	SPIdx                 int // index in []int{0, 1, 2, 3, 5, 8, 13}
 	TaskTypeIdx           int // 0: Feature, 1: Defect, 2: Improvement, 3: Task, 4: Reminder, 5: Habit, 6: Event
 	StatusIdx             int // 0: Defined, 1: In Progress, 2: Review, 3: Testing, 4: Completed
+	SprintIdx             int // 0: None, 1..N: index into AvailableSprints
+	AvailableSprints      []model.Sprint
 	IsAnchoredIdx         int // 0: No, 1: Yes
 	IsAllDayIdx           int // 0: No, 1: Yes
 	LinkSprintIdx         int // 0: No, 1: Yes
@@ -30,7 +32,7 @@ type TaskForm struct {
 	StartHour             int
 	StartMin              int
 	DurationMins          int
-	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days, 14: Start Date, 15: End Date, 16: Is Anchored, 17: Is All Day, 18: Link to Sprint, 20: Link to Feature, 21: Blocked By, 22: Add to Today
+	ActiveField           int // 0: Title, 1: Description, 2: Priority, 3: Story Points, 4: Type, 5: Start/Due Time, 6: Duration, 7: Location, 8: Commute Buffer, 9: Tags, 10: Submit, 11: Is Recurring, 12: Recurring End Date, 13: Recurring Days, 14: Start Date, 15: End Date, 16: Is Anchored, 17: Is All Day, 18: Sprint, 20: Link to Feature, 21: Blocked By, 22: Add to Today, 23: Status
 	TitleInput            textinput.Model
 	DescInput             textinput.Model
 	StartTimeInput        textinput.Model
@@ -157,19 +159,19 @@ func (f TaskForm) VisibleFields() []int {
 
 	// Feature (0), Defect (1), Improvement (2)
 	if f.TaskTypeIdx == 0 || f.TaskTypeIdx == 1 || f.TaskTypeIdx == 2 {
-		fields = append(fields, 23, 3, 21, 9, 10) // Status, Story Points, Blocked By, Tags, Submit
+		fields = append(fields, 18, 23, 3, 21, 9, 10) // Sprint, Status, Story Points, Blocked By, Tags, Submit
 		return fields
 	}
 
 	// Task (3)
 	if f.TaskTypeIdx == 3 {
-		fields = append(fields, 23, 3, 16) // Status, Story Points, Is Anchored
+		fields = append(fields, 3, 16) // Story Points, Is Anchored
 		if f.IsAnchoredIdx == 1 {
 			fields = append(fields, 5, 6) // Start Time, Duration
 		} else {
 			fields = append(fields, 6) // Est Duration
 		}
-		fields = append(fields, 22, 20, 21, 11) // Add to Today, Link to Feature, Blocked By, Is Recurring
+		fields = append(fields, 20, 21, 11) // Link to Feature, Blocked By, Is Recurring
 		if f.IsRecurringIdx == 1 {
 			fields = append(fields, 12, 13)
 		}

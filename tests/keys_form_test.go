@@ -888,6 +888,114 @@ func TestFloatingTaskFormCreation(t *testing.T) {
 	if task.EstimatedDurationMins != 45 {
 		t.Errorf("expected estimated duration 45, got %d", task.EstimatedDurationMins)
 	}
+	if !task.AddedToToday {
+		t.Errorf("expected task created for today to have AddedToToday = true")
+	}
+}
+
+func TestTaskAutomaticTodayShelfAndGlobalList(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, nil)
+	now := time.Now()
+
+	// 1. Create unanchored task on TODAY -> should automatically have AddedToToday = true
+	m.SelectedDay = now
+	m.Form = viewmodel.NewTaskFormWithDate(m.SelectedDay)
+	m.Form.TaskTypeIdx = 3 // Task
+	m.Form.IsAnchoredIdx = 0 // Floating
+	m.Form.TitleInput.SetValue("Today Task")
+	m.SubmitForm()
+
+	// 2. Create anchored task on TODAY -> should have SchedulingType = Anchored, AddedToToday = false
+	m.SelectedDay = now
+	m.Form = viewmodel.NewTaskFormWithDate(m.SelectedDay)
+	m.Form.TaskTypeIdx = 3 // Task
+	m.Form.IsAnchoredIdx = 1 // Anchored
+	m.Form.StartTimeInput.SetValue("10:00")
+	m.Form.DurationInput.SetValue("60")
+	m.Form.TitleInput.SetValue("Anchored Today Task")
+	m.SubmitForm()
+
+	// 3. Create unanchored task on a FUTURE date (tomorrow) -> AddedToToday = false, appears in global list
+	tomorrow := now.AddDate(0, 0, 1)
+	m.SelectedDay = tomorrow
+	m.Form = viewmodel.NewTaskFormWithDate(m.SelectedDay)
+	m.Form.TaskTypeIdx = 3 // Task
+	m.Form.IsAnchoredIdx = 0 // Floating
+	m.Form.TitleInput.SetValue("Future Global Task")
+	m.SubmitForm()
+
+	tasks := database.GetTasks()
+	var todayTask, anchoredTask, futureTask *model.Task
+	for _, tk := range tasks {
+		tkCopy := tk
+		if tk.Title == "Today Task" {
+			todayTask = &tkCopy
+		} else if tk.Title == "Anchored Today Task" {
+			anchoredTask = &tkCopy
+		} else if tk.Title == "Future Global Task" {
+			futureTask = &tkCopy
+		}
+	}
+
+	if todayTask == nil || !todayTask.AddedToToday {
+		t.Fatalf("expected Today Task to exist with AddedToToday = true")
+	}
+	if anchoredTask == nil || anchoredTask.AddedToToday || anchoredTask.SchedulingType != model.Anchored {
+		t.Fatalf("expected Anchored Task to have SchedulingType Anchored and AddedToToday = false")
+	}
+	if futureTask == nil || futureTask.AddedToToday {
+		t.Fatalf("expected Future Task to have AddedToToday = false")
+	}
+
+	// Verify Today Shelf for today contains todayTask, but not futureTask or anchoredTask
+	m.SelectedDay = now
+	todayShelf := m.GetTodoShelfTasks()
+	var foundToday, foundFuture, foundAnchored bool
+	for _, tk := range todayShelf {
+		if tk.Title == "Today Task" {
+			foundToday = true
+		}
+		if tk.Title == "Future Global Task" {
+			foundFuture = true
+		}
+		if tk.Title == "Anchored Today Task" {
+			foundAnchored = true
+		}
+	}
+	if !foundToday {
+		t.Errorf("expected 'Today Task' on today's shelf")
+	}
+	if foundFuture {
+		t.Errorf("did not expect 'Future Global Task' on today's shelf")
+	}
+	if foundAnchored {
+		t.Errorf("did not expect 'Anchored Today Task' on today's shelf")
+	}
+
+	// Verify Global Backlog Shelf contains futureTask and todayTask
+	m.CurrentView = viewmodel.SprintView
+	globalShelf := m.GetShelfData()
+	var foundGlobalFuture, foundGlobalToday bool
+	for _, tk := range globalShelf.Tasks {
+		if tk.Title == "Future Global Task" {
+			foundGlobalFuture = true
+		}
+		if tk.Title == "Today Task" {
+			foundGlobalToday = true
+		}
+	}
+	if !foundGlobalFuture {
+		t.Errorf("expected 'Future Global Task' to appear in global backlog tasks list")
+	}
+	if !foundGlobalToday {
+		t.Errorf("expected 'Today Task' to appear in global backlog tasks list")
+	}
 }
 
 func TestFormPrepopulateSelectedDay(t *testing.T) {
@@ -1025,9 +1133,16 @@ func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
 	featForm := viewmodel.NewTaskForm()
 	featForm.TaskTypeIdx = 0
 	m.Form = featForm
+	m.PopulateFormAvailableFeaturesAndBlockers()
 	renderedFeat := modals.RenderFormModal(&m, th)
 	if !strings.Contains(renderedFeat, "Create Feature") {
 		t.Fatalf("expected modal to contain 'Create Feature', got: %s", renderedFeat)
+	}
+	if !strings.Contains(renderedFeat, "Sprint") {
+		t.Fatalf("expected feature modal to contain 'Sprint', got: %s", renderedFeat)
+	}
+	if !strings.Contains(renderedFeat, "Status") {
+		t.Fatalf("expected feature modal to contain 'Status', got: %s", renderedFeat)
 	}
 	if strings.Contains(renderedFeat, "Start Time") || strings.Contains(renderedFeat, "Is Recurring") {
 		t.Fatalf("feature form should not have Start Time or Is Recurring, got: %s", renderedFeat)
@@ -1041,6 +1156,12 @@ func TestTaskFormLinkToSprintAndDefaultNotAnchored(t *testing.T) {
 	renderedTask := modals.RenderFormModal(&m, th)
 	if !strings.Contains(renderedTask, "Create Task") {
 		t.Fatalf("expected modal to contain 'Create Task', got: %s", renderedTask)
+	}
+	if strings.Contains(renderedTask, "Status") {
+		t.Fatalf("task form should not have Status field, got: %s", renderedTask)
+	}
+	if strings.Contains(renderedTask, "Today Shelf") {
+		t.Fatalf("task form should not have Today Shelf field, got: %s", renderedTask)
 	}
 	if !strings.Contains(renderedTask, "Link to Feature") {
 		t.Fatalf("expected task modal to contain 'Link to Feature', got: %s", renderedTask)

@@ -56,7 +56,9 @@ func (db *JSONDB) AddTask(t model.Task) error {
 	if t.CreatedAt.IsZero() {
 		t.CreatedAt = now
 	}
-	t.UpdatedAt = now
+	if t.UpdatedAt.IsZero() {
+		t.UpdatedAt = now
+	}
 	if t.InitiateDate.IsZero() {
 		t.InitiateDate = t.GetInitiateDate()
 	}
@@ -84,7 +86,9 @@ func (db *JSONDB) AddTaskNoLedger(t model.Task) error {
 	if t.CreatedAt.IsZero() {
 		t.CreatedAt = now
 	}
-	t.UpdatedAt = now
+	if t.UpdatedAt.IsZero() {
+		t.UpdatedAt = now
+	}
 	if t.InitiateDate.IsZero() {
 		t.InitiateDate = t.GetInitiateDate()
 	}
@@ -111,7 +115,9 @@ func (db *JSONDB) updateTaskLocked(t model.Task, recordLedger bool) error {
 	if !exists {
 		return ErrTaskNotFound
 	}
-	t.UpdatedAt = time.Now()
+	if t.UpdatedAt.IsZero() || t.UpdatedAt.Equal(prev.UpdatedAt) {
+		t.UpdatedAt = time.Now()
+	}
 	db.tasks[t.UUID] = t
 	if err := db.saveTasks(); err != nil {
 		return err

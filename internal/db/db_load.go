@@ -96,6 +96,7 @@ func (db *JSONDB) load() error {
 		if err := json.Unmarshal(data, &list); err != nil {
 			return fmt.Errorf("could not unmarshal tasks: %w", err)
 		}
+
 		for _, t := range list {
 			if t.WorkspaceUUID == "" {
 				t.WorkspaceUUID = defaultWSUUID
@@ -112,6 +113,9 @@ func (db *JSONDB) load() error {
 			if t.InitiateDate.IsZero() {
 				t.InitiateDate = t.GetInitiateDate()
 			}
+			t.ID = cleanID(t.ID)
+			t.LinkedFeatureID = cleanID(t.LinkedFeatureID)
+			t.BlockedBy = cleanID(t.BlockedBy)
 			db.tasks[t.UUID] = t
 		}
 	}
@@ -174,4 +178,10 @@ func (db *JSONDB) load() error {
 	}
 
 	return nil
+}
+
+func cleanID(s string) string {
+	s = strings.ReplaceAll(s, "[", "")
+	s = strings.ReplaceAll(s, "]", "")
+	return strings.TrimSpace(s)
 }

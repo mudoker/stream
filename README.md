@@ -45,7 +45,7 @@
 - ⚡ **6 Unified Perspectives**: Seamlessly toggle between **Dashboard**, **Month Grid**, **Sprint Kanban**, **Week Matrix**, **Day Timeline**, and **Deep Work Analytics**.
 - 📋 **Agile Sprint Engine**: Built-in Kanban swimlanes (`Backlog` ➔ `In Progress` ➔ `Testing` ➔ `Done`), story points velocity, issue hierarchy (`Features`, `Defects`, `Improvements`, `Tasks`), and linked blocker badges.
 - 🧘 **Zen Focus Mode & Interruption Tracker**: Pomodoro & stopwatch timer with real-time progress bars, `+5m` focus injections, interruption logging, and deep work metrics.
-- 🎷 **Procedural Jazz Lounge & Ambient Audio**: Generative procedural jazz chord progressions and multi-channel soundscapes (*Rain*, *Thunder*, *Campfire*, *Server Room*, *Lo-Fi loops*) generated natively without leaving the terminal.
+- 🎷 **Procedural Jazz Lounge & Ambient Audio** *(Beta)*: Generative procedural jazz chord progressions and multi-channel soundscapes (*Rain*, *Thunder*, *Campfire*, *Server Room*, *Lo-Fi loops*) generated natively without leaving the terminal.
 - 🔄 **Offline-First Google Calendar 2-Way Sync**: Instant local mutation ledger (`ledger.json`) with background asynchronous delta sync and OAuth2 browser handshake. Zero UI latency even on poor connections.
 - 📂 **Multi-Context Workspaces**: Isolate personal goals, engineering sprints, and consulting clients with instant hot-swapping (`w`/`W` or `:ws-switch`).
 - 🌅 **Daily Shutdown Ritual**: Guided review system (`:review`) that tallies completed story points, focus ratios, and safely carries over undone floating tasks for a clean slate tomorrow.
@@ -121,7 +121,7 @@ Dash   Month  Sprint  Week   Day   Stats
 
 ### 3. 🧘 Execute in the Flow Zone
 - Highlight any task and hit <kbd>z</kbd> to launch **Zen Focus Mode**.
-- Open the **Jazz Lounge** (`:music`) to play generative procedural chord progressions mixed with soothing rain or campfire audio.
+- Open the **Jazz Lounge** (`:music` *(Beta)*) to play generative procedural chord progressions mixed with soothing rain or campfire audio.
 - Hit <kbd>+</kbd> to inject 5 extra minutes when in the zone, or log interruptions to audit your focus purity.
 
 ### 4. 🌅 Daily Shutdown & Reflection
@@ -149,7 +149,11 @@ Press <kbd>z</kbd> on any task to enter the focused fullscreen HUD:
 - **Background Persistence**: Press <kbd>Esc</kbd> anytime — the timer continues running in the background while you navigate the TUI.
 - **Interruption Auditing**: Record external distractions to measure your true focus ratio in **Analytics** (<kbd>6</kbd>).
 
-### 🎷 The Procedural Jazz Lounge
+### 🎷 The Procedural Jazz Lounge `[BETA]`
+
+> [!NOTE]
+> The Jazz Lounge procedural sound engine is currently in **Beta**. You can launch it using `:music` to generate chill background soundscapes while focusing.
+
 Type `:music` in the command palette to launch the built-in ambient audio mixer:
 
 - 🎹 **Procedural Chord Generation**: Algorithmic jazz progressions with selectable keys, smooth piano voicings, trumpet/sax lead riffs, and swing drum rhythms.
@@ -284,7 +288,7 @@ Type `:` in Normal Mode to open the fuzzy command prompt:
 | `:ws-create` | Create a new isolated workspace profile | `:ws-create` |
 | `:ws-edit` | Edit the current workspace icon, name, or badge | `:ws-edit` |
 | `:ws-delete [name]` | Safely remove a workspace and its data | `:ws-delete Consulting` |
-| `:music` | Open the procedural Jazz Lounge & ambient mixer | `:music` |
+| `:music` | Open the procedural Jazz Lounge & ambient mixer *(Beta)* | `:music` |
 | `:review` | Start the Daily Shutdown & Reflection review | `:review` |
 | `:tags` | Open the Tag Management modal | `:tags` |
 | `:profile` | Edit user profile and auto-lock security settings | `:profile` |

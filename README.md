@@ -199,32 +199,31 @@ Type `:music` in the command palette to launch the built-in ambient audio mixer:
 
 `stream` guarantees zero latency. Every task update, sprint transition, or time-block modification is immediately committed to local persistent storage and logged to a transactional delta ledger. 
 
-```mermaid
-flowchart TD
-    subgraph Local_TUI ["🖥️ Local Terminal Environment"]
-        User["User Action (j/k/x/m/:cmd)"]
-        TUI["Bubble Tea TUI Engine"]
-        DB[("Local State: data.json")]
-        Ledger[("Sync Ledger: ledger.json")]
-    end
-
-    subgraph Sync_Daemon ["⚡ Background Sync Worker"]
-        Worker["Async Delta Sync Engine"]
-        Conflict["Conflict Resolver"]
-    end
-
-    subgraph Cloud ["☁️ Google Cloud Platform"]
-        GCal["Google Calendar API (v3)"]
-    end
-
-    User -->|Instant Execution| TUI
-    TUI -->|Atomic Write| DB
-    TUI -->|Queue Operation| Ledger
-    Ledger -.->|Background Poll| Worker
-    Worker -->|Push Local Deltas| GCal
-    GCal -->|Pull Remote Changes| Worker
-    Worker -->|Resolve & Merge| Conflict
-    Conflict -->|Update Local State| DB
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 🖥️  LOCAL TERMINAL WORKSPACE (TUI)                                          │
+│                                                                             │
+│   [ User Input ] ──(j/k/x/m/:cmd)──> [ Bubble Tea TUI Engine ]              │
+│                                                   │                         │
+│                           ┌───────────────────────┴───────────────────────┐ │
+│                           ▼ (Instant Write)                               ▼ │
+│              ┌───────────────────────────┐   ┌───────────────────────────┐│ │
+│              │   💾 Local State Database │   │   📜 Sync Delta Ledger    ││ │
+│              │        (data.json)        │   │        (ledger.json)      ││ │
+│              └─────────────▲─────────────┘   └─────────────┬─────────────┘│ │
+└────────────────────────────┼───────────────────────────────┼────────────────┘
+                             │ (Merge Remote Updates)        │ (Poll Local Deltas)
+┌────────────────────────────┼───────────────────────────────┼────────────────┐
+│ ⚡ BACKGROUND SYNC WORKER  │                               │                │
+│              ┌─────────────┴─────────────┐   ┌─────────────▼─────────────┐  │
+│              │   🤝 Conflict Resolver    │<──│   🚀 Delta Push Engine    │  │
+│              └─────────────▲─────────────┘   └─────────────┬─────────────┘  │
+└────────────────────────────┼───────────────────────────────┼────────────────┘
+                             │ (Pull Remote Changes)         │ (Push Event Deltas)
+                             │                               ▼
+              ┌────────────────────────────────────────────────────────────┐
+              │ ☁️  GOOGLE CALENDAR CLOUD API (v3)                         │
+              └────────────────────────────────────────────────────────────┘
 ```
 
 ### Google Calendar Setup

@@ -966,7 +966,7 @@ func TestSprintFeaturesWithStatusExcludedFromDayTodoShelfBacklog(t *testing.T) {
 		InitiateDate:   today,
 	}
 
-	// 2. Feature in sprint with AddedToToday = true - SHOULD show on Today Shelf
+	// 2. Feature with AddedToToday = true - should NEVER show on Todo Shelf
 	feat2 := model.Task{
 		UUID:           "feat-2",
 		ID:             "FEAT-2",
@@ -979,7 +979,20 @@ func TestSprintFeaturesWithStatusExcludedFromDayTodoShelfBacklog(t *testing.T) {
 		InitiateDate:   today,
 	}
 
-	// 3. Regular Task without sprint / status - SHOULD show in Day Backlog
+	// 3. Sprint task with AddedToToday = true - SHOULD show on Today Shelf
+	sprintTask := model.Task{
+		UUID:           "task-sprint",
+		ID:             "TSK-1",
+		WorkItemType:   model.WorkItemTask,
+		Title:          "Added To Today Task",
+		SprintUUID:     sprint.UUID,
+		LifecycleState: model.StateReady,
+		SchedulingType: model.Floating,
+		AddedToToday:   true,
+		InitiateDate:   today,
+	}
+
+	// 4. Regular Task without sprint / status - SHOULD show in Day Backlog
 	regularTask := model.Task{
 		UUID:           "task-regular",
 		Title:          "Regular Task",
@@ -989,6 +1002,7 @@ func TestSprintFeaturesWithStatusExcludedFromDayTodoShelfBacklog(t *testing.T) {
 
 	database.AddTask(feat1)
 	database.AddTask(feat2)
+	database.AddTask(sprintTask)
 	database.AddTask(regularTask)
 
 	m := viewmodel.NewModel(database, nil)
@@ -1007,6 +1021,7 @@ func TestSprintFeaturesWithStatusExcludedFromDayTodoShelfBacklog(t *testing.T) {
 
 	hasFeat1 := false
 	hasFeat2 := false
+	hasSprintTask := false
 	hasRegularTask := false
 
 	for _, tk := range backlogSection.Tasks {
@@ -1016,21 +1031,226 @@ func TestSprintFeaturesWithStatusExcludedFromDayTodoShelfBacklog(t *testing.T) {
 		if tk.UUID == "feat-2" {
 			hasFeat2 = true
 		}
+		if tk.UUID == "task-sprint" {
+			hasSprintTask = true
+		}
 		if tk.UUID == "task-regular" {
 			hasRegularTask = true
 		}
 	}
 
 	if hasFeat1 {
-		t.Fatalf("FEAT-1 with status READY in sprint should NOT be in Day View Backlog")
+		t.Fatalf("FEAT-1 should NOT be in Day View Todo Shelf")
 	}
-	if !hasFeat2 {
-		t.Fatalf("FEAT-2 with AddedToToday=true should be in Day View shelf")
+	if hasFeat2 {
+		t.Fatalf("FEAT-2 (Feature) should NEVER be in Day View Todo Shelf")
+	}
+	if !hasSprintTask {
+		t.Fatalf("Sprint task with AddedToToday=true should be in Day View shelf")
 	}
 	if !hasRegularTask {
 		t.Fatalf("Regular task without sprint status should be in Day View Backlog")
 	}
 }
+
+func TestUnassignedFeaturesExcludedFromTodoShelf(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+
+	today := time.Now()
+
+	// Unassigned Feature, Defect, and Improvement
+	feat := model.Task{
+		UUID:           "feat-unassigned",
+		ID:             "FEAT-1",
+		WorkItemType:   model.WorkItemFeature,
+		Title:          "Commercialise Kratos",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateBacklog,
+	}
+	defect := model.Task{
+		UUID:           "def-unassigned",
+		ID:             "DEF-1",
+		WorkItemType:   model.WorkItemDefect,
+		Title:          "Fix Login Bug",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateBacklog,
+	}
+	taskItem := model.Task{
+		UUID:           "task-1",
+		ID:             "TSK-8",
+		WorkItemType:   model.WorkItemTask,
+		Title:          "Optimising Kratos",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateBacklog,
+	}
+
+	database.AddTask(feat)
+	database.AddTask(defect)
+	database.AddTask(taskItem)
+
+	m := viewmodel.NewModel(database, nil)
+	m.SelectedDay = today
+
+	// Day View Todo Shelf: only TSK-8 should be present
+	m.CurrentView = viewmodel.DayView
+	dayShelf := m.GetTodoShelfTasks()
+	for _, tk := range dayShelf {
+		if tk.UUID == "feat-unassigned" || tk.UUID == "def-unassigned" {
+			t.Fatalf("Feature or Defect should not appear on Todo Shelf: %+v", tk)
+		}
+	}
+	foundTask := false
+	for _, tk := range dayShelf {
+		if tk.UUID == "task-1" {
+			foundTask = true
+		}
+	}
+	if !foundTask {
+		t.Fatalf("Expected TSK-8 to appear on Todo Shelf")
+	}
+
+	// Sprint View Global Backlog: ALL floating items should be present
+	m.CurrentView = viewmodel.SprintView
+	globalShelf := m.GetGlobalBacklogTasks()
+	foundFeat := false
+	foundDef := false
+	foundTask = false
+	for _, tk := range globalShelf {
+		if tk.UUID == "feat-unassigned" {
+			foundFeat = true
+		}
+		if tk.UUID == "def-unassigned" {
+			foundDef = true
+		}
+		if tk.UUID == "task-1" {
+			foundTask = true
+		}
+	}
+	if !foundFeat || !foundDef || !foundTask {
+		t.Fatalf("Global Backlog in Sprint View should show all unassigned items: feat=%v, def=%v, task=%v", foundFeat, foundDef, foundTask)
+	}
+}
+
+func TestAnchoredTasksExcludedFromTodoShelf(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+
+	today := time.Now()
+
+	// 1. Anchored regular task
+	anchoredTask := model.Task{
+		UUID:           "anchored-1",
+		Title:          "Team Sync Meeting",
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: today.Add(1 * time.Hour),
+			End:   today.Add(2 * time.Hour),
+		},
+	}
+
+	// 2. Completed anchored task
+	completedAnchoredTask := model.Task{
+		UUID:           "anchored-completed",
+		Title:          "Completed Standup",
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateCompleted,
+		UpdatedAt:      today,
+		TimeWindow: model.TimeWindow{
+			Start: today.Add(-2 * time.Hour),
+			End:   today.Add(-1 * time.Hour),
+		},
+	}
+
+	// 3. Anchored task with AddedToToday = true
+	anchoredAddedToToday := model.Task{
+		UUID:           "anchored-added-to-today",
+		Title:          "Anchored Marked Today",
+		SchedulingType: model.Anchored,
+		LifecycleState: model.StateReady,
+		AddedToToday:   true,
+		TimeWindow: model.TimeWindow{
+			Start: today.Add(3 * time.Hour),
+			End:   today.Add(4 * time.Hour),
+		},
+	}
+
+	// 4. Calendar event
+	calEvent := model.Task{
+		UUID:           "event-1",
+		Title:          "Doctor Appointment",
+		SchedulingType: model.Event,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: today.Add(5 * time.Hour),
+			End:   today.Add(6 * time.Hour),
+		},
+	}
+
+	// 5. Anchored habit
+	anchoredHabit := model.Task{
+		UUID:           "habit-anchored",
+		Title:          "Morning Jog",
+		SchedulingType: model.Habit,
+		LifecycleState: model.StateReady,
+		TimeWindow: model.TimeWindow{
+			Start: today.Add(7 * time.Hour),
+			End:   today.Add(8 * time.Hour),
+		},
+	}
+
+	// 6. Floating task (SHOULD appear on Todo Shelf)
+	floatingTask := model.Task{
+		UUID:           "floating-1",
+		Title:          "Write Design Doc",
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+		InitiateDate:   today,
+	}
+
+	database.AddTask(anchoredTask)
+	database.AddTask(completedAnchoredTask)
+	database.AddTask(anchoredAddedToToday)
+	database.AddTask(calEvent)
+	database.AddTask(anchoredHabit)
+	database.AddTask(floatingTask)
+
+	m := viewmodel.NewModel(database, nil)
+	m.SelectedDay = today
+	m.CurrentView = viewmodel.DayView
+
+	shelfTasks := m.GetTodoShelfTasks()
+
+	for _, tk := range shelfTasks {
+		if tk.UUID == "anchored-1" || tk.UUID == "anchored-completed" || tk.UUID == "anchored-added-to-today" || tk.UUID == "event-1" || tk.UUID == "habit-anchored" {
+			t.Fatalf("Anchored item '%s' (%s, %s) should NOT appear on Todo Shelf", tk.Title, tk.UUID, tk.SchedulingType)
+		}
+	}
+
+	foundFloating := false
+	for _, tk := range shelfTasks {
+		if tk.UUID == "floating-1" {
+			foundFloating = true
+			break
+		}
+	}
+	if !foundFloating {
+		t.Fatalf("Expected floating task 'Write Design Doc' to appear on Todo Shelf")
+	}
+}
+
+
 
 
 

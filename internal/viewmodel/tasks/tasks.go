@@ -117,8 +117,13 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 	recurringInstances := make(map[string]model.Task)
 
 	for _, t := range allTasks {
-		// Anchored habits (has start time and end time) should not show on the todo shelf anymore
-		if t.SchedulingType == model.Habit && !t.TimeWindow.Start.IsZero() && !t.TimeWindow.End.IsZero() {
+		// Feature-level items (Features, Defects, Improvements) belong exclusively to Sprint/Global Backlog and must NEVER show on the Todo Shelf.
+		if isFeatureLevelItem(t) {
+			continue
+		}
+
+		// Anchored tasks (fixed time blocks, calendar events, and anchored habits) should not show on the todo shelf anymore
+		if model.IsTaskAnchored(t) {
 			continue
 		}
 
@@ -176,9 +181,9 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 				habits = append(habits, t)
 			}
 		} else if t.SchedulingType == model.Floating || t.AddedToToday {
-			// Sprint items (features, defects, improvements, or items in a sprint with defined/in-progress status)
-			// belong to the sprint Kanban swimlanes and should NOT appear in the day backlog shelf unless explicitly AddedToToday.
-			if (t.SprintUUID != "" || t.WorkItemType == model.WorkItemFeature || t.WorkItemType == model.WorkItemDefect || t.WorkItemType == model.WorkItemImprovement) && !t.AddedToToday {
+			// Sprint items in a sprint with defined/in-progress status belong to the sprint Kanban swimlanes
+			// and should NOT appear in the day backlog shelf unless explicitly AddedToToday.
+			if t.SprintUUID != "" && !t.AddedToToday {
 				continue
 			}
 			// Day view shelf: show undone floating tasks scheduled on or before selectedDay (carried over to subsequent days).
@@ -311,4 +316,19 @@ func sameDay(a, b time.Time) bool {
 	bLocal := b.Local()
 	return aLocal.Year() == bLocal.Year() && aLocal.Month() == bLocal.Month() && aLocal.Day() == bLocal.Day()
 }
+
+func isFeatureLevelItem(t model.Task) bool {
+	if t.WorkItemType == model.WorkItemFeature || t.WorkItemType == model.WorkItemDefect || t.WorkItemType == model.WorkItemImprovement {
+		return true
+	}
+	if t.WorkItemType != "" && t.WorkItemType != model.WorkItemTask {
+		return true
+	}
+	idUpper := strings.ToUpper(t.ID)
+	if strings.HasPrefix(idUpper, "FEAT-") || strings.HasPrefix(idUpper, "FEA-") || strings.HasPrefix(idUpper, "DEF-") || strings.HasPrefix(idUpper, "IMP-") {
+		return true
+	}
+	return false
+}
+
 

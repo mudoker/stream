@@ -77,12 +77,9 @@ go build -ldflags="-s -w" -o stream
 
 Switch between 6 dedicated views instantly with keys <kbd>1</kbd> through <kbd>6</kbd>:
 
-```text
- ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐
- │ 1 │ │ 2 │ │ 3 │ │ 4 │ │ 5 │ │ 6 │
- └───┘ └───┘ └───┘ └───┘ └───┘ └───┘
-Dash   Month  Sprint  Week   Day   Stats
-```
+<p align="center">
+  <img src="./docs/images/perspective_views.svg" alt="The 6 Perspective Views" width="100%" />
+</p>
 
 | Key | View Name | Description | Key Capabilities |
 | :---: | :--- | :--- | :--- |
@@ -99,15 +96,9 @@ Dash   Month  Sprint  Week   Day   Stats
 
 `stream` matches your natural cognitive rhythm throughout the day:
 
-```text
-     09:00 AM                  10:00 AM                 12:00 PM                 06:00 PM
-  ┌────────────┐            ┌────────────┐           ┌────────────┐           ┌────────────┐
-  │  CAPTURE   │  ───────>  │  SCHEDULE  │  ──────>  │ DEEP FOCUS │  ──────>  │  SHUTDOWN  │
-  └────────────┘            └────────────┘           └────────────┘           └────────────┘
-   :todo / :task             :create / i              Press [z]                :review
-   Dump thoughts to          Time-block on            Pomodoro + Jazz          Reflect & carry
-   Todo Shelf                Day timeline             ambient lounge           over clean slate
-```
+<p align="center">
+  <img src="./docs/images/daily_flow.svg" alt="The Daily Flow" width="100%" />
+</p>
 
 ### 1. 📥 Rapid Capture (Inbox Zero)
 - Fast-dump floating tasks to your shelf: `:todo Refactor database query engine`
@@ -135,16 +126,9 @@ Dash   Month  Sprint  Week   Day   Stats
 ### 🍅 Zen Mode (Focus Engine)
 Press <kbd>z</kbd> on any task to enter the focused fullscreen HUD:
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  🧘 FOCUS SESSION: Refactor Authentication Middleware       │
-│                                                             │
-│  [████████████████████░░░░░░░░░░] 21:45 / 25:00 (87%)       │
-│                                                             │
-│  🔥 Interruption Count: 0        🎯 Current Block: 1 of 4   │
-│  [Space] Pause   [+] Add 5m   [b] Break   [Esc] Background  │
-└─────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="./docs/images/zen_focus_hud.svg" alt="Zen Focus Session HUD" width="100%" />
+</p>
 
 - **Background Persistence**: Press <kbd>Esc</kbd> anytime — the timer continues running in the background while you navigate the TUI.
 - **Interruption Auditing**: Record external distractions to measure your true focus ratio in **Analytics** (<kbd>6</kbd>).
@@ -166,24 +150,9 @@ Type `:music` in the command palette to launch the built-in ambient audio mixer:
 
 `stream` supports a structured two-tier hierarchy separating high-level deliverables from executable daily tasks:
 
-```text
-┌───────────────────────────────────────────────────────────────────┐
-│ SPRINT / GLOBAL BACKLOG (Feature-Level Deliverables)               │
-│                                                                   │
-│   🏷️ [FEAT-1] OAuth2 Social Logins         🏷️ [DEF-4] Memory Leak │
-│   🏷️ [IMP-2] Faster JSON Serialization                            │
-└─────────────────┬─────────────────────────────────────────────────┘
-                  │ decomposes into
-                  ▼
-┌───────────────────────────────────────────────────────────────────┐
-│ EXECUTION LAYER (Day Timeline & Todo Shelf)                       │
-│                                                                   │
-│   ⏱️ [ANCHORED] 09:00 - 10:30 Team Sprint Planning                │
-│   📋 [FLOATING] TSK-10: Write unit tests for Google OAuth         │
-│   🔔 [REMINDER] Submit weekly timesheet by 17:00                  │
-│   🔄 [HABIT]    Morning stretch & hydration streak                │
-└───────────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="./docs/images/work_item_taxonomy.svg" alt="Work Item Taxonomy &amp; Agile Engine" width="100%" />
+</p>
 
 ### Classification Breakdown
 

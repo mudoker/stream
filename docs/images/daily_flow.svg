@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 200" width="100%" height="100%">
+  <defs>
+    <style>
+      .bg { fill: #0d1117; }
+      .stage-box { fill: #161b22; stroke: #30363d; stroke-width: 1.5; rx: 8px; }
+      .stage-box:hover { stroke: #58a6ff; }
+      .time-pill { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 11px; font-weight: 700; fill: #8b949e; }
+      .stage-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; text-anchor: middle; }
+      .cmd-text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 11px; font-weight: 600; fill: #58a6ff; text-anchor: middle; }
+      .desc-text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11.5px; fill: #8b949e; text-anchor: middle; }
+      .arrow-line { stroke: #388bfd; stroke-width: 1.8; fill: none; }
+    </style>
+
+    <marker id="arrow-right" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#388bfd"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="880" height="200" class="bg" rx="10"/>
+
+  <!-- ================= STAGE 1: CAPTURE ================= -->
+  <rect x="25" y="25" width="185" height="150" class="stage-box"/>
+  <rect x="75" y="38" width="85" height="20" fill="#21262d" rx="10"/>
+  <text x="117" y="52" class="time-pill" text-anchor="middle">09:00 AM</text>
+  <text x="117" y="85" class="stage-title" fill="#79c0ff">📥 CAPTURE</text>
+  <text x="117" y="112" class="cmd-text">:todo  •  :task</text>
+  <text x="117" y="136" class="desc-text">Dump thoughts</text>
+  <text x="117" y="152" class="desc-text">to Todo Shelf</text>
+
+  <!-- Arrow 1 -> 2 -->
+  <path d="M 215 100 L 240 100" class="arrow-line" marker-end="url(#arrow-right)"/>
+
+  <!-- ================= STAGE 2: SCHEDULE ================= -->
+  <rect x="245" y="25" width="185" height="150" class="stage-box"/>
+  <rect x="295" y="38" width="85" height="20" fill="#21262d" rx="10"/>
+  <text x="337" y="52" class="time-pill" text-anchor="middle">10:00 AM</text>
+  <text x="337" y="85" class="stage-title" fill="#7ee787">🗓️ SCHEDULE</text>
+  <text x="337" y="112" class="cmd-text">:create  •  [i]</text>
+  <text x="337" y="136" class="desc-text">Time-block on</text>
+  <text x="337" y="152" class="desc-text">Day timeline</text>
+
+  <!-- Arrow 2 -> 3 -->
+  <path d="M 435 100 L 460 100" class="arrow-line" marker-end="url(#arrow-right)"/>
+
+  <!-- ================= STAGE 3: DEEP FOCUS ================= -->
+  <rect x="465" y="25" width="185" height="150" class="stage-box"/>
+  <rect x="515" y="38" width="85" height="20" fill="#21262d" rx="10"/>
+  <text x="557" y="52" class="time-pill" text-anchor="middle">12:00 PM</text>
+  <text x="557" y="85" class="stage-title" fill="#d2a8ff">🧘 DEEP FOCUS</text>
+  <text x="557" y="112" class="cmd-text">Press [z]  •  :music</text>
+  <text x="557" y="136" class="desc-text">Pomodoro timer</text>
+  <text x="557" y="152" class="desc-text">+ Jazz lounge</text>
+
+  <!-- Arrow 3 -> 4 -->
+  <path d="M 655 100 L 680 100" class="arrow-line" marker-end="url(#arrow-right)"/>
+
+  <!-- ================= STAGE 4: SHUTDOWN ================= -->
+  <rect x="685" y="25" width="170" height="150" class="stage-box"/>
+  <rect x="728" y="38" width="85" height="20" fill="#21262d" rx="10"/>
+  <text x="770" y="52" class="time-pill" text-anchor="middle">06:00 PM</text>
+  <text x="770" y="85" class="stage-title" fill="#f0883e">🌅 SHUTDOWN</text>
+  <text x="770" y="112" class="cmd-text">:review</text>
+  <text x="770" y="136" class="desc-text">Reflect &amp; carry over</text>
+  <text x="770" y="152" class="desc-text">clean slate</text>
+
+</svg>

@@ -203,32 +203,9 @@ Type `:music` in the command palette to launch the built-in ambient audio mixer:
 
 `stream` guarantees zero latency. Every task update, sprint transition, or time-block modification is immediately committed to local persistent storage and logged to a transactional delta ledger. 
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ 🖥️  LOCAL TERMINAL WORKSPACE (TUI)                                          │
-│                                                                             │
-│   [ User Input ] ──(j/k/x/m/:cmd)──> [ Bubble Tea TUI Engine ]              │
-│                                                   │                         │
-│                           ┌───────────────────────┴───────────────────────┐ │
-│                           ▼ (Instant Write)                               ▼ │
-│              ┌───────────────────────────┐   ┌───────────────────────────┐│ │
-│              │   💾 Local State Database │   │   📜 Sync Delta Ledger    ││ │
-│              │        (data.json)        │   │        (ledger.json)      ││ │
-│              └─────────────▲─────────────┘   └─────────────┬─────────────┘│ │
-└────────────────────────────┼───────────────────────────────┼────────────────┘
-                             │ (Merge Remote Updates)        │ (Poll Local Deltas)
-┌────────────────────────────┼───────────────────────────────┼────────────────┐
-│ ⚡ BACKGROUND SYNC WORKER  │                               │                │
-│              ┌─────────────┴─────────────┐   ┌─────────────▼─────────────┐  │
-│              │   🤝 Conflict Resolver    │<──│   🚀 Delta Push Engine    │  │
-│              └─────────────▲─────────────┘   └─────────────┬─────────────┘  │
-└────────────────────────────┼───────────────────────────────┼────────────────┘
-                             │ (Pull Remote Changes)         │ (Push Event Deltas)
-                             │                               ▼
-              ┌────────────────────────────────────────────────────────────┐
-              │ ☁️  GOOGLE CALENDAR CLOUD API (v3)                         │
-              └────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="./docs/images/sync_architecture.svg" alt="Offline-First Sync Architecture" width="100%" />
+</p>
 
 ### Google Calendar Setup
 1. Create a Google Cloud project on the [Google Cloud Console](https://console.cloud.google.com/).

@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 620" width="100%" height="100%">
+  <defs>
+    <style>
+      .bg { fill: #0d1117; }
+      .container { fill: #161b22; stroke: #30363d; stroke-width: 1.5; rx: 8px; }
+      .container-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; fill: #8b949e; letter-spacing: 0.5px; }
+      .node-box { fill: #21262d; stroke: #38414e; stroke-width: 1.5; rx: 6px; }
+      .node-box-active { fill: #172338; stroke: #388bfd; stroke-width: 1.5; rx: 6px; }
+      .node-box-success { fill: #12281e; stroke: #2ea043; stroke-width: 1.5; rx: 6px; }
+      .node-box-warning { fill: #2e2212; stroke: #d29922; stroke-width: 1.5; rx: 6px; }
+      .node-box-purple { fill: #261b36; stroke: #a371f7; stroke-width: 1.5; rx: 6px; }
+      .node-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 600; fill: #f0f6fc; text-anchor: middle; }
+      .node-sub { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11px; fill: #8b949e; text-anchor: middle; }
+      .edge-label { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 11px; font-weight: 500; fill: #8b949e; text-anchor: middle; }
+      .edge-path { stroke: #58a6ff; stroke-width: 1.8; fill: none; }
+      .edge-path-green { stroke: #3fb950; stroke-width: 1.8; fill: none; }
+      .edge-path-yellow { stroke: #d29922; stroke-width: 1.8; fill: none; }
+      .edge-path-purple { stroke: #bc8cff; stroke-width: 1.8; fill: none; }
+      .edge-dashed { stroke-dasharray: 4,4; }
+    </style>
+    
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#3fb950"/>
+    </marker>
+    <marker id="arrow-yellow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#d29922"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#bc8cff"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="880" height="620" class="bg" rx="10"/>
+
+  <!-- ================= TIER 1: LOCAL TUI ================= -->
+  <rect x="30" y="25" width="820" height="235" class="container"/>
+  <text x="50" y="52" class="container-title">🖥️  LOCAL TERMINAL WORKSPACE (TUI)</text>
+
+  <!-- User Input Node -->
+  <rect x="70" y="75" width="260" height="52" class="node-box"/>
+  <text x="200" y="98" class="node-title">User Input Actions</text>
+  <text x="200" y="115" class="node-sub">VIM Navigation (j / k / x / m / :cmd)</text>
+
+  <!-- Arrow: User Input -> Bubble Tea -->
+  <path d="M 330 101 L 440 101" class="edge-path" marker-end="url(#arrow-blue)"/>
+  <text x="385" y="93" class="edge-label">Event Loop</text>
+
+  <!-- Bubble Tea Engine Node -->
+  <rect x="445" y="75" width="365" height="52" class="node-box-active"/>
+  <text x="627" y="98" class="node-title" fill="#79c0ff">Bubble Tea TUI Engine</text>
+  <text x="627" y="115" class="node-sub">Model-Update-View • State Orchestrator</text>
+
+  <!-- Fork arrows from Bubble Tea Engine down to DB and Ledger -->
+  <!-- Down to DB -->
+  <path d="M 540 127 L 540 150 L 250 150 L 250 172" class="edge-path-green" marker-end="url(#arrow-green)"/>
+  <text x="360" y="145" class="edge-label">Atomic Write</text>
+
+  <!-- Down to Ledger -->
+  <path d="M 710 127 L 710 172" class="edge-path-yellow" marker-end="url(#arrow-yellow)"/>
+  <text x="755" y="152" class="edge-label">Append Log</text>
+
+  <!-- Local State Database Node -->
+  <rect x="120" y="175" width="260" height="60" class="node-box-success"/>
+  <text x="250" y="201" class="node-title" fill="#7ee787">💾 Local State Database</text>
+  <text x="250" y="220" class="node-sub">Persistent Storage (data.json)</text>
+
+  <!-- Sync Delta Ledger Node -->
+  <rect x="580" y="175" width="260" height="60" class="node-box-warning"/>
+  <text x="710" y="201" class="node-title" fill="#e3b341">📜 Sync Delta Ledger</text>
+  <text x="710" y="220" class="node-sub">Transactional Log (ledger.json)</text>
+
+  <!-- Inter-tier connections: Ledger -> Push Engine, Conflict Resolver -> DB -->
+  <path d="M 710 235 L 710 327" class="edge-path-yellow" marker-end="url(#arrow-yellow)"/>
+  <text x="765" y="280" class="edge-label">Poll Local Deltas</text>
+
+  <path d="M 250 330 L 250 240" class="edge-path-green" marker-end="url(#arrow-green)"/>
+  <text x="180" y="285" class="edge-label">Merge Updates</text>
+
+  <!-- ================= TIER 2: SYNC WORKER ================= -->
+  <rect x="30" y="295" width="820" height="150" class="container"/>
+  <text x="50" y="322" class="container-title">⚡  BACKGROUND SYNC WORKER (DAEMON)</text>
+
+  <!-- Conflict Resolver Node -->
+  <rect x="120" y="345" width="260" height="65" class="node-box-purple"/>
+  <text x="250" y="373" class="node-title" fill="#d2a8ff">🤝 Conflict Resolver</text>
+  <text x="250" y="392" class="node-sub">Timestamp &amp; State Deconfliction</text>
+
+  <!-- Push Engine Node -->
+  <rect x="580" y="345" width="260" height="65" class="node-box-active"/>
+  <text x="710" y="373" class="node-title" fill="#79c0ff">🚀 Delta Push Engine</text>
+  <text x="710" y="392" class="node-sub">Compaction, Dedup &amp; Rate Limiting</text>
+
+  <!-- Horizontal dashed arrow: Push Engine -> Conflict Resolver -->
+  <path d="M 580 377 L 385 377" class="edge-path-purple edge-dashed" marker-end="url(#arrow-purple)"/>
+  <text x="482" y="371" class="edge-label">Internal Reconcile</text>
+
+  <!-- Inter-tier connections: Push Engine -> GCal, GCal -> Conflict Resolver -->
+  <path d="M 710 410 L 710 497" class="edge-path" marker-end="url(#arrow-blue)"/>
+  <text x="770" y="455" class="edge-label">Push Event Deltas</text>
+
+  <path d="M 250 500 L 250 415" class="edge-path-purple" marker-end="url(#arrow-purple)"/>
+  <text x="175" y="460" class="edge-label">Pull Changes</text>
+
+  <!-- ================= TIER 3: GOOGLE CLOUD ================= -->
+  <rect x="30" y="480" width="820" height="110" class="container"/>
+  <text x="50" y="507" class="container-title">☁️  GOOGLE CLOUD PLATFORM</text>
+
+  <!-- Google Calendar Cloud Node -->
+  <rect x="120" y="520" width="720" height="52" class="node-box-active"/>
+  <text x="480" y="543" class="node-title" fill="#79c0ff">Google Calendar API (v3)</text>
+  <text x="480" y="560" class="node-sub">OAuth 2.0 PKCE • Primary Calendar 2-Way Synchronization</text>
+
+</svg>

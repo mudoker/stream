@@ -409,6 +409,9 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					}
 
 					m.refreshTasks()
+					if m.Sync != nil {
+						m.Sync.TriggerPushSync()
+					}
 					m.ConfirmOpen = false
 					m.ConfirmActionType = ""
 					m.RecurringEditFromForm = false

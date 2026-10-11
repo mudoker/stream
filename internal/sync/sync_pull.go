@@ -155,7 +155,11 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 						delete(localByGCalID, item.Id)
 					} else {
 						// For Stream user tasks: NEVER delete user tasks! Safely de-anchor to Todo Shelf
-						local.SchedulingType = model.Floating
+						if local.SchedulingType == model.Habit {
+							local.TimeWindow = model.TimeWindow{}
+						} else {
+							local.SchedulingType = model.Floating
+						}
 						local.GCalMetadata = model.GCalMetadata{}
 						_ = s.localDB.UpdateTaskNoLedger(local)
 						localByUUID[local.UUID] = local
@@ -190,8 +194,15 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 					isAllDay = true
 				}
 			}
+			if end.IsZero() && !start.IsZero() {
+				if isAllDay {
+					end = start.Add(24 * time.Hour)
+				} else {
+					end = start.Add(1 * time.Hour)
+				}
+			}
 
-			if !model.IsGCalSyncable(model.Task{SchedulingType: schedVal}) || start.IsZero() {
+			if !model.IsGCalSyncable(model.Task{SchedulingType: schedVal, TimeWindow: model.TimeWindow{Start: start, End: end}}) || start.IsZero() {
 				continue
 			}
 

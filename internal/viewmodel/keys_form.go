@@ -817,6 +817,9 @@ func (m *Model) FinalizeSubmitTask(newTask model.Task) {
 				current = current.AddDate(0, 0, 1)
 			}
 			m.refreshTasks()
+			if m.Sync != nil && count > 0 {
+				m.Sync.TriggerPushSync()
+			}
 			m.StatusMsg = fmt.Sprintf("Created %d recurring occurrences.", count)
 			return
 		}

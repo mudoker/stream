@@ -1284,6 +1284,166 @@ func TestPullRemoteUpdates_PreserveLifecycleState(t *testing.T) {
 	}
 }
 
+func TestPullAndPushAnchoredHabits(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	localDB, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create db: %v", err)
+	}
+
+	ws := model.Workspace{UUID: "ws-1", Name: "Default"}
+	_ = localDB.AddWorkspace(ws)
+
+	// 1. Anchored habit exists locally
+	habitAnchored := model.Task{
+		UUID:           "habit-local-1",
+		WorkspaceUUID:  "ws-1",
+		Title:          "Morning Running",
+		SchedulingType: model.Habit,
+		Source:         model.SourceStream,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 6, 11, 7, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 6, 11, 8, 0, 0, 0, time.UTC),
+		},
+		GCalMetadata: model.GCalMetadata{
+			EventID: "gcal-habit-1",
+		},
+	}
+	_ = localDB.AddTaskNoLedger(habitAnchored)
+
+	// 2. Another anchored habit that was cancelled on remote
+	habitCancelled := model.Task{
+		UUID:           "habit-cancelled-1",
+		WorkspaceUUID:  "ws-1",
+		Title:          "Daily Yoga",
+		SchedulingType: model.Habit,
+		Source:         model.SourceStream,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 6, 11, 8, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 6, 11, 8, 30, 0, 0, time.UTC),
+		},
+		GCalMetadata: model.GCalMetadata{
+			EventID: "gcal-habit-cancelled",
+		},
+	}
+	_ = localDB.AddTaskNoLedger(habitCancelled)
+
+	engine, err := NewSyncEngine(localDB, nil, nil)
+	if err != nil {
+		t.Fatalf("NewSyncEngine failed: %v", err)
+	}
+
+	transport := &mockTransport{
+		roundTrip: func(req *http.Request) (*http.Response, error) {
+			if req.Method == "GET" && strings.Contains(req.URL.Path, "/calendars/primary/events") {
+				respBody := `{
+					"items": [
+						{
+							"id": "gcal-habit-1",
+							"summary": "Morning Running (Trail)",
+							"status": "confirmed",
+							"start": {"dateTime": "2026-06-11T07:15:00Z"},
+							"end": {"dateTime": "2026-06-11T08:15:00Z"},
+							"extendedProperties": {
+								"private": {
+									"uuid": "habit-local-1",
+									"scheduling_type": "HABIT",
+									"source": "stream"
+								}
+							}
+						},
+						{
+							"id": "gcal-habit-cancelled",
+							"status": "cancelled"
+						},
+						{
+							"id": "gcal-habit-remote-new",
+							"summary": "Daily Reading",
+							"status": "confirmed",
+							"start": {"dateTime": "2026-06-11T20:00:00Z"},
+							"end": {"dateTime": "2026-06-11T20:30:00Z"},
+							"extendedProperties": {
+								"private": {
+									"uuid": "habit-remote-new",
+									"scheduling_type": "HABIT",
+									"source": "stream"
+								}
+							}
+						}
+					]
+				}`
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(respBody)),
+					Header:     make(http.Header),
+				}, nil
+			}
+			return nil, fmt.Errorf("unexpected call: %s %s", req.Method, req.URL.String())
+		},
+	}
+
+	client := &http.Client{Transport: transport}
+	srv, _ := calendar.NewService(context.Background(), option.WithHTTPClient(client))
+
+	// Test Pull
+	err = engine.pullRemoteUpdates(srv)
+	if err != nil {
+		t.Fatalf("pullRemoteUpdates failed: %v", err)
+	}
+
+	// Verify habit-local-1 was updated and remained HABIT
+	h1, ok := localDB.GetTask("habit-local-1")
+	if !ok {
+		t.Fatalf("expected habit-local-1 to exist")
+	}
+	if h1.SchedulingType != model.Habit {
+		t.Errorf("expected SchedulingType HABIT, got %s", h1.SchedulingType)
+	}
+	if h1.Title != "Morning Running (Trail)" {
+		t.Errorf("expected updated title, got %s", h1.Title)
+	}
+	expectedStart := time.Date(2026, 6, 11, 7, 15, 0, 0, time.UTC)
+	if !h1.TimeWindow.Start.Equal(expectedStart) {
+		t.Errorf("expected updated start time %s, got %s", expectedStart, h1.TimeWindow.Start)
+	}
+
+	// Verify habit-cancelled-1 was de-anchored (TimeWindow cleared), NOT deleted, and stayed HABIT
+	hCanc, ok := localDB.GetTask("habit-cancelled-1")
+	if !ok {
+		t.Fatalf("expected habit-cancelled-1 to NOT be deleted")
+	}
+	if hCanc.SchedulingType != model.Habit {
+		t.Errorf("expected cancelled habit to remain HABIT, got %s", hCanc.SchedulingType)
+	}
+	if !hCanc.TimeWindow.Start.IsZero() || !hCanc.TimeWindow.End.IsZero() {
+		t.Errorf("expected cancelled habit TimeWindow to be cleared, got %+v", hCanc.TimeWindow)
+	}
+
+	// Verify newly pulled habit was created with HABIT
+	hNew, ok := localDB.GetTask("habit-remote-new")
+	if !ok {
+		t.Fatalf("expected habit-remote-new to be created")
+	}
+	if hNew.SchedulingType != model.Habit {
+		t.Errorf("expected newly created habit to have type HABIT, got %s", hNew.SchedulingType)
+	}
+	if hNew.Title != "Daily Reading" {
+		t.Errorf("expected title Daily Reading, got %s", hNew.Title)
+	}
+
+	// Test Push taskToEvent for anchored habit
+	evt := engine.taskToEvent(h1)
+	if evt.ExtendedProperties == nil || evt.ExtendedProperties.Private == nil {
+		t.Fatalf("expected private extended properties")
+	}
+	if evt.ExtendedProperties.Private["scheduling_type"] != "HABIT" {
+		t.Errorf("expected scheduling_type HABIT in private properties, got %s", evt.ExtendedProperties.Private["scheduling_type"])
+	}
+}
+
+
 
 
 

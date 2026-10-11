@@ -11,23 +11,32 @@ import (
 )
 
 func TestIsGCalSyncable(t *testing.T) {
+	sampleWindow := model.TimeWindow{
+		Start: time.Date(2026, 6, 11, 9, 0, 0, 0, time.UTC),
+		End:   time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC),
+	}
+
 	tests := []struct {
 		name         string
 		taskType     model.SchedulingType
 		workItemType model.WorkItemType
+		timeWindow   model.TimeWindow
 		want         bool
 	}{
-		{"Anchored task is syncable", model.Anchored, model.WorkItemTask, true},
-		{"Anchored task without explicit workItemType is syncable", model.Anchored, "", true},
-		{"Event task is syncable", model.Event, model.WorkItemTask, true},
-		{"Floating task is not syncable", model.Floating, model.WorkItemTask, false},
-		{"Reminder task is not syncable", model.Reminder, "", false},
-		{"Habit task is not syncable", model.Habit, "", false},
-		{"Recurring task is not syncable", model.Recurring, "", false},
-		{"Feature is not syncable", model.Anchored, model.WorkItemFeature, false},
-		{"Defect is not syncable", model.Anchored, model.WorkItemDefect, false},
-		{"Improvement is not syncable", model.Anchored, model.WorkItemImprovement, false},
-		{"Feature floating is not syncable", model.Floating, model.WorkItemFeature, false},
+		{"Anchored task is syncable", model.Anchored, model.WorkItemTask, model.TimeWindow{}, true},
+		{"Anchored task without explicit workItemType is syncable", model.Anchored, "", model.TimeWindow{}, true},
+		{"Event task is syncable", model.Event, model.WorkItemTask, model.TimeWindow{}, true},
+		{"Floating task is not syncable", model.Floating, model.WorkItemTask, model.TimeWindow{}, false},
+		{"Reminder task is not syncable", model.Reminder, "", model.TimeWindow{}, false},
+		{"Unanchored habit task is not syncable", model.Habit, "", model.TimeWindow{}, false},
+		{"Anchored habit task is syncable", model.Habit, "", sampleWindow, true},
+		{"Anchored habit with workItemTask is syncable", model.Habit, model.WorkItemTask, sampleWindow, true},
+		{"Anchored habit with workItemFeature is not syncable", model.Habit, model.WorkItemFeature, sampleWindow, false},
+		{"Recurring task is not syncable", model.Recurring, "", model.TimeWindow{}, false},
+		{"Feature is not syncable", model.Anchored, model.WorkItemFeature, model.TimeWindow{}, false},
+		{"Defect is not syncable", model.Anchored, model.WorkItemDefect, model.TimeWindow{}, false},
+		{"Improvement is not syncable", model.Anchored, model.WorkItemImprovement, model.TimeWindow{}, false},
+		{"Feature floating is not syncable", model.Floating, model.WorkItemFeature, model.TimeWindow{}, false},
 	}
 
 	for _, tt := range tests {
@@ -35,6 +44,7 @@ func TestIsGCalSyncable(t *testing.T) {
 			task := model.Task{
 				SchedulingType: tt.taskType,
 				WorkItemType:   tt.workItemType,
+				TimeWindow:     tt.timeWindow,
 			}
 			got := model.IsGCalSyncable(task)
 			if got != tt.want {
@@ -245,6 +255,107 @@ func TestAutoSyncEndToEndIntegration(t *testing.T) {
 		t.Errorf("expected DELETE entry in ledger, got %v", ledger)
 	}
 }
+
+func TestAnchoredHabitAutoSyncLifecycle(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	database, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+
+	ws := model.Workspace{UUID: "ws-1", Name: "Default"}
+	_ = database.AddWorkspace(ws)
+
+	var logMessages []string
+	syncEngine, err := sync.NewSyncEngine(database, func(msg string) {
+		logMessages = append(logMessages, msg)
+	}, nil)
+	if err != nil {
+		t.Fatalf("failed to create sync engine: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, syncEngine)
+
+	// 1. Unanchored habit: should NOT create ledger entry
+	unanchoredHabit := model.Task{
+		UUID:           "habit-unanchored",
+		WorkspaceUUID:  "ws-1",
+		Title:          "Drink Water",
+		SchedulingType: model.Habit,
+		// TimeWindow is zero
+	}
+	m.AddTask(unanchoredHabit)
+
+	ledger := database.GetLedger()
+	if len(ledger) != 0 {
+		t.Errorf("expected 0 ledger entries for unanchored habit, got %d", len(ledger))
+	}
+
+	// 2. Anchored habit: should create 1 CREATE entry
+	anchoredHabit := model.Task{
+		UUID:           "habit-anchored-1",
+		WorkspaceUUID:  "ws-1",
+		Title:          "Daily Meditation",
+		SchedulingType: model.Habit,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 6, 11, 8, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 6, 11, 8, 30, 0, 0, time.UTC),
+		},
+	}
+	m.AddTask(anchoredHabit)
+
+	ledger = database.GetLedger()
+	if len(ledger) != 1 || ledger[0].Op != "CREATE" {
+		t.Fatalf("expected 1 CREATE entry for anchored habit, got %d", len(ledger))
+	}
+	if ledger[0].TaskUUID != "habit-anchored-1" {
+		t.Errorf("expected ledger entry for habit-anchored-1, got %s", ledger[0].TaskUUID)
+	}
+
+	// 3. Update anchored habit title / time -> should create UPDATE entry
+	anchoredHabit.Title = "Deep Meditation"
+	anchoredHabit.TimeWindow.End = time.Date(2026, 6, 11, 8, 45, 0, 0, time.UTC)
+	m.UpdateTask(anchoredHabit)
+
+	ledger = database.GetLedger()
+	if len(ledger) != 2 || ledger[1].Op != "UPDATE" {
+		t.Fatalf("expected 2nd entry to be UPDATE, got %v", ledger)
+	}
+
+	// 4. De-anchor habit (clear TimeWindow) -> should record DELETE in ledger
+	deanchoredHabit := anchoredHabit
+	deanchoredHabit.TimeWindow = model.TimeWindow{}
+	m.UpdateTask(deanchoredHabit)
+
+	ledger = database.GetLedger()
+	if len(ledger) != 3 || ledger[2].Op != "DELETE" {
+		t.Fatalf("expected 3rd entry to be DELETE for de-anchored habit, got %v", ledger)
+	}
+
+	// 5. Re-anchor habit (restore TimeWindow) -> should record CREATE in ledger
+	reanchoredHabit := deanchoredHabit
+	reanchoredHabit.TimeWindow = model.TimeWindow{
+		Start: time.Date(2026, 6, 11, 8, 0, 0, 0, time.UTC),
+		End:   time.Date(2026, 6, 11, 8, 30, 0, 0, time.UTC),
+	}
+	m.UpdateTask(reanchoredHabit)
+
+	ledger = database.GetLedger()
+	if len(ledger) != 4 || ledger[3].Op != "CREATE" {
+		t.Fatalf("expected 4th entry to be CREATE for re-anchored habit, got %v", ledger)
+	}
+
+	// 6. Delete anchored habit -> should record DELETE in ledger
+	m.DeleteTask(reanchoredHabit.UUID)
+
+	ledger = database.GetLedger()
+	if len(ledger) != 5 || ledger[4].Op != "DELETE" {
+		t.Fatalf("expected 5th entry to be DELETE for deleted habit, got %v", ledger)
+	}
+}
+
 
 
 

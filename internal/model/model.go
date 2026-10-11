@@ -164,7 +164,13 @@ func (t Task) HasCommuteBuffer() bool {
 }
 
 func IsTaskAnchored(t Task) bool {
-	return t.SchedulingType == Anchored || t.SchedulingType == Event || (t.SchedulingType == Habit && !t.TimeWindow.Start.IsZero() && !t.TimeWindow.End.IsZero())
+	if t.SchedulingType == Anchored || t.SchedulingType == Event {
+		return true
+	}
+	if !t.TimeWindow.Start.IsZero() && !t.TimeWindow.End.IsZero() && t.SchedulingType != Recurring && t.SchedulingType != Floating {
+		return true
+	}
+	return false
 }
 
 type GCalSyncMode string
@@ -192,7 +198,7 @@ type UserSettings struct {
 }
 
 func IsGCalSyncable(task Task) bool {
-	// Only tasks and events can sync to GCal.
+	// Only tasks, habits, and events can sync to GCal as long as they are anchored.
 	// Features, defects, improvements, and other sprint/feature-level items must NEVER sync to GCal.
 	if task.WorkItemType == WorkItemFeature || task.WorkItemType == WorkItemDefect || task.WorkItemType == WorkItemImprovement {
 		return false
@@ -200,7 +206,7 @@ func IsGCalSyncable(task Task) bool {
 	if task.WorkItemType != "" && task.WorkItemType != WorkItemTask {
 		return false
 	}
-	return task.SchedulingType == Anchored || task.SchedulingType == Event
+	return IsTaskAnchored(task)
 }
 
 func (s UserSettings) NormalizedGCalSync() UserSettings {

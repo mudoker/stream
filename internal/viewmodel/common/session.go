@@ -16,7 +16,7 @@ func InitiateLogSession(ctx ModelContext, task model.Task) {
 	if task.ExecutionMetrics.ElapsedFocusSeconds > 0 {
 		focusMins = (task.ExecutionMetrics.ElapsedFocusSeconds + 30) / 60
 	} else {
-		if task.SchedulingType == model.Anchored || task.SchedulingType == model.Event {
+		if model.IsTaskAnchored(task) {
 			focusMins = int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
 		} else {
 			focusMins = task.StoryPoints * 45

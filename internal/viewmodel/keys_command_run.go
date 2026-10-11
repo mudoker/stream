@@ -201,6 +201,9 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 				current = current.AddDate(0, 0, 1)
 			}
 			m.refreshTasks()
+			if m.Sync != nil {
+				m.Sync.TriggerPushSync()
+			}
 			m.StatusMsg = fmt.Sprintf("Habit '%s' created (recurring daily for 7 days).", title)
 			return m, nil
 		}

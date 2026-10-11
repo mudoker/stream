@@ -46,6 +46,7 @@ func ToggleTaskCompletion(ctx ModelContext, task model.Task, selectedDay time.Ti
 		task.UpdatedAt = time.Now()
 		ctx.UpdateTask(task)
 		ctx.RefreshTasks()
+		ctx.TriggerGCalPushIfAnchored(task)
 	} else {
 		if task.LifecycleState == model.StateCompleted {
 			task.LifecycleState = model.StateBacklog

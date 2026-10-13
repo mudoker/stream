@@ -3,6 +3,7 @@ package viewmodel
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"stream/internal/model"
@@ -43,15 +44,21 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			}
 
 			// Save button or form fields selected -> Save
-			focusStr := m.LogSessionFocusInput.Value()
+			focusStr := strings.TrimSpace(m.LogSessionFocusInput.Value())
+			if focusStr == "" {
+				focusStr = m.LogSessionFocusInput.Placeholder
+			}
 			focusMins := 0
-			if val, err := strconv.Atoi(focusStr); err == nil && val > 0 {
+			if val, err := strconv.Atoi(focusStr); err == nil && val >= 0 {
 				focusMins = val
 			}
 
-			breakStr := m.LogSessionBreakInput.Value()
+			breakStr := strings.TrimSpace(m.LogSessionBreakInput.Value())
+			if breakStr == "" {
+				breakStr = m.LogSessionBreakInput.Placeholder
+			}
 			breakMins := 0
-			if val, err := strconv.Atoi(breakStr); err == nil && val > 0 {
+			if val, err := strconv.Atoi(breakStr); err == nil && val >= 0 {
 				breakMins = val
 			}
 
@@ -279,8 +286,11 @@ func (m *Model) focusLogSessionPromptFields() {
 	if m.LogSessionActiveField == 0 {
 		m.LogSessionFocusInput.Focus()
 		m.LogSessionBreakInput.Blur()
-	} else {
+	} else if m.LogSessionActiveField == 1 {
 		m.LogSessionFocusInput.Blur()
 		m.LogSessionBreakInput.Focus()
+	} else {
+		m.LogSessionFocusInput.Blur()
+		m.LogSessionBreakInput.Blur()
 	}
 }

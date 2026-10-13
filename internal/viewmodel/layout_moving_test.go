@@ -139,12 +139,18 @@ func TestManualSessionLogging(t *testing.T) {
 		t.Fatalf("expected LogSessionPromptOpen to be active, got LogSessionPromptOpen=%t", m.LogSessionPromptOpen)
 	}
 
-	// Default value of focus minutes should be planned duration (60)
-	if m.LogSessionFocusInput.Value() != "60" {
-		t.Errorf("expected default focus input value '60', got %q", m.LogSessionFocusInput.Value())
+	// Default placeholder of focus minutes should be planned duration (60)
+	if m.LogSessionFocusInput.Placeholder != "60" {
+		t.Errorf("expected default focus input placeholder '60', got %q", m.LogSessionFocusInput.Placeholder)
 	}
-	if m.LogSessionBreakInput.Value() != "0" {
-		t.Errorf("expected default break input value '0', got %q", m.LogSessionBreakInput.Value())
+	if m.LogSessionFocusInput.Value() != "" {
+		t.Errorf("expected default focus input value to be empty, got %q", m.LogSessionFocusInput.Value())
+	}
+	if m.LogSessionBreakInput.Placeholder != "0" {
+		t.Errorf("expected default break input placeholder '0', got %q", m.LogSessionBreakInput.Placeholder)
+	}
+	if m.LogSessionBreakInput.Value() != "" {
+		t.Errorf("expected default break input value to be empty, got %q", m.LogSessionBreakInput.Value())
 	}
 
 	// Fill in new focus/break minutes: 45 focus, 5 break
@@ -301,16 +307,36 @@ func TestManualSessionLogging(t *testing.T) {
 		t.Fatalf("expected LogSessionPromptOpen to be active")
 	}
 
-	// Should inherit focus and break minutes
-	if m.LogSessionFocusInput.Value() != "25" {
-		t.Errorf("expected inherited focus input value '25', got %q", m.LogSessionFocusInput.Value())
+	// Should inherit focus and break minutes as placeholders
+	if m.LogSessionFocusInput.Placeholder != "25" {
+		t.Errorf("expected inherited focus input placeholder '25', got %q", m.LogSessionFocusInput.Placeholder)
 	}
-	if m.LogSessionBreakInput.Value() != "5" {
-		t.Errorf("expected inherited break input value '5', got %q", m.LogSessionBreakInput.Value())
+	if m.LogSessionFocusInput.Value() != "" {
+		t.Errorf("expected inherited focus input value to be empty, got %q", m.LogSessionFocusInput.Value())
+	}
+	if m.LogSessionBreakInput.Placeholder != "5" {
+		t.Errorf("expected inherited break input placeholder '5', got %q", m.LogSessionBreakInput.Placeholder)
+	}
+	if m.LogSessionBreakInput.Value() != "" {
+		t.Errorf("expected inherited break input value to be empty, got %q", m.LogSessionBreakInput.Value())
 	}
 
-	// Press Esc to cancel
-	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEsc})
+	// Press Enter without modifying inputs (leaving them empty) -> assumes placeholder values
+	m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.LogSessionPromptOpen {
+		t.Fatal("expected LogSessionPromptOpen to be closed after Enter")
+	}
+
+	updated4, _ := m.DB.GetTask("task-log-test-4")
+	if updated4.LifecycleState != model.StateCompleted {
+		t.Errorf("expected task to be completed, got %s", updated4.LifecycleState)
+	}
+	if updated4.ExecutionMetrics.ElapsedFocusSeconds != 25*60 {
+		t.Errorf("expected inherited placeholder 25m (1500s) focus time, got %d", updated4.ExecutionMetrics.ElapsedFocusSeconds)
+	}
+	if updated4.ExecutionMetrics.ElapsedBreakSeconds != 5*60 {
+		t.Errorf("expected inherited placeholder 5m (300s) break time, got %d", updated4.ExecutionMetrics.ElapsedBreakSeconds)
+	}
 }
 
 func TestTaskShrinkRemaining(t *testing.T) {
@@ -519,5 +545,32 @@ func TestTaskDurationAdjustScrolling(t *testing.T) {
 	m.AutoScrollToSelectedTask()
 	if m.TimelineHour <= 10 {
 		t.Errorf("expected TimelineHour to increase to keep extended bottom in view, got %d", m.TimelineHour)
+	}
+}
+
+func TestLogSessionInputTypingReplacesPlaceholder(t *testing.T) {
+	m := &Model{}
+	m.InitLogSessionInputs(90, 15)
+
+	if m.LogSessionFocusInput.Placeholder != "90" {
+		t.Fatalf("expected placeholder '90', got %q", m.LogSessionFocusInput.Placeholder)
+	}
+	if m.LogSessionFocusInput.Value() != "" {
+		t.Fatalf("expected value '', got %q", m.LogSessionFocusInput.Value())
+	}
+
+	// User types '4'
+	m.LogSessionPromptOpen = true
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("4")})
+
+	// Value should be "4", NOT "904"
+	if m.LogSessionFocusInput.Value() != "4" {
+		t.Fatalf("expected Value to be '4' on input, got %q", m.LogSessionFocusInput.Value())
+	}
+
+	// User types '2'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	if m.LogSessionFocusInput.Value() != "42" {
+		t.Fatalf("expected Value to be '42' on second input, got %q", m.LogSessionFocusInput.Value())
 	}
 }

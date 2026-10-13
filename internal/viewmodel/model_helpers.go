@@ -17,6 +17,8 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"stream/internal/viewmodel/common/constants"
 )
 
 func tickCmd() tea.Cmd {
@@ -406,12 +408,16 @@ func (m *Model) SetLogSessionPromptTask(task model.Task) {
 }
 
 func (m *Model) InitLogSessionInputs(focusMins, breakMins int) {
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(constants.ColorMuted))
+
 	m.LogSessionFocusInput = textinput.New()
-	m.LogSessionFocusInput.SetValue(strconv.Itoa(focusMins))
+	m.LogSessionFocusInput.Placeholder = strconv.Itoa(focusMins)
+	m.LogSessionFocusInput.PlaceholderStyle = mutedStyle
 	m.LogSessionFocusInput.Focus()
 
 	m.LogSessionBreakInput = textinput.New()
-	m.LogSessionBreakInput.SetValue(strconv.Itoa(breakMins))
+	m.LogSessionBreakInput.Placeholder = strconv.Itoa(breakMins)
+	m.LogSessionBreakInput.PlaceholderStyle = mutedStyle
 
 	m.LogSessionActiveField = 0
 }

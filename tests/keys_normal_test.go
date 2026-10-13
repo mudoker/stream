@@ -292,6 +292,58 @@ func TestQuickAnchorDeAnchorWorkflow(t *testing.T) {
 	}
 }
 
+func TestAnchorPromptDefaultPlaceholders(t *testing.T) {
+	task := model.Task{
+		UUID:                  "task-placeholder-anchor",
+		Title:                 "Workout",
+		SchedulingType:        model.Floating,
+		LifecycleState:        model.StateReady,
+		EstimatedDurationMins: 90,
+	}
+
+	m := &viewmodel.Model{
+		Tasks:            []model.Task{task},
+		SelectedTaskUUID: "task-placeholder-anchor",
+		SelectedDay:      time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC),
+	}
+
+	m.HandleNormalKeys(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	if !m.AnchorPromptOpen {
+		t.Fatal("expected AnchorPromptOpen to be true")
+	}
+
+	// Verify inputs are empty and contain proper placeholders
+	if m.AnchorTimeInput.Value() != "" {
+		t.Errorf("expected empty AnchorTimeInput value, got %q", m.AnchorTimeInput.Value())
+	}
+	if m.AnchorTimeInput.Placeholder == "" {
+		t.Error("expected non-empty AnchorTimeInput placeholder")
+	}
+	if m.AnchorDurationInput.Value() != "" {
+		t.Errorf("expected empty AnchorDurationInput value, got %q", m.AnchorDurationInput.Value())
+	}
+	if m.AnchorDurationInput.Placeholder != "90" {
+		t.Errorf("expected AnchorDurationInput placeholder '90', got %q", m.AnchorDurationInput.Placeholder)
+	}
+
+	// Submit without entering any text
+	resModelRaw, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m2 := resModelRaw.(*viewmodel.Model)
+
+	if m2.AnchorPromptOpen {
+		t.Fatal("expected AnchorPromptOpen to be false after submit")
+	}
+
+	updated := m2.Tasks[0]
+	if updated.SchedulingType != model.Anchored {
+		t.Fatal("expected task to be anchored after submit")
+	}
+	dur := updated.TimeWindow.End.Sub(updated.TimeWindow.Start)
+	if dur != 90*time.Minute {
+		t.Fatalf("expected anchored duration 90m, got %v", dur)
+	}
+}
+
 func TestTaskMoveModeAutoScroll(t *testing.T) {
 	start := time.Date(2026, 6, 6, 10, 0, 0, 0, time.Local)
 	task := model.Task{

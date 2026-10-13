@@ -7,10 +7,12 @@ import (
 
 	"stream/internal/model"
 	"stream/internal/viewmodel/common"
+	"stream/internal/viewmodel/common/constants"
 	"stream/internal/viewmodel/jazzlounge"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
@@ -200,9 +202,11 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 			} else {
 				// Anchor: open start time prompt
 				m.AnchorPromptTask = task
+				mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(constants.ColorMuted))
 				m.AnchorTimeInput = textinput.New()
 				now := time.Now()
-				m.AnchorTimeInput.SetValue(now.Format("15:04"))
+				m.AnchorTimeInput.Placeholder = now.Format("15:04")
+				m.AnchorTimeInput.PlaceholderStyle = mutedStyle
 				m.AnchorTimeInput.Focus()
 
 				m.AnchorDurationInput = textinput.New()
@@ -213,7 +217,8 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 						defaultDur = 60
 					}
 				}
-				m.AnchorDurationInput.SetValue(strconv.Itoa(defaultDur))
+				m.AnchorDurationInput.Placeholder = strconv.Itoa(defaultDur)
+				m.AnchorDurationInput.PlaceholderStyle = mutedStyle
 
 				m.AnchorActiveField = 0
 				m.AnchorPromptOpen = true

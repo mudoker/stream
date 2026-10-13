@@ -105,13 +105,19 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			m.focusAnchorPromptFields()
 			return true, nil
 		case "enter":
-			timeStr := m.AnchorTimeInput.Value()
+			timeStr := strings.TrimSpace(m.AnchorTimeInput.Value())
+			if timeStr == "" {
+				timeStr = m.AnchorTimeInput.Placeholder
+			}
 			hour, min := ParseFlexibleTime(timeStr, 9, 0)
 
 			now := time.Now()
 			startTime := time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), hour, min, 0, 0, now.Location())
 
-			durStr := m.AnchorDurationInput.Value()
+			durStr := strings.TrimSpace(m.AnchorDurationInput.Value())
+			if durStr == "" {
+				durStr = m.AnchorDurationInput.Placeholder
+			}
 			durationMins := 60
 			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
 				durationMins = d

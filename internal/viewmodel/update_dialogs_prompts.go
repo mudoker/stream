@@ -123,6 +123,9 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					remainingTask := t
 					remainingTask.UUID = uuid.New().String()
 					remainingTask.Title = t.Title + " (remaining)"
+					remainingTask.SchedulingType = model.Floating
+					remainingTask.TimeWindow = model.TimeWindow{}
+					remainingTask.GCalMetadata = model.GCalMetadata{}
 					remainingTask.EstimatedDurationMins = remainingMins
 					remainingTask.CreatedAt = time.Now()
 					remainingTask.UpdatedAt = time.Now()

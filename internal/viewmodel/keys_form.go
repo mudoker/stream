@@ -787,6 +787,7 @@ func (m *Model) FinalizeSubmitTask(newTask model.Task) {
 					instance := newTask
 					instance.UUID = uuid.New().String()
 					instance.RecurringParentUUID = parentUUID
+					instance.GCalMetadata = model.GCalMetadata{}
 					
 					if instance.SchedulingType == model.Habit {
 						if timeStr == "" {

@@ -393,6 +393,7 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 								instance := m.PendingEditTask
 								instance.UUID = uuid.New().String()
 								instance.RecurringParentUUID = parentUUID
+								instance.GCalMetadata = model.GCalMetadata{}
 								instance.UpdatedAt = time.Now()
 
 								if instance.SchedulingType == model.Habit && instance.TimeWindow.Start.IsZero() {

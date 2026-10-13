@@ -1,9 +1,11 @@
 package db
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"stream/internal/model"
 )
@@ -471,3 +473,58 @@ func TestDBSaveErrors(t *testing.T) {
 		t.Error("expected write error when clearing ledger in unwritable directory")
 	}
 }
+
+func TestDBLoad_SelfHealWipedHabitTimeWindow(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	configDir := filepath.Join(tempHome, ".config", "stream")
+	_ = os.MkdirAll(configDir, 0755)
+
+	tasks := []model.Task{
+		{
+			UUID:                 "h1-wiped",
+			Title:                "Morning Workout",
+			SchedulingType:       model.Habit,
+			InitiateDate:         time.Date(2026, 10, 13, 7, 0, 0, 0, time.UTC),
+			RecurringParentUUID:  "habit-parent-1",
+			TimeWindow:           model.TimeWindow{}, // wiped to zero
+			GCalMetadata:         model.GCalMetadata{EventID: "stale-cancelled-id"},
+		},
+		{
+			UUID:                 "h2-valid",
+			Title:                "Morning Workout",
+			SchedulingType:       model.Habit,
+			InitiateDate:         time.Date(2026, 10, 12, 7, 0, 0, 0, time.UTC),
+			RecurringParentUUID:  "habit-parent-1",
+			TimeWindow: model.TimeWindow{
+				Start: time.Date(2026, 10, 12, 7, 0, 0, 0, time.UTC),
+				End:   time.Date(2026, 10, 12, 8, 30, 0, 0, time.UTC), // 90 min duration
+			},
+		},
+	}
+	data, _ := json.Marshal(tasks)
+	_ = os.WriteFile(filepath.Join(configDir, "data.json"), data, 0644)
+
+	database, err := NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to load database: %v", err)
+	}
+
+	h1, ok := database.GetTask("h1-wiped")
+	if !ok {
+		t.Fatalf("expected h1-wiped to exist")
+	}
+	expectedStart := time.Date(2026, 10, 13, 7, 0, 0, 0, time.UTC)
+	expectedEnd := time.Date(2026, 10, 13, 8, 30, 0, 0, time.UTC)
+	if !h1.TimeWindow.Start.Equal(expectedStart) {
+		t.Errorf("expected Start %v, got %v", expectedStart, h1.TimeWindow.Start)
+	}
+	if !h1.TimeWindow.End.Equal(expectedEnd) {
+		t.Errorf("expected End %v, got %v", expectedEnd, h1.TimeWindow.End)
+	}
+	if h1.GCalMetadata.EventID != "" {
+		t.Errorf("expected GCalMetadata to be cleared, got %s", h1.GCalMetadata.EventID)
+	}
+}
+

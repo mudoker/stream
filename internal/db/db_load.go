@@ -118,6 +118,28 @@ func (db *JSONDB) load() error {
 			t.BlockedBy = cleanID(t.BlockedBy)
 			db.tasks[t.UUID] = t
 		}
+
+		// Self-heal: recover habits that had their time windows accidentally wiped by sync de-anchoring
+		for _, t := range db.tasks {
+			if t.SchedulingType == model.Habit && t.TimeWindow.Start.IsZero() && !t.InitiateDate.IsZero() && t.RecurringParentUUID != "" {
+				var sampleDur time.Duration
+				for _, sib := range db.tasks {
+					if sib.RecurringParentUUID == t.RecurringParentUUID && !sib.TimeWindow.Start.IsZero() && !sib.TimeWindow.End.IsZero() {
+						d := sib.TimeWindow.End.Sub(sib.TimeWindow.Start)
+						if d > 0 {
+							sampleDur = d
+							break
+						}
+					}
+				}
+				if sampleDur > 0 && (t.InitiateDate.Hour() != 0 || t.InitiateDate.Minute() != 0) {
+					t.TimeWindow.Start = t.InitiateDate
+					t.TimeWindow.End = t.InitiateDate.Add(sampleDur)
+					t.GCalMetadata = model.GCalMetadata{}
+					db.tasks[t.UUID] = t
+				}
+			}
+		}
 	}
 
 	// Load Ledger

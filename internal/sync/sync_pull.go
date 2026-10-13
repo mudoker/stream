@@ -44,6 +44,8 @@ func (s *SyncEngine) defaultWorkspaceUUID() string {
 }
 
 func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
+	s.sanitizeDuplicateEventIDs()
+
 	timeMin := time.Now().AddDate(0, 0, -60).Format(time.RFC3339)
 	timeMax := time.Now().AddDate(0, 0, 180).Format(time.RFC3339)
 
@@ -138,7 +140,17 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 			}
 
 			if item.Status == "cancelled" {
-				if local, exists := localByGCalID[item.Id]; exists {
+				var local model.Task
+				var exists bool
+
+				// If remote event has a private uuid, it belongs ONLY to that task!
+				if uuidVal != "" {
+					local, exists = localByUUID[uuidVal]
+				} else {
+					local, exists = localByGCalID[item.Id]
+				}
+
+				if exists {
 					var remoteUpdated time.Time
 					if item.Updated != "" {
 						remoteUpdated, _ = time.Parse(time.RFC3339, item.Updated)
@@ -165,6 +177,15 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 						localByUUID[local.UUID] = local
 						delete(localByGCalID, item.Id)
 					}
+				}
+
+				// If any task in localByGCalID still points to this cancelled item.Id (e.g. from a past duplicate bug),
+				// decouple its stale GCalMetadata without deleting or de-anchoring it!
+				if staleLocal, ok := localByGCalID[item.Id]; ok && (!exists || staleLocal.UUID != local.UUID) {
+					staleLocal.GCalMetadata = model.GCalMetadata{}
+					_ = s.localDB.UpdateTaskNoLedger(staleLocal)
+					localByUUID[staleLocal.UUID] = staleLocal
+					delete(localByGCalID, item.Id)
 				}
 				continue
 			}
@@ -235,7 +256,7 @@ func (s *SyncEngine) pullRemoteUpdates(srv *calendar.Service) error {
 					exists = true
 				}
 			}
-			if !exists {
+			if !exists && uuidVal == "" {
 				if t, ok := localByGCalID[item.Id]; ok {
 					localTask = t
 					exists = true

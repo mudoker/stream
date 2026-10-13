@@ -481,3 +481,26 @@ func (s *SyncEngine) taskToEvent(task model.Task) *calendar.Event {
 
 	return event
 }
+
+// sanitizeDuplicateEventIDs detects if multiple local tasks are sharing the same GCal EventID.
+// Under no circumstances should two distinct tasks share a single GCal event ID.
+// If duplicates are detected, all except the first task are decoupled by resetting their GCalMetadata.
+func (s *SyncEngine) sanitizeDuplicateEventIDs() {
+	localTasks := s.localDB.GetTasks()
+	seenEventIDs := make(map[string]string) // eventID -> first task UUID
+
+	for _, t := range localTasks {
+		if t.GCalMetadata.EventID == "" {
+			continue
+		}
+		if firstUUID, exists := seenEventIDs[t.GCalMetadata.EventID]; exists {
+			if s.logCallback != nil {
+				s.logCallback(fmt.Sprintf("Sync: decoupled duplicate GCal event ID '%s' on task '%s' (retained on %s)", t.GCalMetadata.EventID, t.Title, firstUUID))
+			}
+			t.GCalMetadata = model.GCalMetadata{}
+			_ = s.localDB.UpdateTaskNoLedger(t)
+		} else {
+			seenEventIDs[t.GCalMetadata.EventID] = t.UUID
+		}
+	}
+}

@@ -109,6 +109,7 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 	}
 
 	// 3. Scan local database for syncable tasks and push with duplicate cleanup & no-op skipping
+	s.sanitizeDuplicateEventIDs()
 	windowStart := time.Now().AddDate(0, 0, -60)
 	localTasks := s.localDB.GetTasks()
 	for _, t := range localTasks {
@@ -162,6 +163,9 @@ func (s *SyncEngine) pushLocalUpdates(srv *calendar.Service) error {
 		}
 
 		if matchedEvent != nil {
+			delete(gcalByEventID, matchedEvent.Id)
+			delete(gcalByTitleTime, normalizeTitleTimeKey(t.Title, t.TimeWindow.Start, t.TimeWindow.End))
+
 			t.GCalMetadata.EventID = matchedEvent.Id
 			if matchedEvent.EventType != "" && matchedEvent.EventType != "default" && matchedEvent.EventType != "focusTime" {
 				// Special Google events (flight reservations, hotel, outOfOffice) are read-only

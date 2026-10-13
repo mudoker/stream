@@ -1443,6 +1443,144 @@ func TestPullAndPushAnchoredHabits(t *testing.T) {
 	}
 }
 
+func TestSyncEngine_CancelledEventDoesNotDeanchorOtherTasks(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	localDB, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create db: %v", err)
+	}
+
+	ws := model.Workspace{UUID: "ws-1", Name: "Default"}
+	_ = localDB.AddWorkspace(ws)
+
+	activeTask := model.Task{
+		UUID:           "local-active-task",
+		WorkspaceUUID:  "ws-1",
+		Title:          "Morning Workout",
+		SchedulingType: model.Habit,
+		Source:         model.SourceStream,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 10, 13, 7, 0, 0, 0, time.UTC),
+			End:   time.Date(2026, 10, 13, 8, 30, 0, 0, time.UTC),
+		},
+		GCalMetadata: model.GCalMetadata{
+			EventID: "shared-event-id",
+		},
+	}
+	_ = localDB.AddTaskNoLedger(activeTask)
+
+	var logged []string
+	engine, err := NewSyncEngine(localDB, func(s string) {
+		logged = append(logged, s)
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewSyncEngine failed: %v", err)
+	}
+
+	// Remote returns event "shared-event-id" as cancelled, but belonging to a DIFFERENT uuid ("old-deleted-uuid")
+	transport := &mockTransport{
+		roundTrip: func(req *http.Request) (*http.Response, error) {
+			if req.Method == "GET" && strings.Contains(req.URL.Path, "/calendars/primary/events") {
+				respBody := `{
+					"items": [
+						{
+							"id": "shared-event-id",
+							"status": "cancelled",
+							"extendedProperties": {
+								"private": {
+									"uuid": "old-deleted-uuid",
+									"source": "stream"
+								}
+							}
+						}
+					]
+				}`
+				return &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(bytes.NewBufferString(respBody)),
+					Header:     make(http.Header),
+				}, nil
+			}
+			return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL.String())
+		},
+	}
+
+	client := &http.Client{Transport: transport}
+	srv, _ := calendar.NewService(context.Background(), option.WithHTTPClient(client))
+
+	err = engine.pullRemoteUpdates(srv)
+	if err != nil {
+		t.Fatalf("pullRemoteUpdates failed: %v", err)
+	}
+
+	// Verify activeTask was NOT de-anchored
+	task, ok := localDB.GetTask("local-active-task")
+	if !ok {
+		t.Fatalf("expected local-active-task to still exist")
+	}
+	if task.TimeWindow.Start.IsZero() || task.TimeWindow.End.IsZero() {
+		t.Errorf("expected TimeWindow to NOT be wiped, got %+v", task.TimeWindow)
+	}
+	if task.SchedulingType != model.Habit {
+		t.Errorf("expected SchedulingType to be preserved as HABIT, got %s", task.SchedulingType)
+	}
+	if task.GCalMetadata.EventID != "" {
+		t.Errorf("expected stale GCalMetadata to be decoupled, got %s", task.GCalMetadata.EventID)
+	}
+}
+
+func TestSyncEngine_SanitizeDuplicateEventIDs(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	localDB, err := db.NewJSONDB()
+	if err != nil {
+		t.Fatalf("failed to create db: %v", err)
+	}
+
+	ws := model.Workspace{UUID: "ws-1", Name: "Default"}
+	_ = localDB.AddWorkspace(ws)
+
+	t1 := model.Task{
+		UUID:          "task-1",
+		WorkspaceUUID: "ws-1",
+		Title:         "Task 1",
+		GCalMetadata: model.GCalMetadata{
+			EventID: "dup-event-123",
+		},
+	}
+	t2 := model.Task{
+		UUID:          "task-2",
+		WorkspaceUUID: "ws-1",
+		Title:         "Task 2",
+		GCalMetadata: model.GCalMetadata{
+			EventID: "dup-event-123",
+		},
+	}
+	_ = localDB.AddTaskNoLedger(t1)
+	_ = localDB.AddTaskNoLedger(t2)
+
+	engine, err := NewSyncEngine(localDB, nil, nil)
+	if err != nil {
+		t.Fatalf("NewSyncEngine failed: %v", err)
+	}
+
+	engine.sanitizeDuplicateEventIDs()
+
+	task1, _ := localDB.GetTask("task-1")
+	task2, _ := localDB.GetTask("task-2")
+
+	// One should retain dup-event-123, the other must be cleared
+	if task1.GCalMetadata.EventID == "" && task2.GCalMetadata.EventID == "" {
+		t.Errorf("expected one task to retain EventID")
+	}
+	if task1.GCalMetadata.EventID != "" && task2.GCalMetadata.EventID != "" {
+		t.Errorf("expected duplicate EventID to be sanitized, but both tasks still have it")
+	}
+}
+
 
 
 

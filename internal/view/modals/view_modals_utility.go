@@ -40,39 +40,13 @@ func RenderCommandPalette(m *viewmodel.Model, t theme.Theme) string {
 	sb.WriteString(lipgloss.NewStyle().Padding(0, 1).Render(m.CommandInput.View()) + "\n")
 	sb.WriteString(divColor.Render(strings.Repeat("─", innerW)) + "\n")
 
-	val := strings.ToLower(m.CommandInput.Value())
-	allCommands := m.GetCommandList()
-
-	var genericEntries []viewmodel.CommandEntry
-	var wsEntries []viewmodel.CommandEntry
-	for _, c := range allCommands {
-		if strings.HasPrefix(c.Name, "ws-switch ") {
-			wsEntries = append(wsEntries, c)
-		} else {
-			genericEntries = append(genericEntries, c)
-		}
-	}
-
-	filterGroup := func(src []viewmodel.CommandEntry) []viewmodel.CommandEntry {
-		var out []viewmodel.CommandEntry
-		for _, c := range src {
-			if strings.Contains(strings.ToLower(c.Name), val) ||
-				strings.Contains(strings.ToLower(c.Desc), val) {
-				out = append(out, c)
-			}
-		}
-		return out
-	}
-	filteredGeneric := filterGroup(genericEntries)
-	filteredWS := filterGroup(wsEntries)
-
-	var allFiltered []viewmodel.CommandEntry
-	allFiltered = append(allFiltered, filteredGeneric...)
-	allFiltered = append(allFiltered, filteredWS...)
+	allFiltered := m.GetFilteredCommandList()
 	totalEntries := len(allFiltered)
 
 	selIdx := m.CommandSelectedIndex
-	if totalEntries > 0 && selIdx >= totalEntries {
+	if selIdx < 0 && strings.TrimSpace(m.CommandInput.Value()) != "" && totalEntries > 0 {
+		selIdx = 0
+	} else if totalEntries > 0 && selIdx >= totalEntries {
 		selIdx = totalEntries - 1
 	}
 

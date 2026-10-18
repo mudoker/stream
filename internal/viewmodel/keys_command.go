@@ -65,7 +65,11 @@ func (m *Model) GetCommandList() []CommandEntry {
 }
 
 func (m *Model) GetFilteredCommandList() []CommandEntry {
-	val := strings.ToLower(m.CommandInput.Value())
+	val := strings.TrimSpace(m.CommandInput.Value())
+	if strings.HasPrefix(val, ":") {
+		val = strings.TrimSpace(strings.TrimPrefix(val, ":"))
+	}
+	val = strings.ToLower(val)
 	allCommands := m.GetCommandList()
 
 	var genericEntries []CommandEntry
@@ -79,13 +83,39 @@ func (m *Model) GetFilteredCommandList() []CommandEntry {
 	}
 
 	filterGroup := func(src []CommandEntry) []CommandEntry {
-		var out []CommandEntry
+		if val == "" {
+			return src
+		}
+		var exact []CommandEntry
+		var prefixName []CommandEntry
+		var containsName []CommandEntry
+		var containsDesc []CommandEntry
+
 		for _, c := range src {
-			if strings.Contains(strings.ToLower(c.Name), val) ||
-				strings.Contains(strings.ToLower(c.Desc), val) {
-				out = append(out, c)
+			nameLower := strings.ToLower(c.Name)
+			descLower := strings.ToLower(c.Desc)
+
+			cleanName := nameLower
+			if idx := strings.Index(cleanName, "<"); idx != -1 {
+				cleanName = strings.TrimSpace(cleanName[:idx])
+			}
+
+			if nameLower == val || cleanName == val {
+				exact = append(exact, c)
+			} else if strings.HasPrefix(nameLower, val) || strings.HasPrefix(cleanName, val) {
+				prefixName = append(prefixName, c)
+			} else if strings.Contains(nameLower, val) {
+				containsName = append(containsName, c)
+			} else if strings.Contains(descLower, val) {
+				containsDesc = append(containsDesc, c)
 			}
 		}
+
+		var out []CommandEntry
+		out = append(out, exact...)
+		out = append(out, prefixName...)
+		out = append(out, containsName...)
+		out = append(out, containsDesc...)
 		return out
 	}
 	filteredGeneric := filterGroup(genericEntries)
@@ -101,23 +131,44 @@ func (m *Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	cmdList := m.GetFilteredCommandList()
 
+	effectiveIdx := m.CommandSelectedIndex
+	if effectiveIdx < 0 && strings.TrimSpace(m.CommandInput.Value()) != "" && len(cmdList) > 0 {
+		effectiveIdx = 0
+	}
+
 	switch key {
 	case "up":
 		if len(cmdList) > 0 {
-			m.CommandSelectedIndex--
 			if m.CommandSelectedIndex < 0 {
 				m.CommandSelectedIndex = len(cmdList) - 1
+			} else {
+				m.CommandSelectedIndex--
+				if m.CommandSelectedIndex < 0 {
+					m.CommandSelectedIndex = len(cmdList) - 1
+				}
 			}
 		}
 		return m, nil
 	case "down":
 		if len(cmdList) > 0 {
-			m.CommandSelectedIndex = (m.CommandSelectedIndex + 1) % len(cmdList)
+			if m.CommandSelectedIndex < 0 {
+				if effectiveIdx == 0 && len(cmdList) > 1 {
+					m.CommandSelectedIndex = 1
+				} else {
+					m.CommandSelectedIndex = 0
+				}
+			} else {
+				m.CommandSelectedIndex = (m.CommandSelectedIndex + 1) % len(cmdList)
+			}
 		}
 		return m, nil
 	case "tab":
 		if len(cmdList) > 0 {
-			m.CommandSelectedIndex = (m.CommandSelectedIndex + 1) % len(cmdList)
+			if m.CommandSelectedIndex < 0 {
+				m.CommandSelectedIndex = 0
+			} else {
+				m.CommandSelectedIndex = (m.CommandSelectedIndex + 1) % len(cmdList)
+			}
 			val := cmdList[m.CommandSelectedIndex].Name
 			if idx := strings.Index(val, "<"); idx != -1 {
 				val = strings.TrimRight(val[:idx], " ") + " "
@@ -128,9 +179,13 @@ func (m *Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "shift+tab":
 		if len(cmdList) > 0 {
-			m.CommandSelectedIndex--
 			if m.CommandSelectedIndex < 0 {
 				m.CommandSelectedIndex = len(cmdList) - 1
+			} else {
+				m.CommandSelectedIndex--
+				if m.CommandSelectedIndex < 0 {
+					m.CommandSelectedIndex = len(cmdList) - 1
+				}
 			}
 			val := cmdList[m.CommandSelectedIndex].Name
 			if idx := strings.Index(val, "<"); idx != -1 {
@@ -141,10 +196,25 @@ func (m *Model) handleCommandKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "enter":
-		if len(cmdList) > 0 && m.CommandSelectedIndex >= 0 && m.CommandSelectedIndex < len(cmdList) {
-			val := cmdList[m.CommandSelectedIndex].Name
+		if strings.TrimSpace(m.CommandInput.Value()) == "" && m.CommandSelectedIndex < 0 {
+			m.CurrentMode = ModeNormal
+			return m, nil
+		}
+
+		if len(cmdList) > 0 && effectiveIdx >= 0 && effectiveIdx < len(cmdList) {
+			matched := cmdList[effectiveIdx]
+			val := matched.Name
 			if idx := strings.Index(val, "<"); idx != -1 {
-				val = strings.TrimRight(val[:idx], " ") + " "
+				prefix := strings.TrimRight(val[:idx], " ") + " "
+				inputVal := strings.TrimSpace(m.CommandInput.Value())
+				cmdBase := strings.TrimSpace(val[:idx])
+				if inputVal == "" || strings.HasPrefix(cmdBase, inputVal) || inputVal == cmdBase {
+					m.CommandInput.SetValue(prefix)
+					m.CommandInput.SetCursor(len(prefix))
+					m.CommandSelectedIndex = -1
+					return m, nil
+				}
+				val = prefix
 			}
 			m.CommandInput.SetValue(val)
 		}

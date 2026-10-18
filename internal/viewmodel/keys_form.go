@@ -65,6 +65,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				numTypes = 4 // Only Feature, Defect, Improvement, Task in Sprint View
 			}
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx - 1 + numTypes) % numTypes
+			if !m.IsEditing && m.Form.TaskTypeIdx <= 2 {
+				m.Form.StatusIdx = 0
+			}
 			m.PopulateFormAvailableFeaturesAndBlockers()
 			return m, nil
 		case 11:
@@ -112,6 +115,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				numTypes = 4 // Only Feature, Defect, Improvement, Task in Sprint View
 			}
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % numTypes
+			if !m.IsEditing && m.Form.TaskTypeIdx <= 2 {
+				m.Form.StatusIdx = 0
+			}
 			m.PopulateFormAvailableFeaturesAndBlockers()
 			return m, nil
 		case 9:
@@ -164,6 +170,9 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				numTypes = 4 // Only Feature, Defect, Improvement, Task in Sprint View
 			}
 			m.Form.TaskTypeIdx = (m.Form.TaskTypeIdx + 1) % numTypes
+			if !m.IsEditing && m.Form.TaskTypeIdx <= 2 {
+				m.Form.StatusIdx = 0
+			}
 			m.PopulateFormAvailableFeaturesAndBlockers()
 			return m, nil
 		case 11:

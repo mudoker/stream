@@ -829,15 +829,17 @@ func TestSprintStatusSelectionAndMoveMode(t *testing.T) {
 	m.SidebarFocus = false
 	m.TodoShelfFocus = false
 
-	// 1. Creating a feature in Sprint View defaults status to the focused swimlane (2: Review)
+	// 1. Creating a feature in Sprint View defaults status to Defined (0)
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
 	if m.Form.TaskTypeIdx != 0 {
 		t.Fatalf("expected Feature type (0), got %d", m.Form.TaskTypeIdx)
 	}
-	if m.Form.StatusIdx != 2 {
-		t.Fatalf("expected StatusIdx 2 (Review), got %d", m.Form.StatusIdx)
+	if m.Form.StatusIdx != 0 {
+		t.Fatalf("expected StatusIdx 0 (Defined), got %d", m.Form.StatusIdx)
 	}
 
+	// Change status to Review (2) to verify custom status and move mode
+	m.Form.StatusIdx = 2
 	m.Form.TitleInput.SetValue("Code Review Checklist")
 	m.SubmitForm()
 	m.CurrentMode = viewmodel.ModeNormal
@@ -2104,5 +2106,58 @@ func TestGlobalBacklogSectionsPerWorkItemType(t *testing.T) {
 	renderedAfterComplete := components.RenderTodoShelf(&m, th, 40)
 	if !strings.Contains(renderedAfterComplete, "No features") {
 		t.Errorf("expected 'No features' in empty features section: %s", renderedAfterComplete)
+	}
+}
+
+func TestCreateFeatureDefaultStateDefined(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	sprint := sprints[0]
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+
+	// 1. Even if cursor was on swimlane 3 (Testing), pressing 'i' to create a feature must default Status to 0 (Defined)
+	m.SprintSwimlaneIdx = 3 // Testing
+	m.SidebarFocus = false
+	m.TodoShelfFocus = false
+
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	if m.Form.TaskTypeIdx != 0 {
+		t.Fatalf("expected TaskTypeIdx 0 (Feature), got %d", m.Form.TaskTypeIdx)
+	}
+	if m.Form.StatusIdx != 0 {
+		t.Fatalf("expected StatusIdx 0 (Defined), got %d", m.Form.StatusIdx)
+	}
+
+	// 2. Cycling type to Defect (1), Improvement (2), Task (3), then back to Feature (0)
+	m.Form.ActiveField = 4                   // Type field
+	m.Update(tea.KeyMsg{Type: tea.KeyRight}) // Defect
+	if m.Form.TaskTypeIdx != 1 || m.Form.StatusIdx != 0 {
+		t.Fatalf("expected Defect (1) with StatusIdx 0 (Defined), got type=%d, status=%d", m.Form.TaskTypeIdx, m.Form.StatusIdx)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRight}) // Improvement
+	if m.Form.TaskTypeIdx != 2 || m.Form.StatusIdx != 0 {
+		t.Fatalf("expected Improvement (2) with StatusIdx 0 (Defined), got type=%d, status=%d", m.Form.TaskTypeIdx, m.Form.StatusIdx)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRight}) // Task
+	if m.Form.TaskTypeIdx != 3 {
+		t.Fatalf("expected Task (3), got %d", m.Form.TaskTypeIdx)
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyRight}) // Back to Feature
+	if m.Form.TaskTypeIdx != 0 || m.Form.StatusIdx != 0 {
+		t.Fatalf("expected Feature (0) with StatusIdx 0 (Defined), got type=%d, status=%d", m.Form.TaskTypeIdx, m.Form.StatusIdx)
+	}
+
+	m.Update(tea.KeyMsg{Type: tea.KeyEsc}) // Exit form
+
+	// 3. Opening create form on Global Backlog shelf
+	m.TodoShelfFocus = true
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	if m.Form.StatusIdx != 0 {
+		t.Fatalf("expected StatusIdx 0 (Defined) on shelf, got %d", m.Form.StatusIdx)
 	}
 }

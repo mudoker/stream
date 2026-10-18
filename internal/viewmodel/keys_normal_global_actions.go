@@ -61,9 +61,29 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		m.Form.IsEditing = false
 		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
 			m.Form.TaskTypeIdx = 0 // Feature
-			m.Form.StatusIdx = m.SprintSwimlaneIdx
+			m.Form.StatusIdx = 0   // Defined
+		} else if m.CurrentView == SprintView && m.TodoShelfFocus {
+			sec, ok := m.GetActiveShelfSection()
+			if ok {
+				switch sec.Type {
+				case SectionFeatures:
+					m.Form.TaskTypeIdx = 0 // Feature
+				case SectionDefects:
+					m.Form.TaskTypeIdx = 1 // Defect
+				case SectionImprovements:
+					m.Form.TaskTypeIdx = 2 // Improvement
+				case SectionTasks:
+					m.Form.TaskTypeIdx = 3 // Task
+				default:
+					m.Form.TaskTypeIdx = 0 // Feature
+				}
+			} else {
+				m.Form.TaskTypeIdx = 0 // Feature
+			}
+			m.Form.StatusIdx = 0 // Defined
 		} else {
 			m.Form.TaskTypeIdx = 3 // Task
+			m.Form.StatusIdx = 0   // Defined
 		}
 		m.PopulateFormAvailableFeaturesAndBlockers()
 		m.Form.TitleInput.Focus()

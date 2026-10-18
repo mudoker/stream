@@ -122,6 +122,7 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 		PriorityIdx:           2,
 		SPIdx:                 2,
 		TaskTypeIdx:           3, // default: Task
+		StatusIdx:             0, // default: 0 (Defined)
 		IsAnchoredIdx:         0,
 		IsAllDayIdx:           0,
 		LinkSprintIdx:         0,

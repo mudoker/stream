@@ -2,6 +2,7 @@ package viewmodel
 
 import (
 	"fmt"
+	"strings"
 
 	"stream/internal/model"
 )
@@ -9,12 +10,15 @@ import (
 type ShelfSectionType string
 
 const (
-	SectionToday     ShelfSectionType = "TODAY"
-	SectionTasks     ShelfSectionType = "TASKS"
-	SectionReminders ShelfSectionType = "REMINDERS"
-	SectionHabits    ShelfSectionType = "HABITS"
-	SectionBacklog   ShelfSectionType = "BACKLOG"
-	SectionCompleted ShelfSectionType = "COMPLETED"
+	SectionToday        ShelfSectionType = "TODAY"
+	SectionFeatures     ShelfSectionType = "FEATURES"
+	SectionDefects      ShelfSectionType = "DEFECTS"
+	SectionImprovements ShelfSectionType = "IMPROVEMENTS"
+	SectionTasks        ShelfSectionType = "TASKS"
+	SectionReminders    ShelfSectionType = "REMINDERS"
+	SectionHabits       ShelfSectionType = "HABITS"
+	SectionBacklog      ShelfSectionType = "BACKLOG"
+	SectionCompleted    ShelfSectionType = "COMPLETED"
 )
 
 type ShelfSection struct {
@@ -52,6 +56,9 @@ func (m *Model) GetShelfData() ShelfData {
 	shelfTasks := m.GetCurrentShelfTasks()
 
 	if isGlobal {
+		var featuresList []model.Task
+		var defectsList []model.Task
+		var improvementsList []model.Task
 		var tasksList []model.Task
 		var completedList []model.Task
 
@@ -59,11 +66,46 @@ func (m *Model) GetShelfData() ShelfData {
 			if task.LifecycleState == model.StateCompleted {
 				completedList = append(completedList, task)
 			} else {
-				tasksList = append(tasksList, task)
+				switch task.WorkItemType {
+				case model.WorkItemFeature:
+					featuresList = append(featuresList, task)
+				case model.WorkItemDefect:
+					defectsList = append(defectsList, task)
+				case model.WorkItemImprovement:
+					improvementsList = append(improvementsList, task)
+				default:
+					if strings.HasPrefix(task.ID, "DEF-") {
+						defectsList = append(defectsList, task)
+					} else if strings.HasPrefix(task.ID, "IMP-") {
+						improvementsList = append(improvementsList, task)
+					} else if strings.HasPrefix(task.ID, "FEA-") || strings.HasPrefix(task.ID, "FEAT-") || strings.HasPrefix(task.ID, "FT-") {
+						featuresList = append(featuresList, task)
+					} else {
+						tasksList = append(tasksList, task)
+					}
+				}
 			}
 		}
 
 		sections := []ShelfSection{
+			{
+				Type:  SectionFeatures,
+				Title: fmt.Sprintf("FEATURES (%d)", len(featuresList)),
+				Icon:  "✨",
+				Tasks: featuresList,
+			},
+			{
+				Type:  SectionDefects,
+				Title: fmt.Sprintf("DEFECTS (%d)", len(defectsList)),
+				Icon:  "🐛",
+				Tasks: defectsList,
+			},
+			{
+				Type:  SectionImprovements,
+				Title: fmt.Sprintf("IMPROVEMENTS (%d)", len(improvementsList)),
+				Icon:  "⚡",
+				Tasks: improvementsList,
+			},
 			{
 				Type:  SectionTasks,
 				Title: fmt.Sprintf("TASKS (%d)", len(tasksList)),

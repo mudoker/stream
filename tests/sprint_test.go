@@ -10,6 +10,7 @@ import (
 	"stream/internal/db"
 	"stream/internal/model"
 	"stream/internal/view"
+	"stream/internal/view/components"
 	"stream/internal/view/modals"
 	"stream/internal/view/pages"
 	"stream/internal/view/theme"
@@ -1896,3 +1897,212 @@ func TestPurgeSquareBracketsOnDBLoad(t *testing.T) {
 	}
 }
 
+func TestGlobalBacklogSectionsPerWorkItemType(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	var sprint model.Sprint
+	for _, s := range sprints {
+		sprint = s
+		break
+	}
+
+	// 1. Feature in Global Backlog (matching user scenario [FEA-11])
+	feat := model.Task{
+		UUID:           "fea-11-uuid",
+		ID:             "FEA-11",
+		Title:          "Infrastructure as code",
+		WorkItemType:   model.WorkItemFeature,
+		Priority:       model.P2,
+		StoryPoints:    13,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	database.AddTask(feat)
+
+	// 2. Defect in Global Backlog
+	def := model.Task{
+		UUID:           "def-1-uuid",
+		ID:             "DEF-1",
+		Title:          "Fix memory leak",
+		WorkItemType:   model.WorkItemDefect,
+		Priority:       model.P1,
+		StoryPoints:    5,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	database.AddTask(def)
+
+	// 3. Improvement in Global Backlog
+	imp := model.Task{
+		UUID:           "imp-1-uuid",
+		ID:             "IMP-1",
+		Title:          "Optimize query index",
+		WorkItemType:   model.WorkItemImprovement,
+		Priority:       model.P2,
+		StoryPoints:    3,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	database.AddTask(imp)
+
+	// 4. Tasks in Global Backlog (matching user scenario [TSK-6], [TSK-12], [TSK-10])
+	tsk6 := model.Task{
+		UUID:            "tsk-6-uuid",
+		ID:              "TSK-6",
+		Title:           "Setup Payment Method",
+		WorkItemType:    model.WorkItemTask,
+		Priority:        model.P2,
+		StoryPoints:     2,
+		LinkedFeatureID: "FEAT-1",
+		SchedulingType:  model.Floating,
+		LifecycleState:  model.StateReady,
+	}
+	tsk12 := model.Task{
+		UUID:           "tsk-12-uuid",
+		ID:             "TSK-12",
+		Title:          "Trading 101",
+		WorkItemType:   model.WorkItemTask,
+		Priority:       model.P2,
+		StoryPoints:    2,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateReady,
+	}
+	tsk10 := model.Task{
+		UUID:            "tsk-10-uuid",
+		ID:              "TSK-10",
+		Title:           "Gather Kratos Tests",
+		WorkItemType:    model.WorkItemTask,
+		Priority:        model.P3,
+		StoryPoints:     5,
+		LinkedFeatureID: "FEAT-1",
+		SchedulingType:  model.Floating,
+		LifecycleState:  model.StateReady,
+	}
+	database.AddTask(tsk6)
+	database.AddTask(tsk12)
+	database.AddTask(tsk10)
+
+	// 5. Completed task
+	doneTsk := model.Task{
+		UUID:           "done-tsk-uuid",
+		ID:             "TSK-1",
+		Title:          "Already completed item",
+		WorkItemType:   model.WorkItemTask,
+		Priority:       model.P2,
+		SchedulingType: model.Floating,
+		LifecycleState: model.StateCompleted,
+	}
+	database.AddTask(doneTsk)
+
+	m := viewmodel.NewModel(database, nil)
+	m.ActiveSprintUUID = sprint.UUID
+	m.CurrentView = viewmodel.SprintView
+	m.TodoShelfFocus = true
+
+	shelfData := m.GetShelfData()
+	if !shelfData.IsGlobalBacklog {
+		t.Fatalf("expected IsGlobalBacklog to be true on SprintView")
+	}
+
+	// Verify sections exist with correct counts
+	sectionMap := make(map[viewmodel.ShelfSectionType]viewmodel.ShelfSection)
+	for _, sec := range shelfData.Sections {
+		sectionMap[sec.Type] = sec
+	}
+
+	featSec, ok := sectionMap[viewmodel.SectionFeatures]
+	if !ok || len(featSec.Tasks) != 1 || featSec.Tasks[0].ID != "FEA-11" {
+		t.Fatalf("expected SectionFeatures with 1 task (FEA-11), got: %+v", featSec)
+	}
+
+	defSec, ok := sectionMap[viewmodel.SectionDefects]
+	if !ok || len(defSec.Tasks) != 1 || defSec.Tasks[0].ID != "DEF-1" {
+		t.Fatalf("expected SectionDefects with 1 task (DEF-1), got: %+v", defSec)
+	}
+
+	impSec, ok := sectionMap[viewmodel.SectionImprovements]
+	if !ok || len(impSec.Tasks) != 1 || impSec.Tasks[0].ID != "IMP-1" {
+		t.Fatalf("expected SectionImprovements with 1 task (IMP-1), got: %+v", impSec)
+	}
+
+	tasksSec, ok := sectionMap[viewmodel.SectionTasks]
+	if !ok || len(tasksSec.Tasks) != 3 {
+		t.Fatalf("expected SectionTasks with 3 tasks, got %d: %+v", len(tasksSec.Tasks), tasksSec.Tasks)
+	}
+
+	compSec, ok := sectionMap[viewmodel.SectionCompleted]
+	if !ok || len(compSec.Tasks) != 1 || compSec.Tasks[0].ID != "TSK-1" {
+		t.Fatalf("expected SectionCompleted with 1 task, got: %+v", compSec)
+	}
+
+	// Verify UI rendering
+	th := theme.NewTheme()
+	m.Layout = viewmodel.ComputeLayout(120, 40)
+	rendered := components.RenderTodoShelf(&m, th, 40)
+
+	if !strings.Contains(rendered, "FEATURES (1)") {
+		t.Errorf("rendered output missing 'FEATURES (1)': %s", rendered)
+	}
+	if !strings.Contains(rendered, "DEFECTS (1)") {
+		t.Errorf("rendered output missing 'DEFECTS (1)': %s", rendered)
+	}
+	if !strings.Contains(rendered, "IMPROVEMENTS (1)") {
+		t.Errorf("rendered output missing 'IMPROVEMENTS (1)': %s", rendered)
+	}
+	if !strings.Contains(rendered, "TASKS (3)") {
+		t.Errorf("rendered output missing 'TASKS (3)': %s", rendered)
+	}
+	if !strings.Contains(rendered, "COMPLETED (1)") {
+		t.Errorf("rendered output missing 'COMPLETED (1)': %s", rendered)
+	}
+
+	// Verify section jumping with J / K
+	m.SelectedTaskUUID = "fea-11-uuid"
+	m.MoveShelfSection(1)
+	if m.SelectedTaskUUID != "def-1-uuid" {
+		t.Errorf("expected jump to def-1-uuid, got %s", m.SelectedTaskUUID)
+	}
+	m.MoveShelfSection(1)
+	if m.SelectedTaskUUID != "imp-1-uuid" {
+		t.Errorf("expected jump to imp-1-uuid, got %s", m.SelectedTaskUUID)
+	}
+	m.MoveShelfSection(1)
+	if m.SelectedTaskUUID != "tsk-6-uuid" {
+		t.Errorf("expected jump to tsk-6-uuid, got %s", m.SelectedTaskUUID)
+	}
+	m.MoveShelfSection(1)
+	if m.SelectedTaskUUID != "done-tsk-uuid" {
+		t.Errorf("expected jump to done-tsk-uuid, got %s", m.SelectedTaskUUID)
+	}
+	// K backward jump
+	m.MoveShelfSection(-1)
+	if m.SelectedTaskUUID != "tsk-6-uuid" {
+		t.Errorf("expected jump back to tsk-6-uuid, got %s", m.SelectedTaskUUID)
+	}
+
+	// Test completing FEA-11 with 'x' moves it to COMPLETED section
+	m.SelectedTaskUUID = "fea-11-uuid"
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}) // No on log focus session
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})                     // Confirm completion
+
+	updatedShelf := m.GetShelfData()
+	upSectionMap := make(map[viewmodel.ShelfSectionType]viewmodel.ShelfSection)
+	for _, sec := range updatedShelf.Sections {
+		upSectionMap[sec.Type] = sec
+	}
+	if len(upSectionMap[viewmodel.SectionFeatures].Tasks) != 0 {
+		t.Errorf("expected 0 features after completion, got %d", len(upSectionMap[viewmodel.SectionFeatures].Tasks))
+	}
+	if len(upSectionMap[viewmodel.SectionCompleted].Tasks) != 2 {
+		t.Errorf("expected 2 completed tasks, got %d", len(upSectionMap[viewmodel.SectionCompleted].Tasks))
+	}
+
+	// Verify empty section render message
+	renderedAfterComplete := components.RenderTodoShelf(&m, th, 40)
+	if !strings.Contains(renderedAfterComplete, "No features") {
+		t.Errorf("expected 'No features' in empty features section: %s", renderedAfterComplete)
+	}
+}

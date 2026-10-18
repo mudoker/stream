@@ -249,7 +249,10 @@ func GetTodoShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Tas
 func GetGlobalBacklogShelfTasks(allTasks []model.Task, selectedDay time.Time) []model.Task {
 	// Global backlog contains ALL floating tasks not assigned to a sprint across all dates.
 	// Habits, events, and reminders are not tasks and appear directly on the day timeline.
-	var backlog []model.Task
+	var features []model.Task
+	var defects []model.Task
+	var improvements []model.Task
+	var backlogTasks []model.Task
 	var completed []model.Task
 
 	for _, t := range allTasks {
@@ -267,14 +270,39 @@ func GetGlobalBacklogShelfTasks(allTasks []model.Task, selectedDay time.Time) []
 		if isDone {
 			completed = append(completed, t)
 		} else {
-			backlog = append(backlog, t)
+			switch t.WorkItemType {
+			case model.WorkItemFeature:
+				features = append(features, t)
+			case model.WorkItemDefect:
+				defects = append(defects, t)
+			case model.WorkItemImprovement:
+				improvements = append(improvements, t)
+			default:
+				if strings.HasPrefix(t.ID, "DEF-") {
+					defects = append(defects, t)
+				} else if strings.HasPrefix(t.ID, "IMP-") {
+					improvements = append(improvements, t)
+				} else if strings.HasPrefix(t.ID, "FEA-") || strings.HasPrefix(t.ID, "FEAT-") || strings.HasPrefix(t.ID, "FT-") {
+					features = append(features, t)
+				} else {
+					backlogTasks = append(backlogTasks, t)
+				}
+			}
 		}
 	}
 
-	ImportSort(backlog)
+	ImportSort(features)
+	ImportSort(defects)
+	ImportSort(improvements)
+	ImportSort(backlogTasks)
 	ImportSort(completed)
 
-	return append(backlog, completed...)
+	var res []model.Task
+	res = append(res, features...)
+	res = append(res, defects...)
+	res = append(res, improvements...)
+	res = append(res, backlogTasks...)
+	return append(res, completed...)
 }
 
 func GetSprintSwimlaneTasks(allTasks []model.Task, sprintUUID string) (defined, inProgress, review, testing, completed []model.Task) {

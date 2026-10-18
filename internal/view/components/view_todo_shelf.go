@@ -79,6 +79,12 @@ func RenderTodoShelf(m *viewmodel.Model, t theme.Theme, appContentHeight int) st
 				emptyMsg = "  No completed tasks"
 			} else if sec.Type == viewmodel.SectionBacklog {
 				emptyMsg = "  No backlog tasks"
+			} else if sec.Type == viewmodel.SectionFeatures {
+				emptyMsg = "  No features"
+			} else if sec.Type == viewmodel.SectionDefects {
+				emptyMsg = "  No defects"
+			} else if sec.Type == viewmodel.SectionImprovements {
+				emptyMsg = "  No improvements"
 			}
 			rows = append(rows, lipgloss.NewStyle().Foreground(t.Muted).Render(emptyMsg), "")
 		} else {

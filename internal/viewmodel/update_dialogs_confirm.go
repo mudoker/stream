@@ -23,7 +23,7 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 	if m.WarningOpen {
 		switch msg.String() {
-		case "enter", "q", "space":
+		case "esc", "enter", "q", "space":
 			m.WarningOpen = false
 			m.WarningMsg = ""
 			return true, nil

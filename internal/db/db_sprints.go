@@ -53,6 +53,8 @@ func (db *JSONDB) GetSprint(uuid string) (model.Sprint, bool) {
 	return s, exists
 }
 
+var ErrSprintOverlap = errors.New("sprint dates cannot overlap with an existing sprint")
+
 func (db *JSONDB) AddSprint(s model.Sprint) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
@@ -66,8 +68,24 @@ func (db *JSONDB) AddSprint(s model.Sprint) error {
 	}
 	s.UpdatedAt = now
 
+	if s.StartDate.IsZero() {
+		s.StartDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	}
 	if s.EndDate.IsZero() || s.EndDate.Before(s.StartDate) {
 		s.EndDate = s.StartDate.AddDate(0, 0, 13)
+	}
+
+	for _, existing := range db.sprints {
+		if existing.UUID == s.UUID {
+			continue
+		}
+		if model.SprintsOverlap(s, existing) {
+			return fmt.Errorf("%w: sprint dates (%s to %s) overlap with existing sprint '%s' (%s to %s)",
+				ErrSprintOverlap,
+				s.StartDate.Format("2006-01-02"), s.EndDate.Format("2006-01-02"),
+				existing.Name,
+				existing.StartDate.Format("2006-01-02"), existing.EndDate.Format("2006-01-02"))
+		}
 	}
 
 	db.sprints[s.UUID] = s
@@ -81,7 +99,29 @@ func (db *JSONDB) UpdateSprint(s model.Sprint) error {
 	if _, exists := db.sprints[s.UUID]; !exists {
 		return errors.New("sprint not found")
 	}
-	s.UpdatedAt = time.Now()
+
+	now := time.Now()
+	if s.StartDate.IsZero() {
+		s.StartDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	}
+	if s.EndDate.IsZero() || s.EndDate.Before(s.StartDate) {
+		s.EndDate = s.StartDate.AddDate(0, 0, 13)
+	}
+
+	for _, existing := range db.sprints {
+		if existing.UUID == s.UUID {
+			continue
+		}
+		if model.SprintsOverlap(s, existing) {
+			return fmt.Errorf("%w: sprint dates (%s to %s) overlap with existing sprint '%s' (%s to %s)",
+				ErrSprintOverlap,
+				s.StartDate.Format("2006-01-02"), s.EndDate.Format("2006-01-02"),
+				existing.Name,
+				existing.StartDate.Format("2006-01-02"), existing.EndDate.Format("2006-01-02"))
+		}
+	}
+
+	s.UpdatedAt = now
 	db.sprints[s.UUID] = s
 	return db.saveSprints()
 }
@@ -121,11 +161,11 @@ func (db *JSONDB) GenerateRecurringSprints(baseSprint model.Sprint, count int) (
 		gapDays = 13
 	}
 
-	var generated []model.Sprint
+	var toAdd []model.Sprint
 	currStart := baseSprint.EndDate.AddDate(0, 0, 1)
 	for i := 1; i <= count; i++ {
 		currEnd := currStart.AddDate(0, 0, gapDays)
-		sprintNum := len(db.sprints) + 1
+		sprintNum := len(db.sprints) + i
 		s := model.Sprint{
 			UUID:          uuid.New().String(),
 			WorkspaceUUID: baseSprint.WorkspaceUUID,
@@ -135,13 +175,32 @@ func (db *JSONDB) GenerateRecurringSprints(baseSprint model.Sprint, count int) (
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
-		db.sprints[s.UUID] = s
-		generated = append(generated, s)
+
+		for _, existing := range db.sprints {
+			if model.SprintsOverlap(s, existing) {
+				return nil, fmt.Errorf("%w: generated sprint '%s' (%s to %s) overlaps with existing sprint '%s' (%s to %s)",
+					ErrSprintOverlap,
+					s.Name, s.StartDate.Format("2006-01-02"), s.EndDate.Format("2006-01-02"),
+					existing.Name, existing.StartDate.Format("2006-01-02"), existing.EndDate.Format("2006-01-02"))
+			}
+		}
+		for _, prevGen := range toAdd {
+			if model.SprintsOverlap(s, prevGen) {
+				return nil, fmt.Errorf("%w: generated sprint '%s' overlaps with generated sprint '%s'",
+					ErrSprintOverlap, s.Name, prevGen.Name)
+			}
+		}
+
+		toAdd = append(toAdd, s)
 		currStart = currEnd.AddDate(0, 0, 1)
+	}
+
+	for _, s := range toAdd {
+		db.sprints[s.UUID] = s
 	}
 
 	if err := db.saveSprints(); err != nil {
 		return nil, err
 	}
-	return generated, nil
+	return toAdd, nil
 }

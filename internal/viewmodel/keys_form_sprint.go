@@ -24,8 +24,9 @@ func (m *Model) handleSprintFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.focusSprintFormFields()
 		return m, nil
 	case "enter":
-		m.submitSprintForm()
-		m.CurrentMode = ModeNormal
+		if m.submitSprintForm() {
+			m.CurrentMode = ModeNormal
+		}
 		return m, nil
 	case "esc":
 		m.CurrentMode = ModeNormal
@@ -65,7 +66,7 @@ func (m *Model) focusSprintFormFields() {
 	}
 }
 
-func (m *Model) submitSprintForm() {
+func (m *Model) submitSprintForm() bool {
 	name := m.SprintForm.NameInput.Value()
 	if name == "" {
 		name = "Sprint"
@@ -105,13 +106,23 @@ func (m *Model) submitSprintForm() {
 			sprint.StartDate = startDate
 			sprint.EndDate = endDate
 			sprint.UpdatedAt = time.Now()
-			m.DB.UpdateSprint(sprint)
+			if err := m.DB.UpdateSprint(sprint); err != nil {
+				m.StatusMsg = fmt.Sprintf("Error: %v", err)
+				m.WarningOpen = true
+				m.WarningMsg = fmt.Sprintf("Cannot update sprint: %v", err)
+				return false
+			}
 			m.ActiveSprintUUID = sprint.UUID
 			m.StatusMsg = fmt.Sprintf("Sprint '%s' updated successfully.", name)
 
 			if recCount > 0 {
-				m.DB.GenerateRecurringSprints(sprint, recCount)
-				m.StatusMsg = fmt.Sprintf("Sprint updated and %d recurring sprints generated.", recCount)
+				if _, err := m.DB.GenerateRecurringSprints(sprint, recCount); err != nil {
+					m.StatusMsg = fmt.Sprintf("Sprint updated, but recurring failed: %v", err)
+					m.WarningOpen = true
+					m.WarningMsg = fmt.Sprintf("Sprint updated, but recurring sprints could not be generated: %v", err)
+				} else {
+					m.StatusMsg = fmt.Sprintf("Sprint updated and %d recurring sprints generated.", recCount)
+				}
 			}
 		}
 	} else {
@@ -124,15 +135,26 @@ func (m *Model) submitSprintForm() {
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
-		m.DB.AddSprint(newSprint)
+		if err := m.DB.AddSprint(newSprint); err != nil {
+			m.StatusMsg = fmt.Sprintf("Error: %v", err)
+			m.WarningOpen = true
+			m.WarningMsg = fmt.Sprintf("Cannot create sprint: %v", err)
+			return false
+		}
 		m.ActiveSprintUUID = newSprint.UUID
 		m.StatusMsg = fmt.Sprintf("Sprint '%s' created successfully.", name)
 
 		if recCount > 0 {
-			m.DB.GenerateRecurringSprints(newSprint, recCount)
-			m.StatusMsg = fmt.Sprintf("Sprint created and %d recurring sprints generated.", recCount)
+			if _, err := m.DB.GenerateRecurringSprints(newSprint, recCount); err != nil {
+				m.StatusMsg = fmt.Sprintf("Sprint created, but recurring failed: %v", err)
+				m.WarningOpen = true
+				m.WarningMsg = fmt.Sprintf("Sprint created, but recurring sprints could not be generated: %v", err)
+			} else {
+				m.StatusMsg = fmt.Sprintf("Sprint created and %d recurring sprints generated.", recCount)
+			}
 		}
 	}
 
 	m.refreshSprints()
+	return true
 }

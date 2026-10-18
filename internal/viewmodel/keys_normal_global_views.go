@@ -23,6 +23,7 @@ func (m *Model) handleGlobalViewsAndNavigation(key string) (bool, tea.Cmd) {
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		m.SprintScrollColOffset = 0
+		m.DefaultToActiveSprint()
 		return true, nil
 	case "4":
 		m.CurrentView = WeekView

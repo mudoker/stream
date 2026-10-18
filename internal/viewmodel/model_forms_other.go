@@ -137,8 +137,20 @@ type SprintForm struct {
 }
 
 func NewSprintForm(defaultName string) SprintForm {
+	return NewSprintFormWithNextAvailableDates(defaultName, nil)
+}
+
+func NewSprintFormWithNextAvailableDates(defaultName string, sprints []model.Sprint) SprintForm {
 	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	if len(sprints) > 0 {
+		latest := sprints[len(sprints)-1]
+		nextDay := latest.EndDate.AddDate(0, 0, 1)
+		nextDayStart := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 0, 0, 0, 0, now.Location())
+		if nextDayStart.After(start) {
+			start = nextDayStart
+		}
+	}
 	end := start.AddDate(0, 0, 13)
 
 	name := textinput.New()

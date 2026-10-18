@@ -87,11 +87,50 @@ func (m *Model) refreshSprints() {
 			}
 		}
 		if !found {
-			m.ActiveSprintUUID = m.Sprints[0].UUID
+			m.DefaultToActiveSprint()
 		}
 	} else {
 		m.ActiveSprintUUID = ""
 	}
+}
+
+// GetCurrentActiveSprint returns the sprint whose dates include the current moment/day.
+func (m *Model) GetCurrentActiveSprint() (model.Sprint, bool) {
+	now := time.Now()
+	for _, s := range m.Sprints {
+		if model.IsSprintActive(s, now) {
+			return s, true
+		}
+	}
+	return model.Sprint{}, false
+}
+
+// DefaultToActiveSprint sets ActiveSprintUUID to the current active sprint.
+// If no sprint is active, it falls back to the earliest upcoming sprint, or the latest sprint.
+func (m *Model) DefaultToActiveSprint() {
+	if len(m.Sprints) == 0 {
+		m.ActiveSprintUUID = ""
+		return
+	}
+	if active, ok := m.GetCurrentActiveSprint(); ok {
+		m.ActiveSprintUUID = active.UUID
+		return
+	}
+	for _, s := range m.Sprints {
+		if s.UUID == m.ActiveSprintUUID {
+			return
+		}
+	}
+	now := time.Now()
+	today := model.NormalizeDate(now)
+	for _, s := range m.Sprints {
+		start, _ := model.SprintDateBounds(s)
+		if start.After(today) {
+			m.ActiveSprintUUID = s.UUID
+			return
+		}
+	}
+	m.ActiveSprintUUID = m.Sprints[len(m.Sprints)-1].UUID
 }
 
 func (m *Model) GetActiveSprint() (model.Sprint, bool) {
@@ -101,6 +140,10 @@ func (m *Model) GetActiveSprint() (model.Sprint, bool) {
 				return s, true
 			}
 		}
+	}
+	if active, ok := m.GetCurrentActiveSprint(); ok {
+		m.ActiveSprintUUID = active.UUID
+		return active, true
 	}
 	if len(m.Sprints) > 0 {
 		return m.Sprints[0], true
@@ -292,6 +335,9 @@ func (m *Model) moveSidebarView(delta int) {
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		m.SprintScrollColOffset = 0
+		if m.CurrentView == SprintView {
+			m.DefaultToActiveSprint()
+		}
 	}
 }
 

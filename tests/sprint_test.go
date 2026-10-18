@@ -56,8 +56,7 @@ func TestSprintDBCRUDAndRecurring(t *testing.T) {
 		t.Fatalf("expected default sprint, got 0")
 	}
 
-	now := time.Now()
-	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	start := sprints[0].EndDate.AddDate(0, 0, 1)
 	end := start.AddDate(0, 0, 13)
 
 	customSprint := model.Sprint{
@@ -70,6 +69,17 @@ func TestSprintDBCRUDAndRecurring(t *testing.T) {
 	err := database.AddSprint(customSprint)
 	if err != nil {
 		t.Fatalf("AddSprint failed: %v", err)
+	}
+
+	// Verify that adding an overlapping sprint fails
+	overlappingSprint := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Overlapping Sprint",
+		StartDate: sprints[0].StartDate,
+		EndDate:   sprints[0].EndDate,
+	}
+	if errOverlap := database.AddSprint(overlappingSprint); errOverlap == nil {
+		t.Fatalf("expected AddSprint with overlapping dates to fail, but it succeeded")
 	}
 
 	fetched, exists := database.GetSprint(customSprint.UUID)
@@ -1685,6 +1695,10 @@ func TestFilterBlockersAndFeaturesActiveAndUpcomingOnly(t *testing.T) {
 	database, cleanup := setupTestSprintDB(t)
 	defer cleanup()
 
+	for _, s := range database.GetSprints() {
+		_ = database.DeleteSprint(s.UUID)
+	}
+
 	now := time.Now()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -2159,5 +2173,314 @@ func TestCreateFeatureDefaultStateDefined(t *testing.T) {
 	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
 	if m.Form.StatusIdx != 0 {
 		t.Fatalf("expected StatusIdx 0 (Defined) on shelf, got %d", m.Form.StatusIdx)
+	}
+}
+
+func TestSprintsOverlapAndActive(t *testing.T) {
+	d := func(year, month, day int) time.Time {
+		return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+	}
+
+	s1 := model.Sprint{StartDate: d(2026, 10, 1), EndDate: d(2026, 10, 14)}
+
+	// 1. Disjoint before
+	sBefore := model.Sprint{StartDate: d(2026, 9, 1), EndDate: d(2026, 9, 30)}
+	if model.SprintsOverlap(s1, sBefore) || model.SprintsOverlap(sBefore, s1) {
+		t.Errorf("expected no overlap between s1 and sBefore")
+	}
+
+	// 2. Disjoint after
+	sAfter := model.Sprint{StartDate: d(2026, 10, 15), EndDate: d(2026, 10, 28)}
+	if model.SprintsOverlap(s1, sAfter) || model.SprintsOverlap(sAfter, s1) {
+		t.Errorf("expected no overlap between s1 and sAfter")
+	}
+
+	// 3. Touching boundary (Oct 14 is in both)
+	sTouch := model.Sprint{StartDate: d(2026, 10, 14), EndDate: d(2026, 10, 27)}
+	if !model.SprintsOverlap(s1, sTouch) || !model.SprintsOverlap(sTouch, s1) {
+		t.Errorf("expected overlap between s1 and sTouch on Oct 14")
+	}
+
+	// 4. Partial overlap
+	sPartial := model.Sprint{StartDate: d(2026, 10, 10), EndDate: d(2026, 10, 20)}
+	if !model.SprintsOverlap(s1, sPartial) || !model.SprintsOverlap(sPartial, s1) {
+		t.Errorf("expected overlap between s1 and sPartial")
+	}
+
+	// 5. Complete enclosure
+	sEnclosed := model.Sprint{StartDate: d(2026, 10, 5), EndDate: d(2026, 10, 8)}
+	if !model.SprintsOverlap(s1, sEnclosed) || !model.SprintsOverlap(sEnclosed, s1) {
+		t.Errorf("expected overlap between s1 and sEnclosed")
+	}
+
+	// Test IsSprintActive
+	nowInside := d(2026, 10, 7)
+	if !model.IsSprintActive(s1, nowInside) {
+		t.Errorf("expected s1 to be active on %v", nowInside)
+	}
+	nowStart := d(2026, 10, 1)
+	if !model.IsSprintActive(s1, nowStart) {
+		t.Errorf("expected s1 to be active on start date %v", nowStart)
+	}
+	nowEnd := d(2026, 10, 14)
+	if !model.IsSprintActive(s1, nowEnd) {
+		t.Errorf("expected s1 to be active on end date %v", nowEnd)
+	}
+	nowBefore := d(2026, 9, 30)
+	if model.IsSprintActive(s1, nowBefore) {
+		t.Errorf("expected s1 NOT to be active before start date %v", nowBefore)
+	}
+	nowAfter := d(2026, 10, 15)
+	if model.IsSprintActive(s1, nowAfter) {
+		t.Errorf("expected s1 NOT to be active after end date %v", nowAfter)
+	}
+}
+
+func TestSprintDisallowOverlapInDB(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	for _, s := range database.GetSprints() {
+		_ = database.DeleteSprint(s.UUID)
+	}
+
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	sprint1 := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Sprint 1",
+		StartDate: today,
+		EndDate:   today.AddDate(0, 0, 13),
+	}
+	if err := database.AddSprint(sprint1); err != nil {
+		t.Fatalf("AddSprint failed: %v", err)
+	}
+
+	// 1. Add overlapping sprint (starts during sprint 1)
+	sprintOverlap := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Overlap Sprint",
+		StartDate: today.AddDate(0, 0, 5),
+		EndDate:   today.AddDate(0, 0, 18),
+	}
+	if err := database.AddSprint(sprintOverlap); err == nil {
+		t.Fatalf("expected AddSprint to reject overlap")
+	}
+
+	// 2. Add non-overlapping sprint (starts day after sprint 1 ends)
+	sprint2 := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Sprint 2",
+		StartDate: today.AddDate(0, 0, 14),
+		EndDate:   today.AddDate(0, 0, 27),
+	}
+	if err := database.AddSprint(sprint2); err != nil {
+		t.Fatalf("expected non-overlapping sprint2 to succeed: %v", err)
+	}
+
+	// 3. Update sprint2 to overlap sprint1
+	sprint2.StartDate = today.AddDate(0, 0, 10)
+	if err := database.UpdateSprint(sprint2); err == nil {
+		t.Fatalf("expected UpdateSprint to reject overlapping dates")
+	}
+
+	// 4. Update sprint2 without changing dates (should succeed)
+	sprint2.StartDate = today.AddDate(0, 0, 14)
+	sprint2.Name = "Sprint 2 Renamed"
+	if err := database.UpdateSprint(sprint2); err != nil {
+		t.Fatalf("expected UpdateSprint with valid dates to succeed: %v", err)
+	}
+
+	// 5. Generate recurring sprints that would hit an existing sprint
+	futureSprint := model.Sprint{
+		UUID:      uuid.New().String(),
+		Name:      "Future Sprint",
+		StartDate: today.AddDate(0, 0, 35),
+		EndDate:   today.AddDate(0, 0, 48),
+	}
+	if err := database.AddSprint(futureSprint); err != nil {
+		t.Fatalf("AddSprint futureSprint failed: %v", err)
+	}
+	// Generating 2 recurring sprints from sprint2 (each 14 days: 28..41 and 42..55) will collide with futureSprint (35..48)
+	_, err := database.GenerateRecurringSprints(sprint2, 2)
+	if err == nil {
+		t.Fatalf("expected GenerateRecurringSprints to fail due to overlap with future sprint")
+	}
+}
+
+func TestSprintViewAlwaysDefaultsToActiveSprint(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	for _, s := range database.GetSprints() {
+		_ = database.DeleteSprint(s.UUID)
+	}
+
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	pastSprint := model.Sprint{
+		UUID:      "sprint-past",
+		Name:      "Past Sprint",
+		StartDate: today.AddDate(0, 0, -20),
+		EndDate:   today.AddDate(0, 0, -6),
+	}
+	activeSprint := model.Sprint{
+		UUID:      "sprint-active",
+		Name:      "Active Sprint",
+		StartDate: today.AddDate(0, 0, -2),
+		EndDate:   today.AddDate(0, 0, 11),
+	}
+	futureSprint := model.Sprint{
+		UUID:      "sprint-future",
+		Name:      "Future Sprint",
+		StartDate: today.AddDate(0, 0, 14),
+		EndDate:   today.AddDate(0, 0, 27),
+	}
+
+	if err := database.AddSprint(pastSprint); err != nil {
+		t.Fatalf("AddSprint pastSprint failed: %v", err)
+	}
+	if err := database.AddSprint(activeSprint); err != nil {
+		t.Fatalf("AddSprint activeSprint failed: %v", err)
+	}
+	if err := database.AddSprint(futureSprint); err != nil {
+		t.Fatalf("AddSprint futureSprint failed: %v", err)
+	}
+
+	m := viewmodel.NewModel(database, nil)
+
+	// 1. On startup (NewModel), ActiveSprintUUID should default to the active sprint
+	if m.ActiveSprintUUID != activeSprint.UUID {
+		t.Fatalf("expected ActiveSprintUUID on startup to be %s, got %s", activeSprint.UUID, m.ActiveSprintUUID)
+	}
+
+	// 2. Switch to Sprint View via key '3'
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	if m.CurrentView != viewmodel.SprintView {
+		t.Fatalf("expected SprintView, got %v", m.CurrentView)
+	}
+	if m.ActiveSprintUUID != activeSprint.UUID {
+		t.Fatalf("expected ActiveSprintUUID in SprintView to be active sprint %s, got %s", activeSprint.UUID, m.ActiveSprintUUID)
+	}
+
+	// 3. User navigates to Future Sprint using 's' in Sprint View
+	m.SidebarFocus = false
+	m.TodoShelfFocus = false
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	if m.ActiveSprintUUID != futureSprint.UUID {
+		t.Fatalf("expected ActiveSprintUUID after 's' to be future sprint %s, got %s", futureSprint.UUID, m.ActiveSprintUUID)
+	}
+
+	// 4. Switch away to Day View (key '5')
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("5")})
+	if m.CurrentView != viewmodel.DayView {
+		t.Fatalf("expected DayView, got %v", m.CurrentView)
+	}
+
+	// 5. Switch back to Sprint View via key '3' -> MUST default back to active sprint
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	if m.CurrentView != viewmodel.SprintView {
+		t.Fatalf("expected SprintView, got %v", m.CurrentView)
+	}
+	if m.ActiveSprintUUID != activeSprint.UUID {
+		t.Fatalf("expected SprintView to default back to active sprint %s, got %s", activeSprint.UUID, m.ActiveSprintUUID)
+	}
+
+	// 6. User navigates to Past Sprint using 'S' (or '[')
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("S")})
+	if m.ActiveSprintUUID != pastSprint.UUID {
+		t.Fatalf("expected ActiveSprintUUID after 'S' to be past sprint %s, got %s", pastSprint.UUID, m.ActiveSprintUUID)
+	}
+
+	// 7. Switch away to Day View, then switch back to Sprint View via command palette ":sprint"
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("5")})
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
+	for _, r := range "sprint" {
+		m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.CurrentView != viewmodel.SprintView {
+		t.Fatalf("expected SprintView from :sprint, got %v", m.CurrentView)
+	}
+	if m.ActiveSprintUUID != activeSprint.UUID {
+		t.Fatalf("expected SprintView from :sprint to default to active sprint %s, got %s", activeSprint.UUID, m.ActiveSprintUUID)
+	}
+}
+
+func TestSprintFormDisallowOverlap(t *testing.T) {
+	database, cleanup := setupTestSprintDB(t)
+	defer cleanup()
+
+	sprints := database.GetSprints()
+	if len(sprints) == 0 {
+		t.Fatalf("expected default sprint in test DB")
+	}
+	existingSprint := sprints[0]
+
+	mVal := viewmodel.NewModel(database, nil)
+	m := &mVal
+	m.CurrentView = viewmodel.SprintView
+
+	// Open Sprint Form via 'I'
+	m.SidebarFocus = false
+	m.TodoShelfFocus = false
+	res, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("I")})
+	m = res.(*viewmodel.Model)
+	if m.CurrentMode != viewmodel.ModeSprintForm {
+		t.Fatalf("expected ModeSprintForm, got %v", m.CurrentMode)
+	}
+
+	// Set dates to overlap with existingSprint
+	m.SprintForm.StartDateInput.SetValue(existingSprint.StartDate.Format("2006-01-02"))
+	m.SprintForm.EndDateInput.SetValue(existingSprint.EndDate.Format("2006-01-02"))
+
+	// Submit with enter
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = res.(*viewmodel.Model)
+
+	// Should remain in ModeSprintForm with WarningOpen set
+	if !m.WarningOpen {
+		t.Fatalf("expected WarningOpen to be true on overlapping sprint submit")
+	}
+	if !strings.Contains(m.WarningMsg, "overlap") {
+		t.Fatalf("expected WarningMsg to mention overlap, got %s", m.WarningMsg)
+	}
+	if m.CurrentMode != viewmodel.ModeSprintForm {
+		t.Fatalf("expected mode to remain ModeSprintForm after validation failure, got %v", m.CurrentMode)
+	}
+
+	// Dismiss warning with Enter
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = res.(*viewmodel.Model)
+	if m.WarningOpen {
+		t.Fatalf("expected WarningOpen to be false after dismissing warning")
+	}
+	if m.CurrentMode != viewmodel.ModeSprintForm {
+		t.Fatalf("expected ModeSprintForm after dismissing warning, got %v", m.CurrentMode)
+	}
+
+	// Fix dates to non-overlapping
+	nextStart := existingSprint.EndDate.AddDate(0, 0, 1)
+	nextEnd := nextStart.AddDate(0, 0, 13)
+	m.SprintForm.NameInput.SetValue("Sprint 2 Non-Overlap")
+	m.SprintForm.StartDateInput.SetValue(nextStart.Format("2006-01-02"))
+	m.SprintForm.EndDateInput.SetValue(nextEnd.Format("2006-01-02"))
+
+	// Submit with enter
+	res, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = res.(*viewmodel.Model)
+	if m.CurrentMode != viewmodel.ModeNormal {
+		t.Fatalf("expected ModeNormal after successful submit, got %v", m.CurrentMode)
+	}
+	if m.WarningOpen {
+		t.Fatalf("did not expect WarningOpen after successful submit")
+	}
+
+	// Verify sprint 2 was added
+	updatedSprints := database.GetSprints()
+	if len(updatedSprints) != 2 {
+		t.Fatalf("expected 2 sprints in database, got %d", len(updatedSprints))
 	}
 }

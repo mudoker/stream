@@ -50,6 +50,46 @@ type Sprint struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+// NormalizeDate returns a time.Time at midnight UTC representing the calendar date of t.
+func NormalizeDate(t time.Time) time.Time {
+	y, m, d := t.Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
+// SprintDateBounds returns the normalized start and end calendar dates for a sprint.
+// If EndDate is before StartDate or zero, it defaults to StartDate + 13 days.
+func SprintDateBounds(s Sprint) (time.Time, time.Time) {
+	var start time.Time
+	if s.StartDate.IsZero() {
+		now := time.Now()
+		start = NormalizeDate(now)
+	} else {
+		start = NormalizeDate(s.StartDate)
+	}
+	end := NormalizeDate(s.EndDate)
+	if end.Before(start) {
+		end = start.AddDate(0, 0, 13)
+	}
+	return start, end
+}
+
+// IsSprintActive returns true if the sprint date range covers the date of `now`.
+func IsSprintActive(s Sprint, now time.Time) bool {
+	if s.StartDate.IsZero() {
+		return false
+	}
+	today := NormalizeDate(now)
+	start, end := SprintDateBounds(s)
+	return !today.Before(start) && !today.After(end)
+}
+
+// SprintsOverlap checks if two sprints share at least one calendar day.
+func SprintsOverlap(s1, s2 Sprint) bool {
+	start1, end1 := SprintDateBounds(s1)
+	start2, end2 := SprintDateBounds(s2)
+	return !start1.After(end2) && !start2.After(end1)
+}
+
 type TimeWindow struct {
 	Start time.Time `json:"start"`
 	End   time.Time `json:"end"`

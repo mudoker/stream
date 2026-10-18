@@ -115,7 +115,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 		if m.CurrentView == SprintView && !m.SidebarFocus && !m.TodoShelfFocus {
 			m.CurrentMode = ModeSprintForm
 			defaultName := fmt.Sprintf("Sprint %d", len(m.Sprints)+1)
-			m.SprintForm = NewSprintForm(defaultName)
+			m.SprintForm = NewSprintFormWithNextAvailableDates(defaultName, m.Sprints)
 			m.SprintForm.NameInput.Focus()
 			return true, nil
 		}

@@ -55,11 +55,12 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		m.CurrentView = SprintView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
+		m.DefaultToActiveSprint()
 		m.StatusMsg = "Switched to Sprint view."
 	case "sprint-create":
 		m.CurrentMode = ModeSprintForm
 		defaultName := fmt.Sprintf("Sprint %d", len(m.Sprints)+1)
-		m.SprintForm = NewSprintForm(defaultName)
+		m.SprintForm = NewSprintFormWithNextAvailableDates(defaultName, m.Sprints)
 		m.SprintForm.NameInput.Focus()
 		m.StatusMsg = "Create new sprint."
 	case "sprint-edit":

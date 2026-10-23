@@ -813,7 +813,13 @@ func TestPartialTaskAnchoring(t *testing.T) {
 	m.AnchorTimeInput.SetValue("09:00")
 	m.AnchorDurationInput.SetValue("45")
 
-	// Press enter to confirm anchoring and trigger splitting
+	// Press enter to trigger anchor remaining confirmation modal
+	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !m.ConfirmOpen || m.ConfirmActionType != "anchor_remaining_confirm" {
+		t.Fatalf("expected anchor_remaining_confirm modal, got ConfirmOpen=%t, Action=%s", m.ConfirmOpen, m.ConfirmActionType)
+	}
+
+	// Confirm logging remaining to shelf (option 0)
 	m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 
 	// Retrieve tasks and check state
@@ -825,7 +831,7 @@ func TestPartialTaskAnchoring(t *testing.T) {
 	for _, task := range tasks {
 		if task.UUID == "gym-session-123" {
 			originalTask = task
-		} else if strings.Contains(task.Title, "remaining") {
+		} else if strings.Contains(task.Title, "pt.2") {
 			remainingTask = task
 			foundRemaining = true
 		}

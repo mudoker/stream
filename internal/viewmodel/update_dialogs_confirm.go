@@ -252,17 +252,14 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				if m.ConfirmSelectedIndex == 0 {
 					m.DB.UpdateTask(m.PendingEditTask)
 					if m.LogRemainingOnConfirm {
-						remainingTitle := m.PendingEditTask.Title
-						if !strings.HasSuffix(remainingTitle, " (remaining)") {
-							remainingTitle += " (remaining)"
-						}
+						remainingTitle := model.GenerateSplitTitle(m.PendingEditTask.Title)
 						remainingTask := model.Task{
 							UUID:                  uuid.New().String(),
 							WorkspaceUUID:         m.PendingEditTask.WorkspaceUUID,
 							Title:                 remainingTitle,
 							Description:           m.PendingEditTask.Description,
 							Priority:              m.PendingEditTask.Priority,
-							StoryPoints:           m.PendingEditTask.StoryPoints,
+							StoryPoints:           model.InferStoryPoints(m.ShrinkRemainingMins),
 							SchedulingType:        model.Floating,
 							LifecycleState:        model.StateReady,
 							EstimatedDurationMins: m.ShrinkRemainingMins,
@@ -451,6 +448,9 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				origDur := m.ConfirmTask.TimeWindow.End.Sub(m.ConfirmTask.TimeWindow.Start)
 				newDur := m.PendingEditTask.TimeWindow.End.Sub(m.PendingEditTask.TimeWindow.Start)
 				m.ShrinkRemainingMins = int((origDur - newDur).Minutes())
+				newDurMinutes := int(newDur.Minutes())
+				m.PendingEditTask.EstimatedDurationMins = newDurMinutes
+				m.PendingEditTask.StoryPoints = model.InferStoryPoints(newDurMinutes)
 
 				if m.PendingEditTask.RecurringParentUUID != "" {
 					m.ConfirmActionType = "edit_recurring"
@@ -460,17 +460,14 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				} else {
 					m.DB.UpdateTask(m.PendingEditTask)
 					if m.LogRemainingOnConfirm {
-						remainingTitle := m.PendingEditTask.Title
-						if !strings.HasSuffix(remainingTitle, " (remaining)") {
-							remainingTitle += " (remaining)"
-						}
+						remainingTitle := model.GenerateSplitTitle(m.PendingEditTask.Title)
 						remainingTask := model.Task{
 							UUID:                  uuid.New().String(),
 							WorkspaceUUID:         m.PendingEditTask.WorkspaceUUID,
 							Title:                 remainingTitle,
 							Description:           m.PendingEditTask.Description,
 							Priority:              m.PendingEditTask.Priority,
-							StoryPoints:           m.PendingEditTask.StoryPoints,
+							StoryPoints:           model.InferStoryPoints(m.ShrinkRemainingMins),
 							SchedulingType:        model.Floating,
 							LifecycleState:        model.StateReady,
 							EstimatedDurationMins: m.ShrinkRemainingMins,
@@ -490,6 +487,49 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 					} else {
 						m.StatusMsg = fmt.Sprintf("Task '%s' shrunk; remaining duration discarded.", m.PendingEditTask.Title)
 					}
+				}
+			case "anchor_remaining_confirm":
+				logRemaining := (m.ConfirmSelectedIndex == 0)
+				if m.DB != nil {
+					m.DB.UpdateTask(m.PendingEditTask)
+				} else {
+					m.updateTaskInMemory(m.PendingEditTask)
+				}
+
+				if logRemaining {
+					remainingTitle := model.GenerateSplitTitle(m.ConfirmTask.Title)
+					remainingTask := m.ConfirmTask
+					remainingTask.UUID = uuid.New().String()
+					remainingTask.Title = remainingTitle
+					remainingTask.SchedulingType = model.Floating
+					remainingTask.TimeWindow = model.TimeWindow{}
+					remainingTask.GCalMetadata = model.GCalMetadata{}
+					remainingTask.EstimatedDurationMins = m.ShrinkRemainingMins
+					remainingTask.StoryPoints = model.InferStoryPoints(m.ShrinkRemainingMins)
+					remainingTask.LifecycleState = model.StateReady
+					remainingTask.CreatedAt = time.Now()
+					remainingTask.UpdatedAt = time.Now()
+
+					if m.DB != nil {
+						m.DB.AddTask(remainingTask)
+					} else {
+						m.Tasks = append(m.Tasks, remainingTask)
+					}
+				}
+
+				if m.DB != nil {
+					m.refreshTasks()
+				}
+				m.SelectedTaskUUID = m.PendingEditTask.UUID
+				m.AutoScrollToSelectedTask()
+				m.triggerGCalPush(m.PendingEditTask)
+
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				if logRemaining {
+					m.StatusMsg = fmt.Sprintf("Task '%s' anchored to %s; remaining %dm logged to Todo Shelf.", m.PendingEditTask.Title, m.PendingEditTask.TimeWindow.Start.Format("15:04"), m.ShrinkRemainingMins)
+				} else {
+					m.StatusMsg = fmt.Sprintf("Task '%s' anchored to %s; remaining duration discarded.", m.PendingEditTask.Title, m.PendingEditTask.TimeWindow.Start.Format("15:04"))
 				}
 			default: // delete
 				if m.ConfirmSelectedIndex == 0 {
@@ -547,6 +587,10 @@ func (m *Model) handleConfirmDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""
 				m.StatusMsg = "Shrink canceled."
+			} else if m.ConfirmActionType == "anchor_remaining_confirm" {
+				m.ConfirmOpen = false
+				m.ConfirmActionType = ""
+				m.StatusMsg = "Anchoring canceled."
 			} else if m.ConfirmActionType == "factory_reset" {
 				m.ConfirmOpen = false
 				m.ConfirmActionType = ""

@@ -9,7 +9,6 @@ import (
 	"stream/internal/model"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/google/uuid"
 )
 
 func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
@@ -118,7 +117,7 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			if durStr == "" {
 				durStr = m.AnchorDurationInput.Placeholder
 			}
-			durationMins := 60
+			durationMins := 45
 			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
 				durationMins = d
 			}
@@ -126,29 +125,38 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 
 			t := m.AnchorPromptTask
 
+			originalMins := t.EstimatedDurationMins
+			if originalMins <= 0 && t.StoryPoints > 0 {
+				originalMins = t.StoryPoints * 45
+			}
+
 			// Partial task anchoring logic
-			if t.SchedulingType == model.Floating && t.EstimatedDurationMins > 0 {
-				originalMins := t.EstimatedDurationMins
-				if durationMins < originalMins {
-					remainingMins := originalMins - durationMins
+			if t.SchedulingType == model.Floating && originalMins > durationMins {
+				m.AnchorPromptOpen = false
+				m.ConfirmOpen = true
+				m.ConfirmActionType = "anchor_remaining_confirm"
+				m.ConfirmSelectedIndex = 0
+				m.ConfirmFocusArea = 0
+				m.ConfirmTask = t
 
-					// Spawn remaining task
-					remainingTask := t
-					remainingTask.UUID = uuid.New().String()
-					remainingTask.Title = t.Title + " (remaining)"
-					remainingTask.SchedulingType = model.Floating
-					remainingTask.TimeWindow = model.TimeWindow{}
-					remainingTask.GCalMetadata = model.GCalMetadata{}
-					remainingTask.EstimatedDurationMins = remainingMins
-					remainingTask.CreatedAt = time.Now()
-					remainingTask.UpdatedAt = time.Now()
-
-					if m.DB != nil {
-						m.DB.AddTask(remainingTask)
-					} else {
-						m.Tasks = append(m.Tasks, remainingTask)
-					}
+				pending := t
+				if pending.SchedulingType != model.Habit {
+					pending.SchedulingType = model.Anchored
+					pending.LifecycleState = model.StateScheduled
+				} else {
+					pending.LifecycleState = model.StateReady
 				}
+				pending.TimeWindow = model.TimeWindow{
+					Start: startTime,
+					End:   startTime.Add(dur),
+				}
+				pending.EstimatedDurationMins = durationMins
+				pending.StoryPoints = model.InferStoryPoints(durationMins)
+
+				m.PendingEditTask = pending
+				m.ShrinkRemainingMins = originalMins - durationMins
+				m.StatusMsg = "Choose whether to log remaining time to Todo Shelf."
+				return true, nil
 			}
 
 			if t.SchedulingType != model.Habit {
@@ -161,6 +169,8 @@ func (m *Model) handlePromptDialogKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 				Start: startTime,
 				End:   startTime.Add(dur),
 			}
+			t.EstimatedDurationMins = durationMins
+			t.StoryPoints = model.InferStoryPoints(durationMins)
 
 			if m.DB != nil {
 				m.DB.UpdateTask(t)

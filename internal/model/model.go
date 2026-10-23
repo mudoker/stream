@@ -1,6 +1,9 @@
 package model
 
 import (
+	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -263,6 +266,8 @@ func (s UserSettings) NormalizedGCalSync() UserSettings {
 	return s
 }
 
+var splitPartRegex = regexp.MustCompile(`(?i)(?:\s*\((?:pt\.?\s*(\d+)|remaining)\)|[\s\-_]+pt\.?\s*(\d+)|\s+\(remaining\))$`)
+
 // InferStoryPoints infers story points from estimated duration in minutes:
 // 1 point is 1 to 45 minutes, 2 points is 46 to 90 minutes, and so on.
 func InferStoryPoints(durationMins int) int {
@@ -293,4 +298,30 @@ func InferDurationFromPoints(points int) int {
 		return 0
 	}
 	return points * 45
+}
+
+// GenerateSplitTitle creates the title for the remainder/split task.
+// If original has no part suffix ("split nothing"), it creates "... pt.2".
+// If original is "... pt.2", it creates "... pt.3", and so on.
+func GenerateSplitTitle(originalTitle string) string {
+	loc := splitPartRegex.FindStringSubmatchIndex(originalTitle)
+	if loc == nil {
+		return strings.TrimSpace(originalTitle) + " pt.2"
+	}
+
+	base := strings.TrimSpace(originalTitle[:loc[0]])
+	match := splitPartRegex.FindStringSubmatch(originalTitle)
+
+	partNum := 1
+	numStr := match[1]
+	if numStr == "" {
+		numStr = match[2]
+	}
+	if numStr != "" {
+		if n, err := strconv.Atoi(numStr); err == nil && n > 0 {
+			partNum = n
+		}
+	}
+
+	return fmt.Sprintf("%s pt.%d", base, partNum+1)
 }

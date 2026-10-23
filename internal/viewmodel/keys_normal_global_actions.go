@@ -234,7 +234,7 @@ func (m *Model) handleGlobalActions(key string) (bool, tea.Cmd) {
 				if defaultDur <= 0 {
 					defaultDur = task.StoryPoints * 45
 					if defaultDur <= 0 {
-						defaultDur = 60
+						defaultDur = 45
 					}
 				}
 				m.AnchorDurationInput.Placeholder = strconv.Itoa(defaultDur)

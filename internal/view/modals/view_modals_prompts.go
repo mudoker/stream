@@ -402,7 +402,10 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 	case "shrink_remaining_confirm":
 		origDur := m.ConfirmTask.TimeWindow.End.Sub(m.ConfirmTask.TimeWindow.Start)
 		newDur := m.PendingEditTask.TimeWindow.End.Sub(m.PendingEditTask.TimeWindow.Start)
-		remainingMins := int((origDur - newDur).Minutes())
+		remainingMins := m.ShrinkRemainingMins
+		if remainingMins <= 0 {
+			remainingMins = int((origDur - newDur).Minutes())
+		}
 
 		boldAccent := lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
 		boldSuccess := lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true)
@@ -416,6 +419,28 @@ func RenderConfirmModal(m *viewmodel.Model, t theme.Theme) string {
 				"",
 				"Would you like to log the remaining time",
 				fmt.Sprintf("  (%s) to the Todo Shelf or discard it?", boldSuccess.Render(fmt.Sprintf("%d minutes", remainingMins))),
+				"",
+				boldMuted.Render("  Logs to Shelf as a floating backlog item."),
+			},
+			[]string{"Log to Shelf", "Discard"},
+			m.ConfirmSelectedIndex,
+			-1,
+			m.ConfirmFocusArea,
+			t,
+		)
+	case "anchor_remaining_confirm":
+		boldAccent := lipgloss.NewStyle().Foreground(t.Accent).Bold(true)
+		boldSuccess := lipgloss.NewStyle().Foreground(t.SuccessColor).Bold(true)
+		boldMuted := lipgloss.NewStyle().Foreground(t.Muted)
+
+		return components.RenderBaseConfirmModal(
+			"⚓   TASK ANCHORED",
+			[]string{
+				"You are anchoring part of the task:",
+				"  " + boldAccent.Render(theme.SentenceCase(m.ConfirmTask.Title)),
+				"",
+				"Would you like to log the remaining time",
+				fmt.Sprintf("  (%s) to the Todo Shelf or discard it?", boldSuccess.Render(fmt.Sprintf("%d minutes", m.ShrinkRemainingMins))),
 				"",
 				boldMuted.Render("  Logs to Shelf as a floating backlog item."),
 			},
@@ -447,7 +472,7 @@ func RenderAnchorPromptModal(m *viewmodel.Model, t theme.Theme) string {
 
 	bodyLines = append(bodyLines, fmt.Sprintf("  Task:  %s", lipgloss.NewStyle().Bold(true).Render(theme.SentenceCase(m.AnchorPromptTask.Title))))
 	if m.AnchorPromptTask.SchedulingType == model.Floating && m.AnchorPromptTask.EstimatedDurationMins > 0 {
-		bodyLines = append(bodyLines, fmt.Sprintf("  Est:   %d mins (remaining)", m.AnchorPromptTask.EstimatedDurationMins))
+		bodyLines = append(bodyLines, fmt.Sprintf("  Est:   %d mins", m.AnchorPromptTask.EstimatedDurationMins))
 	} else {
 		bodyLines = append(bodyLines, fmt.Sprintf("  Est:   %d SP (%d mins)", m.AnchorPromptTask.StoryPoints, m.AnchorPromptTask.StoryPoints*45))
 	}

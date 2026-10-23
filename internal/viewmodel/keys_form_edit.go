@@ -31,12 +31,12 @@ func (m *Model) startEditMode(task model.Task) {
 		m.Form.PriorityIdx = 3
 	}
 
-	m.Form.SPIdx = 2
-	for idx, val := range SPOptions {
-		if val == task.StoryPoints {
-			m.Form.SPIdx = idx
-			break
-		}
+	if task.StoryPoints > 0 {
+		m.Form.SPIdx = SPIndexForPoints(task.StoryPoints)
+	} else if task.EstimatedDurationMins > 0 {
+		m.Form.SPIdx = SPIndexForPoints(model.InferStoryPoints(task.EstimatedDurationMins))
+	} else {
+		m.Form.SPIdx = 1
 	}
 
 	switch task.LifecycleState {
@@ -124,8 +124,10 @@ func (m *Model) startEditMode(task model.Task) {
 			m.Form.StartTimeInput.SetValue(time.Now().Format("15:04"))
 			if task.EstimatedDurationMins > 0 {
 				m.Form.DurationInput.SetValue(fmt.Sprintf("%d", task.EstimatedDurationMins))
+			} else if task.StoryPoints > 0 {
+				m.Form.DurationInput.SetValue(fmt.Sprintf("%d", task.StoryPoints*45))
 			} else {
-				m.Form.DurationInput.SetValue("60")
+				m.Form.DurationInput.SetValue("45")
 			}
 		}
 	}

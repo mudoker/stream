@@ -17,6 +17,15 @@ var TaskTypeOptions = []string{"Feature", "Defect", "Improvement", "Task", "Remi
 var StatusOptions = []string{"Defined", "In Progress", "Review", "Testing", "Completed"}
 var SPOptions = []int{0, 1, 2, 3, 5, 8, 13}
 
+func SPIndexForPoints(sp int) int {
+	for i, opt := range SPOptions {
+		if opt == sp {
+			return i
+		}
+	}
+	return 1
+}
+
 func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	visible := m.Form.VisibleFields()
@@ -58,6 +67,12 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case 3:
 			m.Form.SPIdx = (m.Form.SPIdx - 1 + len(SPOptions)) % len(SPOptions)
+			sp := SPOptions[m.Form.SPIdx]
+			if sp > 0 {
+				m.Form.DurationInput.SetValue(strconv.Itoa(sp * 45))
+			} else {
+				m.Form.DurationInput.SetValue("0")
+			}
 			return m, nil
 		case 4:
 			numTypes := len(TaskTypeOptions)
@@ -108,6 +123,12 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case 3:
 			m.Form.SPIdx = (m.Form.SPIdx + 1) % len(SPOptions)
+			sp := SPOptions[m.Form.SPIdx]
+			if sp > 0 {
+				m.Form.DurationInput.SetValue(strconv.Itoa(sp * 45))
+			} else {
+				m.Form.DurationInput.SetValue("0")
+			}
 			return m, nil
 		case 4:
 			numTypes := len(TaskTypeOptions)
@@ -163,6 +184,12 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case 3:
 			m.Form.SPIdx = (m.Form.SPIdx + 1) % len(SPOptions)
+			sp := SPOptions[m.Form.SPIdx]
+			if sp > 0 {
+				m.Form.DurationInput.SetValue(strconv.Itoa(sp * 45))
+			} else {
+				m.Form.DurationInput.SetValue("0")
+			}
 			return m, nil
 		case 4:
 			numTypes := len(TaskTypeOptions)
@@ -236,6 +263,10 @@ func (m *Model) handleFormKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.Form.StartTimeInput, cmd = m.Form.StartTimeInput.Update(msg)
 		} else {
 			m.Form.DurationInput, cmd = m.Form.DurationInput.Update(msg)
+			if d, err := strconv.Atoi(strings.TrimSpace(m.Form.DurationInput.Value())); err == nil && d > 0 {
+				sp := model.InferStoryPoints(d)
+				m.Form.SPIdx = SPIndexForPoints(sp)
+			}
 		}
 	case 7:
 		if m.Form.TaskTypeIdx == 5 || m.Form.TaskTypeIdx == 6 {
@@ -355,7 +386,10 @@ func (m *Model) SubmitForm() {
 	}
 
 	startTime := time.Date(baseDay.Year(), baseDay.Month(), baseDay.Day(), 9, 0, 0, 0, now.Location())
-	duration := 60
+	duration := 45
+	if spVal > 0 {
+		duration = spVal * 45
+	}
 
 	if (taskType == 3 && m.Form.IsAnchoredIdx == 1) || taskType == 5 || taskType == 6 {
 		timeStr := strings.TrimSpace(m.Form.StartTimeInput.Value())
@@ -491,6 +525,15 @@ func (m *Model) SubmitForm() {
 		if m.Form.IsAnchoredIdx == 1 {
 			newTask.SchedulingType = model.Anchored
 			newTask.AddedToToday = false
+			durStr := strings.TrimSpace(m.Form.DurationInput.Value())
+			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
+				duration = d
+				newTask.StoryPoints = model.InferStoryPoints(d)
+			} else if spVal > 0 {
+				duration = spVal * 45
+				newTask.StoryPoints = spVal
+			}
+			newTask.EstimatedDurationMins = duration
 			newTask.TimeWindow = model.TimeWindow{
 				Start: startTime,
 				End:   startTime.Add(time.Duration(duration) * time.Minute),
@@ -502,10 +545,16 @@ func (m *Model) SubmitForm() {
 			}
 		} else {
 			newTask.SchedulingType = model.Floating
-			newTask.StoryPoints = spVal
-			durStr := m.Form.DurationInput.Value()
+			durStr := strings.TrimSpace(m.Form.DurationInput.Value())
 			if d, err := strconv.Atoi(durStr); err == nil && d > 0 {
 				newTask.EstimatedDurationMins = d
+				newTask.StoryPoints = model.InferStoryPoints(d)
+			} else if spVal > 0 {
+				newTask.EstimatedDurationMins = spVal * 45
+				newTask.StoryPoints = spVal
+			} else {
+				newTask.EstimatedDurationMins = 0
+				newTask.StoryPoints = 0
 			}
 			if SameDay(baseDay, time.Now()) {
 				newTask.AddedToToday = true

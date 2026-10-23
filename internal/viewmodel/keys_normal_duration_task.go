@@ -149,6 +149,9 @@ func (m *Model) confirmTaskDurationAdjust() {
 	for i, t := range m.Tasks {
 		if t.UUID == originalUUID {
 			m.Tasks[i].TimeWindow = finalTimeWindow
+			newDurMinutes := int(finalTimeWindow.End.Sub(finalTimeWindow.Start).Minutes())
+			m.Tasks[i].EstimatedDurationMins = newDurMinutes
+			m.Tasks[i].StoryPoints = model.InferStoryPoints(newDurMinutes)
 			originalTask = m.Tasks[i]
 			originalFound = true
 			break

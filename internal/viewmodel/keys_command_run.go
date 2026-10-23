@@ -164,10 +164,11 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			UUID:           uuid.New().String(),
 			WorkspaceUUID:  m.ActiveWorkspaceUUID,
 			Title:          title,
-			Priority:       model.P2,
-			StoryPoints:    3,
-			SchedulingType: model.Floating,
-			LifecycleState: model.StateReady,
+			Priority:              model.P2,
+			StoryPoints:           1,
+			EstimatedDurationMins: 45,
+			SchedulingType:        model.Floating,
+			LifecycleState:        model.StateReady,
 		}
 		if cmdName == "create" {
 			if m.CurrentView == SprintView {
@@ -176,7 +177,7 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 			}
 			now := time.Now()
 			start := time.Date(m.SelectedDay.Year(), m.SelectedDay.Month(), m.SelectedDay.Day(), 9, 0, 0, 0, now.Location())
-			end := start.Add(1 * time.Hour)
+			end := start.Add(45 * time.Minute)
 			newTask.SchedulingType = model.Anchored
 			newTask.TimeWindow = model.TimeWindow{Start: start, End: end}
 			newTask.LifecycleState = model.StateScheduled

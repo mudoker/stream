@@ -262,3 +262,35 @@ func (s UserSettings) NormalizedGCalSync() UserSettings {
 	}
 	return s
 }
+
+// InferStoryPoints infers story points from estimated duration in minutes:
+// 1 point is 1 to 45 minutes, 2 points is 46 to 90 minutes, and so on.
+func InferStoryPoints(durationMins int) int {
+	if durationMins <= 0 {
+		return 0
+	}
+	if durationMins <= 45 {
+		return 1
+	}
+	if durationMins <= 90 {
+		return 2
+	}
+	if durationMins <= 135 {
+		return 3
+	}
+	if durationMins <= 225 {
+		return 5
+	}
+	if durationMins <= 360 {
+		return 8
+	}
+	return 13
+}
+
+// InferDurationFromPoints returns estimated duration in minutes for points (45 mins per point).
+func InferDurationFromPoints(points int) int {
+	if points <= 0 {
+		return 0
+	}
+	return points * 45
+}

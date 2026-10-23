@@ -84,8 +84,8 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 	st.SetValue(defaultTime)
 
 	dur := textinput.New()
-	dur.Placeholder = "60"
-	dur.SetValue("60")
+	dur.Placeholder = "45"
+	dur.SetValue("45")
 
 	tags := textinput.New()
 	tags.Placeholder = "engineering, refactor, admin"
@@ -120,7 +120,7 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 
 	form := TaskForm{
 		PriorityIdx:           2,
-		SPIdx:                 2,
+		SPIdx:                 1,
 		TaskTypeIdx:           3, // default: Task
 		StatusIdx:             0, // default: 0 (Defined)
 		IsAnchoredIdx:         0,
@@ -131,7 +131,7 @@ func NewTaskFormWithDate(baseDate time.Time) TaskForm {
 		BlockedByIdx:          0,
 		StartHour:             baseDate.Hour(),
 		StartMin:              baseDate.Minute(),
-		DurationMins:          60,
+		DurationMins:          45,
 		ActiveField:           0,
 		TitleInput:            t,
 		DescInput:             d,

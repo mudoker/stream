@@ -11,7 +11,15 @@ func ConfirmDeanchor(ctx ModelContext, task model.Task) {
 	if task.SchedulingType == model.Habit {
 		task.TimeWindow = model.TimeWindow{} // clear time window to deanchor
 	} else {
+		if !task.TimeWindow.Start.IsZero() && !task.TimeWindow.End.IsZero() {
+			durMins := int(task.TimeWindow.End.Sub(task.TimeWindow.Start).Minutes())
+			if durMins > 0 {
+				task.EstimatedDurationMins = durMins
+				task.StoryPoints = model.InferStoryPoints(durMins)
+			}
+		}
 		task.SchedulingType = model.Floating
+		task.TimeWindow = model.TimeWindow{}
 	}
 	task.LifecycleState = model.StateReady
 	task.UpdatedAt = time.Now()

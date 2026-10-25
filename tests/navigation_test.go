@@ -80,6 +80,54 @@ func TestWeekNavigation(t *testing.T) {
 	}
 }
 
+func TestWeekHorizontalNavigationAndAutoScroll(t *testing.T) {
+	monday := time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC)
+	m := &viewmodel.Model{
+		CurrentView:         viewmodel.WeekView,
+		CurrentMode:         viewmodel.ModeNormal,
+		SelectedDay:         monday,
+		Layout:              viewmodel.ComputeLayout(75, 24), // narrow width (~54 workspace content -> visibleCols = 3)
+		Width:               75,
+		Height:              24,
+		WeekScrollColOffset: 0,
+	}
+
+	m.AutoScrollWeekCol()
+	if m.WeekScrollColOffset != 0 {
+		t.Fatalf("expected initial WeekScrollColOffset to be 0, got %d", m.WeekScrollColOffset)
+	}
+
+	// Move right to Tuesday (idx 1), Wednesday (idx 2)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}) // Tuesday
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}) // Wednesday
+	if m.WeekScrollColOffset != 0 {
+		t.Fatalf("Wednesday (idx 2) should fit in visibleCols=3 with offset 0, got %d", m.WeekScrollColOffset)
+	}
+
+	// Move right to Thursday (idx 3) -> offset should slide to 1
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}) // Thursday
+	if m.WeekScrollColOffset != 1 {
+		t.Fatalf("expected offset 1 for Thursday with visibleCols=3, got %d", m.WeekScrollColOffset)
+	}
+
+	// Move right to Sunday (idx 6)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}) // Friday (4)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}) // Saturday (5)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("l")}) // Sunday (6)
+	if m.WeekScrollColOffset != 4 {
+		t.Fatalf("expected offset 4 for Sunday (maxOffset=4 with visibleCols=3), got %d", m.WeekScrollColOffset)
+	}
+
+	// Move left back to Wednesday (idx 2) -> offset should slide back to 2
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")}) // Saturday (5)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")}) // Friday (4)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")}) // Thursday (3)
+	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")}) // Wednesday (2)
+	if m.WeekScrollColOffset > 2 {
+		t.Fatalf("expected offset <= 2 for Wednesday, got %d", m.WeekScrollColOffset)
+	}
+}
+
 func TestDayNavigation(t *testing.T) {
 	today := time.Date(2026, 6, 19, 12, 0, 0, 0, time.UTC)
 	t1 := model.Task{

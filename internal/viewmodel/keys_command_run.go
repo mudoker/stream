@@ -45,6 +45,8 @@ func (m *Model) RunCommand(val string) (tea.Model, tea.Cmd) {
 		m.CurrentView = WeekView
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
+		m.WeekScrollColOffset = 0
+		m.AutoScrollWeekCol()
 		m.StatusMsg = "Switched to Week view."
 	case "day":
 		m.CurrentView = DayView

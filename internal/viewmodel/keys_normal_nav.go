@@ -135,18 +135,22 @@ func (m *Model) handleWeekNav(key string) {
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -1)
 		m.selectDefaultTaskForSelectedWeekDay()
 		m.AutoScrollToSelectedWeekTask()
+		m.AutoScrollWeekCol()
 	case "l", "right":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, 1)
 		m.selectDefaultTaskForSelectedWeekDay()
 		m.AutoScrollToSelectedWeekTask()
+		m.AutoScrollWeekCol()
 	case "H":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, -7)
 		m.selectDefaultTaskForSelectedWeekDay()
 		m.AutoScrollToSelectedWeekTask()
+		m.AutoScrollWeekCol()
 	case "L", "K":
 		m.SelectedDay = m.SelectedDay.AddDate(0, 0, 7)
 		m.selectDefaultTaskForSelectedWeekDay()
 		m.AutoScrollToSelectedWeekTask()
+		m.AutoScrollWeekCol()
 	case "j", "down":
 		m.ScrollOffset++
 		dayTasks := m.getWeekDayTasks(m.SelectedDay)
@@ -580,6 +584,50 @@ func (m *Model) AutoScrollSprintLane() {
 	}
 	if m.SprintScrollColOffset < 0 {
 		m.SprintScrollColOffset = 0
+	}
+}
+
+func (m *Model) AutoScrollWeekCol() {
+	numCols := 7
+	workspaceW := m.Layout.WorkspaceW
+	if workspaceW < 40 {
+		workspaceW = 40
+	}
+	availW := workspaceW - 4
+	minColW := 14
+	if availW < minColW {
+		availW = minColW
+	}
+
+	visibleCols := (availW + 1) / (minColW + 1)
+	if visibleCols < 1 {
+		visibleCols = 1
+	}
+	if visibleCols > numCols {
+		visibleCols = numCols
+	}
+
+	maxOffset := numCols - visibleCols
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+
+	selectedDayIdx := int(m.SelectedDay.Weekday()) - 1
+	if selectedDayIdx < 0 {
+		selectedDayIdx = 6
+	}
+
+	if selectedDayIdx < m.WeekScrollColOffset {
+		m.WeekScrollColOffset = selectedDayIdx
+	} else if selectedDayIdx >= m.WeekScrollColOffset+visibleCols {
+		m.WeekScrollColOffset = selectedDayIdx - visibleCols + 1
+	}
+
+	if m.WeekScrollColOffset > maxOffset {
+		m.WeekScrollColOffset = maxOffset
+	}
+	if m.WeekScrollColOffset < 0 {
+		m.WeekScrollColOffset = 0
 	}
 }
 

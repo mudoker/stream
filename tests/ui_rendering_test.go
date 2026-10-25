@@ -12,6 +12,8 @@ import (
 	"stream/internal/view/pages"
 	"stream/internal/view/theme"
 	"stream/internal/viewmodel"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestRenderCardLayout(t *testing.T) {
@@ -972,6 +974,139 @@ func TestTodoShelfTaskMultiLineRendering(t *testing.T) {
 	}
 	if strings.Contains(rendered, "⚡") {
 		t.Errorf("Expected no spark emoji in shelf task card, got:\n%s", rendered)
+	}
+}
+
+func TestWeekViewFullHorizontalFillAndResponsiveNoOverflow(t *testing.T) {
+	th := theme.NewTheme()
+	now := time.Date(2026, 10, 24, 10, 0, 0, 0, time.Local) // Saturday
+
+	task1 := model.Task{
+		UUID:           "task-1",
+		Title:          "How to shrink properly",
+		Priority:       model.P0,
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 10, 19, 7, 49, 0, 0, time.Local), // Mon
+			End:   time.Date(2026, 10, 19, 8, 34, 0, 0, time.Local),
+		},
+	}
+	task2 := model.Task{
+		UUID:           "task-2",
+		Title:          "Workout at Gym",
+		Priority:       model.P1,
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 10, 19, 19, 0, 0, 0, time.Local),
+			End:   time.Date(2026, 10, 19, 20, 30, 0, 0, time.Local),
+		},
+	}
+	task3 := model.Task{
+		UUID:           "task-3",
+		Title:          "NAB's Discussion",
+		Priority:       model.P2,
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 10, 20, 9, 0, 0, 0, time.Local), // Tue
+			End:   time.Date(2026, 10, 20, 17, 0, 0, 0, time.Local),
+		},
+	}
+	task4 := model.Task{
+		UUID:           "task-4",
+		Title:          "UI Scalability Enhancement",
+		Priority:       model.P0,
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 10, 23, 7, 0, 0, 0, time.Local), // Fri
+			End:   time.Date(2026, 10, 23, 9, 0, 0, 0, time.Local),
+		},
+	}
+	task5 := model.Task{
+		UUID:           "task-5",
+		Title:          "Enhance Responsiveness",
+		Priority:       model.P1,
+		SchedulingType: model.Anchored,
+		TimeWindow: model.TimeWindow{
+			Start: time.Date(2026, 10, 23, 9, 30, 0, 0, time.Local), // Fri
+			End:   time.Date(2026, 10, 23, 12, 0, 0, 0, time.Local),
+		},
+	}
+
+	widths := []int{60, 75, 80, 95, 110, 130, 160}
+
+	for _, w := range widths {
+		m := &viewmodel.Model{
+			Layout:           viewmodel.ComputeLayout(w, 35),
+			Width:            w,
+			Height:           35,
+			CurrentView:      viewmodel.WeekView,
+			SelectedDay:      now, // Saturday Oct 24
+			SelectedTaskUUID: task1.UUID,
+			Tasks:            []model.Task{task1, task2, task3, task4, task5},
+		}
+
+		availW := m.Layout.WorkspaceW - 4
+		rendered := pages.RenderWeekView(m, th, 33)
+		lines := strings.Split(rendered, "\n")
+
+		if len(lines) < 4 {
+			t.Fatalf("width %d: expected at least 4 lines rendered, got %d", w, len(lines))
+		}
+
+		// Header title line
+		titleLineW := lipgloss.Width(lines[0])
+		if titleLineW > availW {
+			t.Errorf("width %d: week title line width (%d) exceeds available workspace width (%d)", w, titleLineW, availW)
+		}
+
+		// Verify every column row line (starting from line 2 after blank line) does NOT exceed availW
+		// and that column width is uniform across all rows of joined columns
+		expectedLanesW := -1
+		for rowIdx := 2; rowIdx < len(lines); rowIdx++ {
+			line := lines[rowIdx]
+			lineW := lipgloss.Width(line)
+			if lineW > availW {
+				t.Errorf("width %d, line %d: line width (%d) exceeds available width (%d). Line: %q", w, rowIdx, lineW, availW, line)
+			}
+			if expectedLanesW == -1 {
+				expectedLanesW = lineW
+			} else if lineW != expectedLanesW {
+				t.Errorf("width %d, line %d: line width (%d) doesn't match expected lanes width (%d)", w, rowIdx, lineW, expectedLanesW)
+			}
+		}
+
+		// Ensure no lines wrap or produce broken day headers
+		for rowIdx, line := range lines {
+			if strings.Contains(line, "24 [ACT] SUN 25") {
+				t.Errorf("width %d, line %d: found corrupted wrapped header '24 [ACT] SUN 25'!", w, rowIdx)
+			}
+		}
+	}
+}
+
+func TestWeekViewHorizontalScrollForActiveDay(t *testing.T) {
+	th := theme.NewTheme()
+	sat := time.Date(2026, 10, 24, 10, 0, 0, 0, time.Local) // Saturday
+
+	m := &viewmodel.Model{
+		Layout:      viewmodel.ComputeLayout(75, 30), // narrow width (~54 workspace content)
+		Width:       75,
+		Height:      30,
+		CurrentView: viewmodel.WeekView,
+		SelectedDay: sat,
+	}
+
+	rendered := pages.RenderWeekView(m, th, 28)
+
+	// In narrow view (~54 width), 7 days cannot fit simultaneously (needs ~104).
+	// Saturday (idx 5) is selected, so the view MUST auto-scroll so Saturday is visible.
+	if !strings.Contains(rendered, "SAT") {
+		t.Errorf("Expected active day SAT to be visible in horizontally scrolled week view, got:\n%s", rendered)
+	}
+
+	// Verify WeekScrollColOffset was updated to keep Saturday visible
+	if m.WeekScrollColOffset == 0 {
+		t.Errorf("Expected WeekScrollColOffset > 0 for Saturday in narrow view, got %d", m.WeekScrollColOffset)
 	}
 }
 

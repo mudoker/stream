@@ -96,6 +96,7 @@ type Model struct {
 	SprintForm            SprintForm
 	SprintSwimlaneIdx     int // 0: Defined, 1: In Progress, 2: Review, 3: Testing, 4: Completed
 	SprintScrollColOffset int // Horizontal viewport offset for wide swimlanes
+	WeekScrollColOffset   int // Horizontal viewport offset for week lanes
 
 	PromptOpen        bool
 	PromptTask        model.Task

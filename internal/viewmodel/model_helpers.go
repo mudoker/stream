@@ -335,8 +335,11 @@ func (m *Model) moveSidebarView(delta int) {
 		m.ScrollOffset = 0
 		m.ShelfScrollOffset = 0
 		m.SprintScrollColOffset = 0
+		m.WeekScrollColOffset = 0
 		if m.CurrentView == SprintView {
 			m.DefaultToActiveSprint()
+		} else if m.CurrentView == WeekView {
+			m.AutoScrollWeekCol()
 		}
 	}
 }
